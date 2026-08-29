@@ -1,0 +1,109 @@
+/** Postgres erişimi (Supabase pooler). Motor doğrudan SQL yazar; REST/service_role kullanılmaz. */
+import pg from 'pg';
+import { required } from './env.js';
+import type { AssetClass, Quote } from './types.js';
+
+const { Pool } = pg;
+export const pool = new Pool({
+  connectionString: required('DATABASE_URL'),
+  max: 4,
+  ssl: { rejectUnauthorized: false },
+});
+
+// numeric sütunlar string döner; sayıya çevir.
+pg.types.setTypeParser(1700, (v) => (v === null ? null : Number(v)));
+
+export interface Candidate {
+  instrumentId: string;
+  symbol: string;
+  classCode: AssetClass;
+  currency: string;
+  cadence: string;
+  providerId: string;
+  providerSymbol: string;
+  priority: number;
+}
+
+/** Aktif enstrümanları failover adaylarıyla (priority sırasında) döndürür. */
+export async function loadCandidates(): Promise<Map<string, Candidate[]>> {
+  const { rows } = await pool.query<Candidate>(`
+    select i.id as "instrumentId", i.symbol, i.class_code as "classCode",
+           i.currency, i.cadence,
+           s.provider_id as "providerId", s.provider_symbol as "providerSymbol",
+           s.priority
+    from instruments i
+    join instrument_sources s on s.instrument_id = i.id and s.is_active
+    where i.is_active
+    order by i.id, s.priority`);
+  const map = new Map<string, Candidate[]>();
+  for (const r of rows) {
+    const list = map.get(r.instrumentId) ?? [];
+    list.push(r);
+    map.set(r.instrumentId, list);
+  }
+  return map;
+}
+
+/** Snapshot ve goldapi türetmesi için son bilinen USD/EUR -> TRY kurları. */
+export async function loadLatestFx(): Promise<Map<string, number>> {
+  const { rows } = await pool.query<{ base: string; rate: number }>(`
+    select distinct on (base) base, rate
+    from fx_rates where quote = 'TRY'
+    order by base, ts desc`);
+  return new Map(rows.map((r) => [r.base, r.rate]));
+}
+
+export async function startRun(kind: string): Promise<string> {
+  const { rows } = await pool.query<{ id: string }>(
+    `insert into fetch_runs (kind, status) values ($1,'running') returning id`, [kind]);
+  return rows[0].id;
+}
+
+export async function finishRun(id: string, ok: number, fail: number, detail: unknown): Promise<void> {
+  const status = fail === 0 ? 'ok' : ok === 0 ? 'failed' : 'partial';
+  await pool.query(
+    `update fetch_runs set finished_at=now(), status=$2, ok_count=$3, fail_count=$4, detail=$5 where id=$1`,
+    [id, status, ok, fail, JSON.stringify(detail)]);
+}
+
+/** prices tablosuna yazar. Aynı (instrument, ts) varsa yok sayar — sentetik/duplike satır yazılmaz. */
+export async function writePrices(rows: { instrumentId: string; q: Quote }[]): Promise<number> {
+  if (!rows.length) return 0;
+  const vals: unknown[] = [];
+  const tuples = rows.map((r, i) => {
+    const b = i * 5;
+    vals.push(r.instrumentId, r.q.ts, r.q.price, r.q.currency, r.q.source);
+    return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5})`;
+  });
+  const res = await pool.query(
+    `insert into prices (instrument_id, ts, price, currency, source)
+     values ${tuples.join(',')}
+     on conflict (instrument_id, ts) do nothing`, vals);
+  return res.rowCount ?? 0;
+}
+
+/** fx-sınıfı quote'lardan döviz katmanını besler (USDTRY -> base USD, quote TRY). */
+export async function writeFxRates(rows: { base: string; quote: string; q: Quote }[]): Promise<number> {
+  if (!rows.length) return 0;
+  const vals: unknown[] = [];
+  const tuples = rows.map((r, i) => {
+    const b = i * 5;
+    vals.push(r.base, r.quote, r.q.ts, r.q.price, r.q.source);
+    return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5})`;
+  });
+  const res = await pool.query(
+    `insert into fx_rates (base, quote, ts, rate, source)
+     values ${tuples.join(',')}
+     on conflict (base, quote, ts) do nothing`, vals);
+  return res.rowCount ?? 0;
+}
+
+export async function logHealth(
+  rows: { providerId: string; status: 'ok' | 'degraded' | 'down'; latencyMs?: number; error?: string }[],
+): Promise<void> {
+  for (const r of rows) {
+    await pool.query(
+      `insert into provider_health (provider_id, status, latency_ms, error) values ($1,$2,$3,$4)`,
+      [r.providerId, r.status, r.latencyMs ?? null, r.error ?? null]);
+  }
+}
