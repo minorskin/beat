@@ -1,6 +1,6 @@
-name: Fiyat Çek (saatlik)
+name: Fiyat Çek + Snapshot (saatlik)
 
-# Motor: aktif enstrümanların fiyatını çekip prices/fx_rates'e yazar.
+# Motor: fiyatları çeker (prices/fx_rates) ve hemen ardından portföy snapshot'ı alır.
 # BULUTTAN çalışır -> Mac kapalıyken de veri toplanır (projenin özü).
 on:
   workflow_dispatch:
@@ -22,7 +22,12 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci || npm install
-      - run: npm run fetch hourly
+      - name: Fiyatları çek
+        run: npm run fetch hourly
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+      - name: Snapshot al
+        run: npm run snapshot hourly
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
