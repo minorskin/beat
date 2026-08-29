@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0e17;
+  --panel: #121826;
+  --panel-2: #1a2234;
+  --border: #232d42;
+  --text: #e6edf7;
+  --muted: #8b98b0;
+  --accent: #3b82f6;
+  --up: #22c55e;
+  --down: #ef4444;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.tnum { font-variant-numeric: tabular-nums; }
