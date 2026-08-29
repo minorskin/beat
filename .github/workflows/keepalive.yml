@@ -1,0 +1,26 @@
+name: Keepalive
+
+# GitHub, 60 gün repo aktivitesi yoksa zamanlanmış workflow'ları OTOMATİK KAPATIR.
+# Fetch job'ları repoya commit atmadığı için bu sayaç kendiliğinden sıfırlanmaz.
+# Bu workflow aylık boş bir commit atarak zamanlayıcıyı canlı tutar.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 1 * *'    # her ayın 1'i
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Boş commit at
+        run: |
+          git config user.name  "beat-keepalive"
+          git config user.email "actions@github.com"
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .keepalive
+          git add .keepalive
+          git commit -m "chore: keepalive $(date -u +%Y-%m-%d)" || exit 0
+          git push

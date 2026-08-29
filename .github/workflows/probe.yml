@@ -1,0 +1,22 @@
+name: Kaynak Probe
+
+# Bu workflow'un tek amacı: kaynakların BULUT çıkış IP'sinden erişilebilirliğini kanıtlamak.
+# Haftalık koşar (canary) -> bir kaynak sessizce bozulursa erken haber veririz.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 1'   # Pazartesi 06:17 UTC
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci || npm install
+      - run: npm run probe
+        env:
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
