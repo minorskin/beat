@@ -3,6 +3,7 @@ import { tl, usd, num, pct, timeAgo } from '@/lib/format';
 import PortfolioChart from '@/components/PortfolioChart';
 import AllocationDonut from '@/components/AllocationDonut';
 import AddTransaction from '@/components/AddTransaction';
+import Projection from '@/components/Projection';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +55,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
               <PortfolioChart data={history} range={range} currency="TRY" />
             </div>
             <AllocationDonut data={alloc} />
+          </div>
+
+          {/* Projeksiyon */}
+          <div className="mb-4">
+            <Projection current={snap.total_value_try} />
           </div>
 
           {/* Pozisyon tablosu */}
