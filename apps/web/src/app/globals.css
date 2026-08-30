@@ -133,7 +133,7 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 .navlink-on { background: var(--panel-3); color: var(--text); }
 
 /* Sticky bar altında kalmasın */
-[id="dashboard"], [id="portfoy"] { scroll-margin-top: 72px; }
+[id="dashboard"], [id="portfoy"], [id="izleme"] { scroll-margin-top: 72px; }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 

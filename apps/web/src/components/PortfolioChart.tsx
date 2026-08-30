@@ -1,15 +1,20 @@
 'use client';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useState } from 'react';
+import { useParamNav } from './useParamNav';
 
-type Point = { ts: string; try: number; usd: number };
+type Point = { ts: string; try: number; usd: number; own_try: number; own_usd: number };
 const RANGES = ['1G', '1H', '1A', '1Y', 'TUM'] as const;
 
 export default function PortfolioChart({
-  data, range, currency,
-}: { data: Point[]; range: string; currency: 'TRY' | 'USD' }) {
+  data, range, currency, own,
+}: { data: Point[]; range: string; currency: 'TRY' | 'USD'; own: boolean }) {
   const [cur, setCur] = useState<'TRY' | 'USD'>(currency);
-  const key = cur === 'TRY' ? 'try' : 'usd';
+  const setParam = useParamNav();
+  // Geçmiş her iki büyüklüğü de taşır; anahtar yalnız hangi seriyi çizeceğimizi seçer.
+  const key = own
+    ? (cur === 'TRY' ? 'own_try' : 'own_usd')
+    : (cur === 'TRY' ? 'try' : 'usd');
   const fmtY = (n: number) =>
     new Intl.NumberFormat('tr-TR', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
   const rows = data.map((d) => ({
@@ -20,7 +25,9 @@ export default function PortfolioChart({
   return (
     <div className="panel p-3 sm:p-5">
       <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
-        <h2 className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Portföy Değeri</h2>
+        <h2 className="text-sm font-medium" style={{ color: 'var(--muted)' }}>
+          Portföy Değeri{own && <span style={{ color: 'var(--faint)' }}> · bana ait</span>}
+        </h2>
         <div className="flex gap-1 shrink-0">
           {(['TRY', 'USD'] as const).map((c) => (
             <button key={c} onClick={() => setCur(c)} className={`seg tnum ${cur === c ? 'seg-on' : ''}`}>
@@ -47,7 +54,7 @@ export default function PortfolioChart({
               itemStyle={{ color: '#ededed' }}
               formatter={(v) => {
                 const s = new Intl.NumberFormat('tr-TR').format(Math.round(Number(v))) + (cur === 'TRY' ? ' ₺' : ' $');
-                return [s, 'Değer'] as [string, string];
+                return [s, own ? 'Bana ait' : 'Değer'] as [string, string];
               }} />
             <Area type="monotone" dataKey={key} stroke="#3b82f6" strokeWidth={2} fill="url(#g)" />
           </AreaChart>
@@ -55,9 +62,13 @@ export default function PortfolioChart({
       </div>
       <div className="flex gap-1 mt-3 sm:mt-4">
         {RANGES.map((r) => (
-          <a key={r} href={`?range=${r}`} className={`seg tnum flex-1 text-center ${r === range ? 'seg-on' : ''}`}>
+          <button
+            key={r}
+            onClick={() => setParam('range', r)}
+            className={`seg tnum flex-1 text-center ${r === range ? 'seg-on' : ''}`}
+          >
             {r === 'TUM' ? 'TÜMÜ' : r}
-          </a>
+          </button>
         ))}
       </div>
     </div>

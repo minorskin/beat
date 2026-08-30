@@ -14,14 +14,36 @@ BIST · ABD hisse/ETF · TEFAS fonları · kripto · altın · döviz.
 
 Yerelde hiçbir bileşen çalışmaz. Mac kapalıyken de veri toplanır.
 
-## Veri modeli — üç ilke
+## Veri modeli — dört ilke
 
 1. **`transactions` tek doğruluk kaynağıdır.** Pozisyonlar ondan türetilir; maliyet bazı ve K/Z bedavaya gelir.
 2. **`prices` yalnızca gerçekten gözlemlenen tick'leri tutar.** Sentetik satır asla yazılmaz.
 3. **Taşınan fiyat işaretlenir.** Piyasa kapalıyken snapshot son fiyatı taşır ama `is_stale=true` ve gerçek `price_ts` ile.
+4. **Sahiplik ayrı bir boyuttur.** Bir pozisyonun adedinin tamamı bana ait olmayabilir; bu adeti bölmekle değil, her satıra emanet payı yazmakla çözülür.
 
 > Portföyün TL değeri tüm piyasalar kapalıyken bile değişir — USDTRY 7/24 hareket eder.
 > Bu yüzden döviz katmanı hisse fiyatlarından bağımsız, kendi ritminde çekilir.
+
+## Kısmi sahiplik (emanet)
+
+Bir pozisyondaki adetin bir kısmı başkası adına tutulabiliyor. Aynı enstrümanı ikiye
+bölmek maliyet bazını bozacağı için sahiplik **ayrı bir boyut** olarak işleniyor:
+
+- Her işlem satırı `external_quantity` taşır — o işlemdeki adetin bana ait olmayan kısmı.
+- `own = quantity - external_qty`; `v_holdings` her ikisini de verir.
+- Snapshot'lar **hem toplam hem bana-ait** büyüklüğü yazar (`own_value_try`, `own_cost_try`, …).
+  Bu yüzden arayüzdeki **Toplam / Bana Ait** anahtarı geçmiş grafiklerde de doğru çalışır —
+  istemcide oransal tahmin yapılmaz.
+- Mevcut bir pozisyonu geriye dönük paylaştırmak için `transfer` tipi kullanılır:
+  adet değişmez, yalnız emanet payı güncellenir.
+
+## İzleme listesi
+
+Ayrı tablo yok. **Kataloğa eklenmiş ama pozisyonu olmayan enstrüman = izlenen enstrüman**
+(`v_watchlist`). Arayüzden eklenen enstrümanın para birimi, takvimi, ritmi ve failover
+zinciri varlık sınıfından türetilir (`apps/web/src/lib/catalog.ts`; `seed.sql`'deki
+zincirlerle aynı tutulmalı). Fiyatı bir sonraki fetch turundan itibaren birikmeye başlar;
+ilk alım girildiğinde satır kendiliğinden portföye geçer.
 
 ## Enstrüman ritimleri
 
@@ -58,7 +80,9 @@ npm run probe             # kaynak sağlığı (buluttan çalıştırmak esas)
 npm run typecheck
 ```
 
-Şema: `supabase/migrations/0001_init.sql` → ardından `supabase/seed.sql`.
+Şema: `supabase/migrations/0001_init.sql` → `0002_ownership_watchlist.sql` → ardından `supabase/seed.sql`.
+Migration'lar sıralı ve idempotent'e yakındır (`add column if not exists`); mevcut kurulumda
+yalnız yeni olanı çalıştırmak yeterli.
 
 ## Bilinen eksik
 
