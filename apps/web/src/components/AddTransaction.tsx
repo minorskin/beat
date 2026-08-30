@@ -47,7 +47,7 @@ export default function AddTransaction({ instruments, locations }: { instruments
           >
             <div className="col-span-2 flex items-center justify-between mb-1">
               <h2 className="text-sm font-medium">{isTransfer ? 'Emanet Düzelt' : 'İşlem Ekle'}</h2>
-              <button type="button" onClick={reset} className="seg" aria-label="Kapat">✕</button>
+              <button type="button" onClick={reset} className="seg text-[15px] leading-none" aria-label="Kapat">✕</button>
             </div>
 
             <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>

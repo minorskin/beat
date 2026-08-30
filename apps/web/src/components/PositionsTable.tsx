@@ -30,7 +30,7 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
 
 function FunnelIcon() {
   return (
-    <svg viewBox="0 0 12 12" width="9" height="9" aria-hidden="true" className="shrink-0">
+    <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" className="shrink-0">
       <path d="M1 2h10L7.2 6.4V11L4.8 9.4V6.4z" fill="currentColor" />
     </svg>
   );
@@ -261,7 +261,7 @@ export default function PositionsTable({
                         className="inline-flex items-center gap-1 min-w-0"
                       >
                         <span className="truncate">{c.label}</span>
-                        <span className="tnum shrink-0" style={{ opacity: sortKey === c.key ? 1 : 0.3 }}>
+                        <span className="tnum shrink-0 text-[13px] leading-none" style={{ opacity: sortKey === c.key ? 1 : 0.3 }}>
                           {sortKey === c.key ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
                         </span>
                       </button>

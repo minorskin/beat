@@ -56,7 +56,7 @@ export default function EditInstrument({
           >
             <div className="col-span-2 flex items-center justify-between mb-1">
               <h2 className="text-sm font-medium">{symbol} — Varlığı Düzenle</h2>
-              <button type="button" onClick={reset} className="seg" aria-label="Kapat">✕</button>
+              <button type="button" onClick={reset} className="seg text-[15px] leading-none" aria-label="Kapat">✕</button>
             </div>
 
             <input type="hidden" name="instrument_id" value={id} />

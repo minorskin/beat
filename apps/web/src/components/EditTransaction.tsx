@@ -49,7 +49,7 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
           >
             <div className="col-span-2 flex items-center justify-between mb-1">
               <h2 className="text-sm font-medium">İşlemi Düzenle</h2>
-              <button type="button" onClick={reset} className="seg" aria-label="Kapat">✕</button>
+              <button type="button" onClick={reset} className="seg text-[15px] leading-none" aria-label="Kapat">✕</button>
             </div>
 
             <input type="hidden" name="id" value={tx.id} />
