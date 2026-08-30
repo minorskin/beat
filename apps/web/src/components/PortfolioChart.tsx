@@ -18,46 +18,44 @@ export default function PortfolioChart({
   }));
 
   return (
-    <div className="panel p-4 sm:p-5">
-      <div className="flex items-center justify-between mb-4">
+    <div className="panel p-3 sm:p-5">
+      <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
         <h2 className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Portföy Değeri</h2>
-        <div className="flex gap-1">
+        <div className="flex gap-1 shrink-0">
           {(['TRY', 'USD'] as const).map((c) => (
-            <button key={c} onClick={() => setCur(c)}
-              className="px-2.5 py-1 rounded-md text-xs tnum"
-              style={{ background: cur === c ? 'var(--accent)' : 'var(--panel-2)', color: cur === c ? '#fff' : 'var(--muted)' }}>
+            <button key={c} onClick={() => setCur(c)} className={`seg tnum ${cur === c ? 'seg-on' : ''}`}>
               {c}
             </button>
           ))}
         </div>
       </div>
-      <div style={{ width: '100%', height: 240 }}>
-        <ResponsiveContainer>
-          <AreaChart data={rows} margin={{ left: 4, right: 8, top: 4, bottom: 0 }}>
+      <div className="w-full h-[200px] sm:h-[260px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={rows} margin={{ left: 0, right: 4, top: 4, bottom: 0 }}>
             <defs>
               <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                <stop offset="0%" stopColor="#f5f5f5" stopOpacity={0.22} />
+                <stop offset="100%" stopColor="#f5f5f5" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--muted)' }} minTickGap={40} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: 'var(--muted)' }} width={44} axisLine={false} tickLine={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#8a8a8a' }} minTickGap={40} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: '#8a8a8a' }} width={42} axisLine={false} tickLine={false} />
             <Tooltip
-              contentStyle={{ background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }}
-              labelStyle={{ color: 'var(--muted)' }}
+              cursor={{ stroke: '#3d3d3d', strokeWidth: 1 }}
+              contentStyle={{ background: '#1c1c1c', border: 'none', borderRadius: 4, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}
+              labelStyle={{ color: '#8a8a8a' }}
+              itemStyle={{ color: '#ededed' }}
               formatter={(v) => {
                 const s = new Intl.NumberFormat('tr-TR').format(Math.round(Number(v))) + (cur === 'TRY' ? ' ₺' : ' $');
                 return [s, 'Değer'] as [string, string];
               }} />
-            <Area type="monotone" dataKey={key} stroke="var(--accent)" strokeWidth={2} fill="url(#g)" />
+            <Area type="monotone" dataKey={key} stroke="#f5f5f5" strokeWidth={1.5} fill="url(#g)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex gap-1 mt-4">
+      <div className="flex gap-1 mt-3 sm:mt-4">
         {RANGES.map((r) => (
-          <a key={r} href={`?range=${r}`}
-            className="flex-1 text-center py-1.5 rounded-md text-xs tnum"
-            style={{ background: r === range ? 'var(--panel-2)' : 'transparent', color: r === range ? 'var(--text)' : 'var(--muted)', border: '1px solid var(--border)' }}>
+          <a key={r} href={`?range=${r}`} className={`seg tnum flex-1 text-center ${r === range ? 'seg-on' : ''}`}>
             {r === 'TUM' ? 'TÜMÜ' : r}
           </a>
         ))}

@@ -24,33 +24,31 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const alloc = [...byGroup].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
   return (
-    <main className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
+    <main className="max-w-6xl mx-auto px-3 sm:px-5 lg:px-8 py-5 sm:py-8">
       {/* Başlık */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Beat</h1>
-          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+      <header className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-lg font-semibold tracking-tight">Beat</h1>
+          <p className="text-[11px] sm:text-xs truncate" style={{ color: 'var(--muted)' }}>
             {lastFetch ? `Son güncelleme ${timeAgo(lastFetch.finished_at)} · ${lastFetch.status}` : 'Henüz veri yok'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <AddTransaction instruments={instruments} />
           <form action={logout}>
-            <button type="submit" className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--panel-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
-              Çıkış
-            </button>
+            <button type="submit" className="btn btn-ghost">Çıkış</button>
           </form>
         </div>
-      </div>
+      </header>
 
       {!snap ? (
-        <div className="panel p-8 text-center" style={{ color: 'var(--muted)' }}>
+        <div className="panel p-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
           Henüz snapshot yok. İşlem ekleyip motorun çalışmasını bekleyin.
         </div>
       ) : (
         <>
           {/* KPI */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
             <Kpi label="Toplam Değer" value={tl(snap.total_value_try)} sub={usd(snap.total_value_usd)} />
             <Kpi label="Maliyet" value={tl(snap.total_cost_try)} sub="toplam alım" />
             <Kpi label="Kâr / Zarar" value={`${up ? '+' : ''}${tl(pnl)}`} sub={pct(pnlPct)} tone={up ? 'up' : 'down'} />
@@ -58,58 +56,61 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           </div>
 
           {/* Grafik + Donut */}
-          <div className="grid lg:grid-cols-3 gap-4 mb-4">
-            <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4">
+            <div className="lg:col-span-2 min-w-0">
               <PortfolioChart data={history} range={range} currency="TRY" />
             </div>
             <AllocationDonut data={alloc} />
           </div>
 
           {/* Projeksiyon */}
-          <div className="mb-4">
+          <div className="mb-3 sm:mb-4">
             <Projection current={snap.total_value_try} />
           </div>
 
           {/* Pozisyon tablosu */}
-          <div className="panel overflow-hidden">
-            <div className="px-4 sm:px-5 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+          <section className="panel overflow-hidden">
+            <div className="px-4 sm:px-5 pt-4 pb-3">
               <h2 className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Pozisyonlar</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="tbl w-full text-sm min-w-[420px]">
                 <thead>
-                  <tr style={{ color: 'var(--muted)' }} className="text-xs">
+                  <tr style={{ color: 'var(--muted)' }} className="text-[11px] uppercase tracking-wide">
                     <th className="text-left font-medium px-4 sm:px-5 py-2.5">Varlık</th>
                     <th className="text-right font-medium px-3 py-2.5">Adet</th>
                     <th className="text-right font-medium px-3 py-2.5">Fiyat</th>
                     <th className="text-right font-medium px-3 py-2.5">Değer (₺)</th>
                     <th className="text-right font-medium px-3 py-2.5 hidden sm:table-cell">K/Z</th>
-                    <th className="text-right font-medium px-4 sm:px-5 py-2.5">Ağırlık</th>
+                    <th className="text-right font-medium px-4 sm:px-5 py-2.5 hidden sm:table-cell">Ağırlık</th>
                   </tr>
                 </thead>
                 <tbody>
                   {positions.map((p) => (
-                    <tr key={p.symbol} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                    <tr key={p.symbol}>
                       <td className="px-4 sm:px-5 py-3">
                         <div className="font-medium flex items-center gap-2">
                           {p.symbol}
-                          {p.is_stale && <span title="Taşınmış fiyat (piyasa kapalı)" className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--muted)' }} />}
+                          {p.is_stale && <span title="Taşınmış fiyat (piyasa kapalı)" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--faint)' }} />}
                         </div>
-                        <div className="text-xs truncate max-w-[160px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
+                        <div className="text-[11px] truncate max-w-[120px] sm:max-w-[180px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
+                        <div className="text-[11px] tnum mt-0.5 sm:hidden" style={{ color: (p.pnl_pct ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
+                          {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
+                        </div>
                       </td>
-                      <td className="text-right px-3 py-3 tnum">{num(p.quantity, p.quantity < 1 ? 4 : 2)}</td>
-                      <td className="text-right px-3 py-3 tnum">{num(p.price, 2)} {p.currency === 'USD' ? '$' : '₺'}</td>
-                      <td className="text-right px-3 py-3 tnum">{tl(p.value_try)}</td>
-                      <td className="text-right px-3 py-3 tnum hidden sm:table-cell" style={{ color: (p.pnl_pct ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
+                      <td className="text-right px-3 py-3 tnum whitespace-nowrap">{num(p.quantity, p.quantity < 1 ? 4 : 2)}</td>
+                      <td className="text-right px-3 py-3 tnum whitespace-nowrap">{num(p.price, 2)} {p.currency === 'USD' ? '$' : '₺'}</td>
+                      <td className="text-right px-3 py-3 tnum whitespace-nowrap">{tl(p.value_try)}</td>
+                      <td className="text-right px-3 py-3 tnum hidden sm:table-cell whitespace-nowrap" style={{ color: (p.pnl_pct ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
                         {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
                       </td>
-                      <td className="text-right px-4 sm:px-5 py-3 tnum" style={{ color: 'var(--muted)' }}>%{num(p.weight_pct, 1)}</td>
+                      <td className="text-right px-4 sm:px-5 py-3 tnum hidden sm:table-cell whitespace-nowrap" style={{ color: 'var(--muted)' }}>%{num(p.weight_pct, 1)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
         </>
       )}
     </main>
@@ -119,10 +120,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
 function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'up' | 'down' }) {
   const color = tone === 'up' ? 'var(--up)' : tone === 'down' ? 'var(--down)' : 'var(--text)';
   return (
-    <div className="panel p-4">
-      <div className="text-xs mb-1" style={{ color: 'var(--muted)' }}>{label}</div>
-      <div className="text-lg font-semibold tnum" style={{ color }}>{value}</div>
-      {sub && <div className="text-xs mt-0.5 tnum" style={{ color: 'var(--muted)' }}>{sub}</div>}
+    <div className="panel p-3 sm:p-4">
+      <div className="text-[11px] mb-1 truncate" style={{ color: 'var(--muted)' }}>{label}</div>
+      <div className="text-base sm:text-lg font-semibold tnum truncate" style={{ color }}>{value}</div>
+      {sub && <div className="text-[11px] mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{sub}</div>}
     </div>
   );
 }

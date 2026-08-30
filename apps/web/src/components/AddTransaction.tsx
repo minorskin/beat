@@ -11,56 +11,75 @@ export default function AddTransaction({ instruments }: { instruments: Instrumen
 
   return (
     <>
-      <button onClick={() => setOpen((v) => !v)}
-        className="px-3 py-2 rounded-lg text-sm font-medium"
-        style={{ background: 'var(--accent)', color: '#fff' }}>
-        {open ? 'Kapat' : '+ İşlem Ekle'}
+      <button onClick={() => setOpen(true)} className="btn btn-primary">
+        <span className="sm:hidden">+ İşlem</span>
+        <span className="hidden sm:inline">+ İşlem Ekle</span>
       </button>
+
       {open && (
-        <form
-          action={(fd) => start(async () => {
-            const r = await addTransaction(fd);
-            setMsg(r.ok ? 'Eklendi ✓' : r.error || 'Hata');
-            if (r.ok) setTimeout(() => setMsg(''), 2000);
-          })}
-          className="panel p-4 mt-3 grid grid-cols-2 gap-3">
-          <label className="col-span-2 text-xs" style={{ color: 'var(--muted)' }}>
-            Enstrüman
-            <select name="instrument_id" required onChange={(e) => {
-              const ins = instruments.find((i) => i.id === e.target.value);
-              if (ins) setCur(ins.currency);
-            }} className="w-full mt-1 p-2 rounded-md" style={{ background: 'var(--panel-2)', color: 'var(--text)', border: '1px solid var(--border)' }}>
-              <option value="">Seç…</option>
-              {instruments.map((i) => <option key={i.id} value={i.id}>{i.symbol} — {i.display_name}</option>)}
-            </select>
-          </label>
-          <label className="text-xs" style={{ color: 'var(--muted)' }}>
-            İşlem
-            <select name="type" defaultValue="buy" className="w-full mt-1 p-2 rounded-md" style={{ background: 'var(--panel-2)', color: 'var(--text)', border: '1px solid var(--border)' }}>
-              <option value="buy">Alım</option><option value="sell">Satım</option>
-              <option value="adjustment">Adet Düzelt</option><option value="dividend">Temettü</option>
-            </select>
-          </label>
-          <label className="text-xs" style={{ color: 'var(--muted)' }}>
-            Adet
-            <input name="quantity" type="number" step="any" required className="w-full mt-1 p-2 rounded-md tnum" style={{ background: 'var(--panel-2)', color: 'var(--text)', border: '1px solid var(--border)' }} />
-          </label>
-          <label className="text-xs" style={{ color: 'var(--muted)' }}>
-            Birim Fiyat ({cur})
-            <input name="unit_price" type="number" step="any" className="w-full mt-1 p-2 rounded-md tnum" style={{ background: 'var(--panel-2)', color: 'var(--text)', border: '1px solid var(--border)' }} />
-          </label>
-          <label className="text-xs" style={{ color: 'var(--muted)' }}>
-            Tarih
-            <input name="executed_at" type="datetime-local" className="w-full mt-1 p-2 rounded-md" style={{ background: 'var(--panel-2)', color: 'var(--text)', border: '1px solid var(--border)' }} />
-          </label>
-          <input type="hidden" name="currency" value={cur} />
-          <div className="col-span-2 flex items-center gap-3">
-            <button type="submit" disabled={pending} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--up)', color: '#04120a', opacity: pending ? 0.6 : 1 }}>
-              {pending ? 'Kaydediliyor…' : 'Kaydet'}
-            </button>
-            {msg && <span className="text-xs" style={{ color: 'var(--muted)' }}>{msg}</span>}
-          </div>
-        </form>
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          style={{ background: 'rgba(0,0,0,0.65)' }}
+          onClick={() => setOpen(false)}
+        >
+          <form
+            onClick={(e) => e.stopPropagation()}
+            action={(fd) => start(async () => {
+              const r = await addTransaction(fd);
+              setMsg(r.ok ? 'Eklendi ✓' : r.error || 'Hata');
+              if (r.ok) setTimeout(() => { setMsg(''); setOpen(false); }, 1200);
+            })}
+            className="sheet w-full sm:max-w-md p-4 sm:p-5 grid grid-cols-2 gap-3 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="col-span-2 flex items-center justify-between mb-1">
+              <h2 className="text-sm font-medium">İşlem Ekle</h2>
+              <button type="button" onClick={() => setOpen(false)} className="seg" aria-label="Kapat">✕</button>
+            </div>
+
+            <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+              Enstrüman
+              <select name="instrument_id" required className="field mt-1" onChange={(e) => {
+                const ins = instruments.find((i) => i.id === e.target.value);
+                if (ins) setCur(ins.currency);
+              }}>
+                <option value="">Seç…</option>
+                {instruments.map((i) => <option key={i.id} value={i.id}>{i.symbol} — {i.display_name}</option>)}
+              </select>
+            </label>
+
+            <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+              İşlem
+              <select name="type" defaultValue="buy" className="field mt-1">
+                <option value="buy">Alım</option><option value="sell">Satım</option>
+                <option value="adjustment">Adet Düzelt</option><option value="dividend">Temettü</option>
+              </select>
+            </label>
+
+            <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+              Adet
+              <input name="quantity" type="number" step="any" required inputMode="decimal" className="field mt-1 tnum" />
+            </label>
+
+            <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+              Birim Fiyat ({cur})
+              <input name="unit_price" type="number" step="any" inputMode="decimal" className="field mt-1 tnum" />
+            </label>
+
+            <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+              Tarih
+              <input name="executed_at" type="datetime-local" className="field mt-1" />
+            </label>
+
+            <input type="hidden" name="currency" value={cur} />
+
+            <div className="col-span-2 flex items-center gap-3 mt-1">
+              <button type="submit" disabled={pending} className="btn btn-primary flex-1 sm:flex-none">
+                {pending ? 'Kaydediliyor…' : 'Kaydet'}
+              </button>
+              {msg && <span className="text-xs" style={{ color: 'var(--muted)' }}>{msg}</span>}
+            </div>
+          </form>
+        </div>
       )}
     </>
   );

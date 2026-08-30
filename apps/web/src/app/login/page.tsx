@@ -18,13 +18,12 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
   const err = (await searchParams).e;
   return (
     <main className="min-h-screen flex items-center justify-center px-4">
-      <form action={login} className="panel p-6 w-full max-w-xs">
+      <form action={login} className="panel p-5 sm:p-6 w-full max-w-xs">
         <h1 className="text-lg font-semibold mb-1">Beat</h1>
-        <p className="text-xs mb-4" style={{ color: 'var(--muted)' }}>Portföyüne erişmek için şifre gir</p>
-        <input name="password" type="password" autoFocus placeholder="Şifre"
-          className="w-full p-2.5 rounded-md mb-3" style={{ background: 'var(--panel-2)', color: 'var(--text)', border: '1px solid var(--border)' }} />
-        {err && <p className="text-xs mb-3" style={{ color: 'var(--down)' }}>Yanlış şifre</p>}
-        <button type="submit" className="w-full py-2.5 rounded-lg text-sm font-medium" style={{ background: 'var(--accent)', color: '#fff' }}>
+        <p className="text-[11px] mb-4" style={{ color: 'var(--muted)' }}>Portföyüne erişmek için şifre gir</p>
+        <input name="password" type="password" autoFocus placeholder="Şifre" className="field mb-3" />
+        {err && <p className="text-[11px] mb-3" style={{ color: 'var(--down)' }}>Yanlış şifre</p>}
+        <button type="submit" className="btn btn-primary w-full py-2.5">
           Giriş
         </button>
       </form>

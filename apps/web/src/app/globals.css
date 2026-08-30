@@ -1,30 +1,137 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0a0e17;
-  --panel: #121826;
-  --panel-2: #1a2234;
-  --border: #232d42;
-  --text: #e6edf7;
-  --muted: #8b98b0;
-  --accent: #3b82f6;
-  --up: #22c55e;
-  --down: #ef4444;
+  /* nötr siyah tonları — mavi yok */
+  --bg: #0a0a0a;
+  --panel: #131313;
+  --panel-2: #1c1c1c;
+  --panel-3: #262626;
+  --text: #ededed;
+  --muted: #8a8a8a;
+  --faint: #5c5c5c;
+  --accent: #f5f5f5;
+  --accent-fg: #0a0a0a;
+  --up: #4cae63;
+  --down: #d15b5b;
+  --border: transparent;   /* borderlar kaldırıldı — eski referanslar için */
+
+  --r: 6px;
+  --r-sm: 4px;
 }
 
 html, body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; border: 0 !important; outline-offset: 2px; }
 
 .panel {
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--r);
 }
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* Form alanları — border yerine tonal ayrım */
+.field {
+  width: 100%;
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  padding: 0.55rem 0.65rem;
+  font-size: 0.875rem;
+  appearance: none;
+  transition: background 0.15s ease;
+}
+.field:hover { background: var(--panel-3); }
+.field:focus { background: var(--panel-3); outline: 2px solid var(--faint); }
+.field::placeholder { color: var(--faint); }
+select.field {
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 1.75rem;
+}
+input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
+
+/* Butonlar */
+.btn {
+  border-radius: var(--r-sm);
+  font-size: 0.875rem;
+  padding: 0.5rem 0.85rem;
+  line-height: 1.25rem;
+  white-space: nowrap;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  cursor: pointer;
+}
+.btn-primary { background: var(--accent); color: var(--accent-fg); font-weight: 500; }
+.btn-primary:hover { background: #ffffff; }
+.btn-ghost { background: var(--panel-2); color: var(--muted); }
+.btn-ghost:hover { background: var(--panel-3); color: var(--text); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Segment / sekme */
+.seg {
+  border-radius: var(--r-sm);
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  background: transparent;
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+}
+.seg:hover { background: var(--panel-2); color: var(--text); }
+.seg-on { background: var(--panel-3); color: var(--text); }
+.seg-on:hover { background: var(--panel-3); }
+
+/* Tablo — çizgi yok, tonal zebra + hover */
+.tbl thead tr { background: var(--panel-2); }
+.tbl tbody tr { transition: background 0.12s ease; }
+.tbl tbody tr:nth-child(odd) { background: rgba(255, 255, 255, 0.018); }
+.tbl tbody tr:hover { background: var(--panel-2); }
+
+/* Alt sayfa (mobil) → ortalanmış panel (masaüstü) */
+.sheet {
+  background: var(--panel);
+  border-radius: var(--r) var(--r) 0 0;
+}
+@media (min-width: 640px) {
+  .sheet { border-radius: var(--r); }
+}
+
+/* Aralık girdisi */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--panel-3);
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+
+/* Recharts odak halkasını kapat */
+.recharts-wrapper *:focus { outline: none; }
