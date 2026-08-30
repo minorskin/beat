@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "beat-cron",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "observability": { "enabled": true },
+  // GH scheduled cron güvenilmez -> bu Worker güvenilir tetikleyici.
+  // Her 30 dk: fetch.yml workflow_dispatch. Snapshot saatlik bucket, 2x/saat garanti.
+  "triggers": { "crons": ["*/30 * * * *"] }
+}
