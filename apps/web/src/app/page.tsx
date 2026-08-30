@@ -1,6 +1,7 @@
 import {
   getLatestSnapshot, getPositions, getHistory, getInstruments,
-  getLastFetch, getWatchlist, getAssetClasses,
+  getLastFetch, getWatchlist, getAssetClasses, getPeriodChanges,
+  type Change,
 } from '@/lib/data';
 import { tl, usd, num, pct, timeAgo } from '@/lib/format';
 import PortfolioChart from '@/components/PortfolioChart';
@@ -21,9 +22,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // Sayfadaki her sayı tek bu bayrağa bakar; karışık görünüm olmaz.
   const own = sp.own === '1';
 
-  const [snap, positions, history, instruments, lastFetch, watchlist, classes] = await Promise.all([
+  const [snap, positions, history, instruments, lastFetch, watchlist, classes, changes] = await Promise.all([
     getLatestSnapshot(), getPositions(), getHistory(range), getInstruments(),
-    getLastFetch(), getWatchlist(), getAssetClasses(),
+    getLastFetch(), getWatchlist(), getAssetClasses(), getPeriodChanges(),
   ]);
 
   const value = own ? (snap?.own_value_try ?? 0) : (snap?.total_value_try ?? 0);
@@ -97,6 +98,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             <Kpi label="Maliyet" value={tl(cost)} sub={own ? 'bana ait alım' : 'toplam alım'} />
             <Kpi label="Kâr / Zarar" value={`${up ? '+' : ''}${tl(pnl)}`} sub={pct(pnlPct)} tone={up ? 'up' : 'down'} />
             <Kpi label="Pozisyon" value={String(rows.length)} sub={`${rows.filter((p) => p.is_stale).length} taşınmış fiyat`} />
+          </div>
+
+          {/* Dönemsel değişim */}
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <ChangeCell label="Gün" c={own ? changes.day.own : changes.day.total} />
+            <ChangeCell label="Hafta" c={own ? changes.week.own : changes.week.total} />
+            <ChangeCell label="Ay" c={own ? changes.month.own : changes.month.total} />
+            <ChangeCell label="Başından" c={own ? changes.all.own : changes.all.total} />
           </div>
 
           {/* Grafik + Donut */}
@@ -203,6 +212,26 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: 
       <div className="text-[11px] mb-1 truncate" style={{ color: 'var(--muted)' }}>{label}</div>
       <div className="text-base sm:text-lg font-semibold tnum truncate" style={{ color }}>{value}</div>
       {sub && <div className="text-[11px] mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{sub}</div>}
+    </div>
+  );
+}
+
+// Dönemsel değişim hücresi — baz yoksa (yeterli geçmiş yok) '—'.
+function ChangeCell({ label, c }: { label: string; c: Change | null }) {
+  const has = c != null && c.pct != null;
+  const good = has && (c!.pct as number) >= 0;
+  const color = !has ? 'var(--muted)' : good ? 'var(--up)' : 'var(--down)';
+  return (
+    <div className="panel p-2.5 sm:p-3">
+      <div className="text-[11px] mb-0.5 truncate" style={{ color: 'var(--muted)' }}>{label}</div>
+      <div className="text-sm sm:text-base font-semibold tnum" style={{ color }}>
+        {has ? `${good ? '+' : ''}${num(c!.pct as number, 2)}%` : '—'}
+      </div>
+      {has && (
+        <div className="text-[11px] mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>
+          {good ? '+' : ''}{tl(c!.abs)}
+        </div>
+      )}
     </div>
   );
 }

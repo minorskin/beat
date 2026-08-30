@@ -103,3 +103,55 @@ export async function getLastFetch(): Promise<{ kind: string; status: string; fi
     `select kind, status, finished_at from fetch_runs where finished_at is not null order by started_at desc limit 1`);
   return r[0] ?? null;
 }
+
+// ── Dönemsel değişim (gün/hafta/ay/başından beri) ──────────────────────────
+// Hem toplam hem own_* için; own görünümünde payda da own alınır (yoksa yanlış oran).
+export interface Change { abs: number; pct: number | null }
+export interface PeriodChanges {
+  day: { total: Change | null; own: Change | null };
+  week: { total: Change | null; own: Change | null };
+  month: { total: Change | null; own: Change | null };
+  all: { total: Change | null; own: Change | null; since: string | null };
+}
+
+export async function getPeriodChanges(): Promise<PeriodChanges> {
+  const rows = await q<{
+    t_now: number; o_now: number;
+    t_d: number | null; o_d: number | null;
+    t_w: number | null; o_w: number | null;
+    t_m: number | null; o_m: number | null;
+    t_a: number | null; o_a: number | null; a_ts: string | null;
+  }>(`
+    with cur as (
+      select ts, total_value_try, own_value_try
+      from portfolio_snapshots where granularity='hourly' order by ts desc limit 1
+    )
+    select cur.total_value_try t_now, cur.own_value_try o_now,
+      b1.total_value_try t_d,  b1.own_value_try o_d,
+      b7.total_value_try t_w,  b7.own_value_try o_w,
+      b30.total_value_try t_m, b30.own_value_try o_m,
+      bf.total_value_try t_a,  bf.own_value_try o_a, bf.ts a_ts
+    from cur
+    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
+      where granularity='hourly' and ts <= cur.ts - interval '1 day'  order by ts desc limit 1) b1 on true
+    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
+      where granularity='hourly' and ts <= cur.ts - interval '7 days' order by ts desc limit 1) b7 on true
+    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
+      where granularity='hourly' and ts <= cur.ts - interval '30 days' order by ts desc limit 1) b30 on true
+    left join lateral (select total_value_try, own_value_try, ts from portfolio_snapshots
+      where granularity='hourly' order by ts asc limit 1) bf on true`);
+
+  const r = rows[0];
+  const mk = (now: number, base: number | null): Change | null =>
+    base == null ? null : { abs: now - base, pct: base ? ((now - base) / base) * 100 : null };
+  if (!r) {
+    const n = { total: null, own: null };
+    return { day: n, week: n, month: n, all: { total: null, own: null, since: null } };
+  }
+  return {
+    day: { total: mk(r.t_now, r.t_d), own: mk(r.o_now, r.o_d) },
+    week: { total: mk(r.t_now, r.t_w), own: mk(r.o_now, r.o_w) },
+    month: { total: mk(r.t_now, r.t_m), own: mk(r.o_now, r.o_m) },
+    all: { total: mk(r.t_now, r.t_a), own: mk(r.o_now, r.o_a), since: r.a_ts ?? null },
+  };
+}
