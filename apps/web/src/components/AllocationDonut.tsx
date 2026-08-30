@@ -2,8 +2,8 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 type Slice = { name: string; value: number };
-// gri tonlu rampa — mavi/renk yok
-const COLORS = ['#fafafa', '#cfcfcf', '#a8a8a8', '#8a8a8a', '#6b6b6b', '#525252', '#404040', '#333333'];
+// kategorik palet — arayüz nötr siyah, veri renkli
+const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#ef4444', '#64748b'];
 
 export default function AllocationDonut({ data }: { data: Slice[] }) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;

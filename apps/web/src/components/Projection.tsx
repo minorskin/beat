@@ -41,8 +41,8 @@ export default function Projection({ current }: { current: number }) {
           <AreaChart data={data} margin={{ left: 0, right: 4, top: 4, bottom: 0 }}>
             <defs>
               <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#4cae63" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#4cae63" stopOpacity={0} />
+                <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#8a8a8a' }} minTickGap={30} axisLine={false} tickLine={false} />
@@ -53,7 +53,7 @@ export default function Projection({ current }: { current: number }) {
               itemStyle={{ color: '#ededed' }}
               formatter={(v, n) => [`${fmt(Number(v))} ₺`, n === 'deger' ? 'Değer' : 'Anapara'] as [string, string]} />
             <Area type="monotone" dataKey="anapara" stroke="#6b6b6b" strokeWidth={1} strokeDasharray="3 3" fill="none" />
-            <Area type="monotone" dataKey="deger" stroke="#4cae63" strokeWidth={2} fill="url(#pg)" />
+            <Area type="monotone" dataKey="deger" stroke="#22c55e" strokeWidth={2} fill="url(#pg)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

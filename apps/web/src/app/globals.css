@@ -11,9 +11,19 @@
   --faint: #5c5c5c;
   --accent: #f5f5f5;
   --accent-fg: #0a0a0a;
-  --up: #4cae63;
-  --down: #d15b5b;
+  --up: #22c55e;
+  --down: #ef4444;
   --border: transparent;   /* borderlar kaldırıldı — eski referanslar için */
+
+  /* Grafik renkleri — arayüz nötr siyah, veri renkli */
+  --c1: #3b82f6;
+  --c2: #22c55e;
+  --c3: #f59e0b;
+  --c4: #a855f7;
+  --c5: #ec4899;
+  --c6: #14b8a6;
+  --c7: #ef4444;
+  --c8: #64748b;
 
   --r: 6px;
   --r-sm: 4px;
@@ -96,6 +106,36 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 .tbl tbody tr { transition: background 0.12s ease; }
 .tbl tbody tr:nth-child(odd) { background: rgba(255, 255, 255, 0.018); }
 .tbl tbody tr:hover { background: var(--panel-2); }
+
+/* Sticky üst bar */
+.appbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(10, 10, 10, 0.82);
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+}
+@supports not (backdrop-filter: blur(12px)) {
+  .appbar { background: var(--bg); }
+}
+
+.navlink {
+  border-radius: var(--r-sm);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.navlink:hover { background: var(--panel-2); color: var(--text); }
+.navlink-on { background: var(--panel-3); color: var(--text); }
+
+/* Sticky bar altında kalmasın */
+[id="dashboard"], [id="portfoy"] { scroll-margin-top: 72px; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 /* Alt sayfa (mobil) → ortalanmış panel (masaüstü) */
 .sheet {

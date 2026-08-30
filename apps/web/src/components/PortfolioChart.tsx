@@ -34,8 +34,8 @@ export default function PortfolioChart({
           <AreaChart data={rows} margin={{ left: 0, right: 4, top: 4, bottom: 0 }}>
             <defs>
               <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#f5f5f5" stopOpacity={0.22} />
-                <stop offset="100%" stopColor="#f5f5f5" stopOpacity={0} />
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#8a8a8a' }} minTickGap={40} axisLine={false} tickLine={false} />
@@ -49,7 +49,7 @@ export default function PortfolioChart({
                 const s = new Intl.NumberFormat('tr-TR').format(Math.round(Number(v))) + (cur === 'TRY' ? ' ₺' : ' $');
                 return [s, 'Değer'] as [string, string];
               }} />
-            <Area type="monotone" dataKey={key} stroke="#f5f5f5" strokeWidth={1.5} fill="url(#g)" />
+            <Area type="monotone" dataKey={key} stroke="#3b82f6" strokeWidth={2} fill="url(#g)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

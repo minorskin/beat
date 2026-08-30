@@ -4,6 +4,7 @@ import PortfolioChart from '@/components/PortfolioChart';
 import AllocationDonut from '@/components/AllocationDonut';
 import AddTransaction from '@/components/AddTransaction';
 import Projection from '@/components/Projection';
+import SectionNav from '@/components/SectionNav';
 import { logout } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -24,29 +25,36 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const alloc = [...byGroup].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
   return (
-    <main className="max-w-6xl mx-auto px-3 sm:px-5 lg:px-8 py-5 sm:py-8">
-      {/* Başlık */}
-      <header className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
-        <div className="min-w-0">
-          <h1 className="text-base sm:text-lg font-semibold tracking-tight">Beat</h1>
-          <p className="text-[11px] sm:text-xs truncate" style={{ color: 'var(--muted)' }}>
-            {lastFetch ? `Son güncelleme ${timeAgo(lastFetch.finished_at)} · ${lastFetch.status}` : 'Henüz veri yok'}
-          </p>
+    <>
+      {/* Sticky üst bar */}
+      <div className="appbar">
+        <div className="max-w-6xl mx-auto px-3 sm:px-5 lg:px-8 h-14 flex items-center justify-between gap-2">
+          <SectionNav />
+          <div className="flex items-center gap-2 shrink-0">
+            <AddTransaction instruments={instruments} />
+            <form action={logout}>
+              <button type="submit" className="btn btn-ghost">Çıkış</button>
+            </form>
+          </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <AddTransaction instruments={instruments} />
-          <form action={logout}>
-            <button type="submit" className="btn btn-ghost">Çıkış</button>
-          </form>
-        </div>
-      </header>
+      </div>
 
+      <main className="max-w-6xl mx-auto px-3 sm:px-5 lg:px-8 pb-8 sm:pb-12">
       {!snap ? (
-        <div className="panel p-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
+        <div className="panel p-8 mt-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
           Henüz snapshot yok. İşlem ekleyip motorun çalışmasını bekleyin.
         </div>
       ) : (
         <>
+          {/* Dashboard — sayfanın başı */}
+          <section id="dashboard" className="pt-4 sm:pt-6">
+          <div className="mb-3 sm:mb-4">
+            <h2 className="text-base sm:text-lg font-semibold tracking-tight">Dashboard</h2>
+            <p className="text-[11px] sm:text-xs truncate" style={{ color: 'var(--muted)' }}>
+              {lastFetch ? `Son güncelleme ${timeAgo(lastFetch.finished_at)} · ${lastFetch.status}` : 'Henüz veri yok'}
+            </p>
+          </div>
+
           {/* KPI */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
             <Kpi label="Toplam Değer" value={tl(snap.total_value_try)} sub={usd(snap.total_value_usd)} />
@@ -64,14 +72,24 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           </div>
 
           {/* Projeksiyon */}
-          <div className="mb-3 sm:mb-4">
+          <div>
             <Projection current={snap.total_value_try} />
+          </div>
+          </section>
+
+          {/* Portföy — sayfanın sonu */}
+          <section id="portfoy" className="pt-8 sm:pt-10">
+          <div className="mb-3 sm:mb-4">
+            <h2 className="text-base sm:text-lg font-semibold tracking-tight">Portföy</h2>
+            <p className="text-[11px] sm:text-xs" style={{ color: 'var(--muted)' }}>
+              {positions.length} pozisyon · {tl(snap.total_value_try)}
+            </p>
           </div>
 
           {/* Pozisyon tablosu */}
-          <section className="panel overflow-hidden">
+          <div className="panel overflow-hidden">
             <div className="px-4 sm:px-5 pt-4 pb-3">
-              <h2 className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Pozisyonlar</h2>
+              <h3 className="text-sm font-medium" style={{ color: 'var(--muted)' }}>Pozisyonlar</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="tbl w-full text-sm min-w-[420px]">
@@ -110,10 +128,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                 </tbody>
               </table>
             </div>
+          </div>
           </section>
         </>
       )}
-    </main>
+      </main>
+    </>
   );
 }
 
