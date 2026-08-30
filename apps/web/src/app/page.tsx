@@ -75,7 +75,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           <section id="dashboard" className="pt-4 sm:pt-6">
           <div className="mb-3 sm:mb-4">
             <h2 className="text-base sm:text-lg font-semibold tracking-tight">Dashboard</h2>
-            <p className="text-[11px] sm:text-xs truncate" style={{ color: 'var(--muted)' }}>
+            {/* timeAgo Date.now()'a bakar: sunucudaki render ile tarayıcıdaki
+                hydration arasında saniyeler geçtiği için metin kaçınılmaz
+                olarak farklı çıkar ("12sn önce" / "14sn önce"). Bu tek satır
+                için uyuşmazlığı bastırıyoruz. */}
+            <p className="text-[11px] sm:text-xs truncate" style={{ color: 'var(--muted)' }} suppressHydrationWarning>
               {lastFetch ? `Son güncelleme ${timeAgo(lastFetch.finished_at)} · ${lastFetch.status}` : 'Henüz veri yok'}
             </p>
           </div>
