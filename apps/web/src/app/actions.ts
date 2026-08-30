@@ -1,6 +1,7 @@
 'use server';
 import { q, pool } from '@/lib/db';
 import { CLASS_DEFAULTS, SYMBOL_RE } from '@/lib/catalog';
+import { resolveInstrumentMeta, GOLD_OPTIONS } from '@/lib/resolve';
 import { revalidatePath } from 'next/cache';
 
 type Result = { ok: boolean; error?: string };
@@ -11,6 +12,7 @@ export async function addTransaction(formData: FormData): Promise<Result> {
   const currency = String(formData.get('currency') || 'TRY');
   const executed_at = String(formData.get('executed_at') || '') || new Date().toISOString();
   const external = Number(formData.get('external_quantity') || 0) || 0;
+  const location = String(formData.get('location') || '').trim() || null;
 
   if (!instrument_id) return { ok: false, error: 'Enstrüman zorunlu' };
 
@@ -37,9 +39,9 @@ export async function addTransaction(formData: FormData): Promise<Result> {
   if (ext > Math.abs(quantity)) return { ok: false, error: 'Emanet adedi işlem adedini aşamaz' };
 
   await q(
-    `insert into transactions (instrument_id, type, quantity, external_quantity, unit_price, currency, executed_at)
-     values ($1,$2,$3,$4,$5,$6,$7)`,
-    [instrument_id, type, quantity, ext, unit_price, currency, executed_at]);
+    `insert into transactions (instrument_id, type, quantity, external_quantity, unit_price, currency, executed_at, location)
+     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [instrument_id, type, quantity, ext, unit_price, currency, executed_at, location]);
   revalidatePath('/');
   return { ok: true };
 }
@@ -47,19 +49,33 @@ export async function addTransaction(formData: FormData): Promise<Result> {
 /**
  * Kataloğa yeni enstrüman ekler. Pozisyonu olmadığı sürece izleme listesinde
  * durur; fiyatı bir sonraki fetch turundan itibaren çekilmeye başlar.
+ *
+ * Görünen ad ve (gerekliyse) kaynak kodu kullanıcıdan istenmez — ilgili
+ * kaynaktan (Yahoo/TEFAS/CoinGecko) otomatik çekilir; altın için sabit bir
+ * listeden seçilir. Kullanıcı yalnız varlık sınıfı + sembol girer.
  */
 export async function addInstrument(formData: FormData): Promise<Result> {
   const class_code = String(formData.get('class_code') || '');
-  const symbol = String(formData.get('symbol') || '').trim().toUpperCase();
-  const display_name = String(formData.get('display_name') || '').trim();
-  const provider_symbol = String(formData.get('provider_symbol') || '').trim();
-
   const def = CLASS_DEFAULTS[class_code];
   if (!def) return { ok: false, error: 'Geçersiz varlık sınıfı' };
-  if (!SYMBOL_RE.test(symbol)) return { ok: false, error: 'Sembol 2-20 karakter olmalı (harf, rakam, . veya -)' };
-  if (!display_name) return { ok: false, error: 'Görünen ad zorunlu' };
-  if (def.needsProviderSymbol && !provider_symbol) return { ok: false, error: def.providerHint ?? 'Kaynak sembolü zorunlu' };
-  if (class_code === 'fx' && symbol.length !== 6) return { ok: false, error: 'Döviz sembolü 6 harf olmalı (ör. GBPTRY)' };
+
+  let symbol: string, display_name: string, provider_symbol: string;
+
+  if (class_code === 'gold') {
+    const goldCode = String(formData.get('gold_code') || '');
+    const g = GOLD_OPTIONS.find((o) => o.code === goldCode);
+    if (!g) return { ok: false, error: 'Altın türü seç' };
+    symbol = g.symbol; display_name = g.display_name; provider_symbol = g.code;
+  } else {
+    symbol = String(formData.get('symbol') || '').trim().toUpperCase();
+    if (!SYMBOL_RE.test(symbol)) return { ok: false, error: 'Sembol 2-20 karakter olmalı (harf, rakam, . veya -)' };
+    if (class_code === 'fx' && symbol.length !== 6) return { ok: false, error: 'Döviz sembolü 6 harf olmalı (ör. GBPTRY)' };
+
+    const resolved = await resolveInstrumentMeta(class_code, symbol);
+    if ('error' in resolved) return { ok: false, error: resolved.error };
+    display_name = resolved.display_name;
+    provider_symbol = resolved.provider_symbol;
+  }
 
   const dup = await q<{ symbol: string }>(`select symbol from instruments where symbol=$1`, [symbol]);
   if (dup.length) return { ok: false, error: `${symbol} zaten kayıtlı` };
@@ -87,6 +103,52 @@ export async function addInstrument(formData: FormData): Promise<Result> {
     client.release();
   }
 
+  revalidatePath('/');
+  return { ok: true };
+}
+
+/** Var olan bir işlemi düzenler — instrument_id sabit kalır, geri kalan alanlar yeniden yazılır. */
+export async function updateTransaction(formData: FormData): Promise<Result> {
+  const id = String(formData.get('id') || '');
+  if (!id) return { ok: false, error: 'Kayıt yok' };
+  const type = String(formData.get('type') || 'buy');
+  const currency = String(formData.get('currency') || 'TRY');
+  const executed_at = String(formData.get('executed_at') || '') || new Date().toISOString();
+  const external = Number(formData.get('external_quantity') || 0) || 0;
+  const location = String(formData.get('location') || '').trim() || null;
+
+  if (type === 'transfer') {
+    await q(
+      `update transactions set type='transfer', quantity=0, external_quantity=$2, currency=$3, executed_at=$4, location=$5
+       where id=$1`,
+      [id, external, currency, executed_at, location]);
+    revalidatePath('/');
+    return { ok: true };
+  }
+
+  const quantity = Number(formData.get('quantity'));
+  const unit_price = formData.get('unit_price') ? Number(formData.get('unit_price')) : null;
+  if (!quantity) return { ok: false, error: 'Adet zorunlu' };
+
+  const ext = type === 'buy' || type === 'sell' ? external : 0;
+  if (ext < 0) return { ok: false, error: 'Emanet adedi negatif olamaz' };
+  if (ext > Math.abs(quantity)) return { ok: false, error: 'Emanet adedi işlem adedini aşamaz' };
+
+  await q(
+    `update transactions set type=$2, quantity=$3, external_quantity=$4, unit_price=$5, currency=$6, executed_at=$7, location=$8
+     where id=$1`,
+    [id, type, quantity, ext, unit_price, currency, executed_at, location]);
+  revalidatePath('/');
+  return { ok: true };
+}
+
+/** Kataloğa kayıtlı bir enstrümanın görünen adını düzenler. */
+export async function updateInstrument(formData: FormData): Promise<Result> {
+  const instrument_id = String(formData.get('instrument_id') || '');
+  if (!instrument_id) return { ok: false, error: 'Enstrüman yok' };
+  const display_name = String(formData.get('display_name') || '').trim();
+  if (!display_name) return { ok: false, error: 'Ad zorunlu' };
+  await q(`update instruments set display_name=$2 where id=$1`, [instrument_id, display_name]);
   revalidatePath('/');
   return { ok: true };
 }

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 const SECTIONS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'portfoy', label: 'Portföy' },
-  { id: 'izleme', label: 'İzleme' },
 ] as const;
 
 export default function SectionNav() {

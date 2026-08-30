@@ -101,11 +101,20 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 .seg-on { background: var(--panel-3); color: var(--text); }
 .seg-on:hover { background: var(--panel-3); }
 
-/* Tablo — çizgi yok, tonal zebra + hover */
+/* Tablo — çizgi yok, tüm ana satırlar aynı koyu ton + hover */
 .tbl thead tr { background: var(--panel-2); }
 .tbl tbody tr { transition: background 0.12s ease; }
-.tbl tbody tr:nth-child(odd) { background: rgba(255, 255, 255, 0.018); }
 .tbl tbody tr:hover { background: var(--panel-2); }
+
+/* Akordiyon: işlem satırları ana satırdan biraz daha açık, kısa bir açılış/kapanış animasyonu ile */
+.tbl tbody tr.tx-row { background: var(--panel-2); animation: tx-row-in 160ms ease; }
+.tbl tbody tr.tx-row:hover { background: var(--panel-3); }
+.tbl tbody tr.tx-row-out { animation: tx-row-out 160ms ease forwards; }
+@keyframes tx-row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes tx-row-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .tbl tbody tr.tx-row, .tbl tbody tr.tx-row-out { animation: none; }
+}
 
 /* Sticky üst bar */
 .appbar {
@@ -133,7 +142,7 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 .navlink-on { background: var(--panel-3); color: var(--text); }
 
 /* Sticky bar altında kalmasın */
-[id="dashboard"], [id="portfoy"], [id="izleme"] { scroll-margin-top: 72px; }
+[id="dashboard"], [id="portfoy"] { scroll-margin-top: 72px; }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 

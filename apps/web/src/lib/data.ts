@@ -8,12 +8,22 @@ export interface Snapshot {
   own_cost_try: number; own_unrealized_pnl_try: number;
 }
 export interface Position {
-  symbol: string; display_name: string; class_code: string; ui_group: string;
-  quantity: number; price: number; currency: string; price_ts: string;
-  is_stale: boolean; value_try: number; value_usd: number; weight_pct: number;
-  avg_cost: number | null; pnl_try: number; pnl_pct: number | null;
+  instrument_id: string;
+  symbol: string; display_name: string; class_code: string; class_name: string; ui_group: string;
+  quantity: number; price: number | null; currency: string; price_ts: string | null;
+  is_stale: boolean; value_try: number | null; value_usd: number | null; weight_pct: number | null;
+  avg_cost: number | null; pnl_try: number | null; pnl_pct: number | null;
   external_quantity: number; own_quantity: number;
-  own_value_try: number; own_value_usd: number; own_weight_pct: number; own_pnl_try: number;
+  own_value_try: number | null; own_value_usd: number | null; own_weight_pct: number | null; own_pnl_try: number | null;
+  // Güncel (açık) lot'un açılış/kapanış tarihi + kullanılan konumlar — transactions'tan hesaplanır.
+  opened_at: string | null; closed_at: string | null; locations: string[];
+  // Tutuluyor ama motor henüz fiyat çekmedi — bir sonraki turda gelir, o ana kadar değer/K-Z/ağırlık "—".
+  pending: boolean;
+}
+export interface TxRow {
+  id: string; instrument_id: string; type: string;
+  quantity: number; unit_price: number | null; currency: string;
+  executed_at: string; location: string | null; external_quantity: number;
 }
 export interface HistoryPoint { ts: string; try: number; usd: number; own_try: number; own_usd: number }
 export interface Instrument {
@@ -38,27 +48,82 @@ export async function getLatestSnapshot(): Promise<Snapshot | null> {
 export async function getPositions(): Promise<Position[]> {
   return q<Position>(`
     with latest as (select id from portfolio_snapshots order by ts desc limit 1),
-         fx as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1)
-    select i.symbol, i.display_name, i.class_code, ac.ui_group,
-           ps.quantity, ps.price, i.currency, ps.price_ts, ps.is_stale,
+         latest_ps as (select ps.* from position_snapshots ps join latest l on l.id = ps.snapshot_id),
+         fx as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1),
+         -- Güncel lot'un açılış/kapanış tarihi + konumları: buy/sell'i imzalı adet
+         -- olarak biriktirip, adet sıfıra her indiğinde yeni bir "segment" başlat.
+         -- Bir enstrümanın en güncel segmenti = o an açık (ya da en son kapanan) pozisyon.
+         ledger as (
+           select instrument_id, id, executed_at, location,
+                  case when type='buy' then quantity when type='sell' then -quantity else 0 end as signed_qty
+           from transactions
+         ),
+         running as (
+           select *, sum(signed_qty) over (partition by instrument_id order by executed_at, id) as running_qty
+           from ledger
+         ),
+         segmented as (
+           select *,
+             sum(case when running_qty = 0 then 1 else 0 end)
+               over (partition by instrument_id order by executed_at, id rows between unbounded preceding and 1 preceding) as segment_id
+           from running
+         ),
+         segments as (
+           select instrument_id, segment_id,
+             min(executed_at) filter (where signed_qty <> 0) as opened_at,
+             max(executed_at) filter (where running_qty = 0) as closed_at,
+             array_remove(array_agg(distinct location), null) as locations
+           from segmented
+           group by instrument_id, segment_id
+         ),
+         current_segment as (
+           select distinct on (instrument_id) instrument_id, opened_at, closed_at, locations
+           from segments
+           order by instrument_id, segment_id desc
+         )
+    -- v_holdings tahrik eder: elde tutulan HER şey listelenir, motor fiyatı henüz
+    -- çekmemiş olsa bile (snapshot yoksa fiyat/değer/ağırlık null → arayüzde "—"/"bekliyor").
+    select i.id as instrument_id, i.symbol, i.display_name, i.class_code, ac.name as class_name, ac.ui_group,
+           h.quantity, ps.price, i.currency, ps.price_ts, coalesce(ps.is_stale, false) as is_stale,
            ps.value_try, ps.value_usd, ps.weight_pct,
-           ps.own_quantity, ps.own_value_try, ps.own_value_usd, ps.own_weight_pct,
+           h.own_quantity, ps.own_value_try, ps.own_value_usd, ps.own_weight_pct,
            coalesce(h.external_qty, 0) as external_quantity,
            h.avg_cost,
-           (ps.value_try - coalesce(h.avg_cost,0) * ps.quantity *
+           (ps.value_try - coalesce(h.avg_cost,0) * h.quantity *
               case when i.currency='USD' then (select rate from fx) else 1 end
            ) as pnl_try,
-           (ps.own_value_try - coalesce(h.avg_cost,0) * ps.own_quantity *
+           (ps.own_value_try - coalesce(h.avg_cost,0) * h.own_quantity *
               case when i.currency='USD' then (select rate from fx) else 1 end
            ) as own_pnl_try,
-           case when h.avg_cost > 0 then
-             ((ps.price - h.avg_cost) / h.avg_cost) * 100 end as pnl_pct
-    from position_snapshots ps
-    join latest l on l.id = ps.snapshot_id
-    join instruments i on i.id = ps.instrument_id
+           case when h.avg_cost > 0 and ps.price is not null then
+             ((ps.price - h.avg_cost) / h.avg_cost) * 100 end as pnl_pct,
+           cs.opened_at, cs.closed_at, coalesce(cs.locations, '{}') as locations,
+           (ps.instrument_id is null) as pending
+    from v_holdings h
+    join instruments i on i.id = h.instrument_id
     join asset_classes ac on ac.code = i.class_code
-    left join v_holdings h on h.instrument_id = ps.instrument_id
-    order by ps.value_try desc`);
+    left join latest_ps ps on ps.instrument_id = h.instrument_id
+    left join current_segment cs on cs.instrument_id = h.instrument_id
+    where h.quantity <> 0
+    order by ps.value_try desc nulls last`);
+}
+
+/** Bir enstrümana ait tüm işlemler, en yeniden eskiye — akordiyon paneli için. */
+export async function getTransactionsByInstrument(): Promise<Record<string, TxRow[]>> {
+  const rows = await q<TxRow>(`
+    select instrument_id, id, type, quantity, unit_price, currency, executed_at, location, external_quantity
+    from transactions
+    order by instrument_id, executed_at desc, id desc`);
+  const byInstrument: Record<string, TxRow[]> = {};
+  for (const r of rows) (byInstrument[r.instrument_id] ??= []).push(r);
+  return byInstrument;
+}
+
+/** Daha önce girilmiş konumlar — İşlem Ekle formunda otomatik tamamlama için. */
+export async function getLocations(): Promise<string[]> {
+  const rows = await q<{ location: string }>(
+    `select distinct location from transactions where location is not null and location <> '' order by location`);
+  return rows.map((r) => r.location);
 }
 
 export async function getHistory(range: string): Promise<HistoryPoint[]> {

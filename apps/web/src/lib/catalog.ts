@@ -18,17 +18,13 @@ export interface ClassDefault {
   cadence: 'hourly' | 'market_hours' | 'daily_close';
   /** Kanonik sembol için ipucu */
   symbolHint: string;
-  /** Kaynak sembolü alanı için ipucu; boşsa alan gizlenir */
-  providerHint?: string;
-  /** Kaynak sembolü zorunlu mu (kanonik semboldan türetilemiyorsa) */
-  needsProviderSymbol: boolean;
   sources: (symbol: string, providerSymbol: string) => SourceSpec[];
 }
 
 export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
   stock_us: {
     currency: 'USD', calendar: 'NYSE', cadence: 'market_hours',
-    symbolHint: 'Borsa kodu — AAPL, MSFT', needsProviderSymbol: false,
+    symbolHint: 'Borsa kodu — AAPL, MSFT',
     sources: (s) => [
       { provider: 'yahoo', providerSymbol: s, priority: 10 },
       { provider: 'twelvedata', providerSymbol: s, priority: 20 },
@@ -36,7 +32,7 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
   },
   etf_us: {
     currency: 'USD', calendar: 'NYSE', cadence: 'market_hours',
-    symbolHint: 'ETF kodu — VOO, QQQ', needsProviderSymbol: false,
+    symbolHint: 'ETF kodu — VOO, QQQ',
     sources: (s) => [
       { provider: 'yahoo', providerSymbol: s, priority: 10 },
       { provider: 'twelvedata', providerSymbol: s, priority: 20 },
@@ -44,23 +40,22 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
   },
   stock_tr: {
     currency: 'TRY', calendar: 'BIST', cadence: 'market_hours',
-    symbolHint: 'BIST kodu — THYAO, ASELS', needsProviderSymbol: false,
+    symbolHint: 'BIST kodu — THYAO, ASELS',
     sources: (s) => [{ provider: 'yahoo', providerSymbol: `${s}.IS`, priority: 10 }],
   },
   fund_tr: {
     currency: 'TRY', calendar: 'TEFAS_DAILY', cadence: 'daily_close',
-    symbolHint: 'TEFAS fon kodu — 3 harf, ör. THF', needsProviderSymbol: false,
+    symbolHint: 'TEFAS fon kodu — 3 harf, ör. THF',
     sources: (s) => [{ provider: 'tefas', providerSymbol: s, priority: 10 }],
   },
   gold: {
     currency: 'TRY', calendar: 'CRYPTO_24_7', cadence: 'hourly',
-    symbolHint: 'Kendi verdiğin ad — CEYREKALTIN', needsProviderSymbol: true,
-    providerHint: 'truncgil alan adı — GRA, CEYREK_ALTIN, YARIM_ALTIN',
+    symbolHint: '',
     sources: (_s, ps) => [{ provider: 'truncgil', providerSymbol: ps, priority: 10 }],
   },
   fx: {
     currency: 'TRY', calendar: 'FX_24_5', cadence: 'hourly',
-    symbolHint: '6 harf — GBPTRY, CHFTRY', needsProviderSymbol: false,
+    symbolHint: '6 harf — GBPTRY, CHFTRY',
     // truncgil/tcmb baz para birimini bekler: GBPTRY -> GBP
     sources: (s) => [
       { provider: 'truncgil', providerSymbol: s.slice(0, 3), priority: 10 },
@@ -69,8 +64,7 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
   },
   crypto: {
     currency: 'USD', calendar: 'CRYPTO_24_7', cadence: 'hourly',
-    symbolHint: 'Kısa kod — SOL, AVAX', needsProviderSymbol: true,
-    providerHint: 'CoinGecko id — solana, avalanche-2 (küçük harf)',
+    symbolHint: 'Kısa kod — SOL, AVAX',
     sources: (_s, ps) => [{ provider: 'coingecko', providerSymbol: ps, priority: 10 }],
   },
 };

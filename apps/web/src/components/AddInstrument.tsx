@@ -2,12 +2,13 @@
 import { useState, useTransition } from 'react';
 import { addInstrument } from '@/app/actions';
 import { CLASS_DEFAULTS } from '@/lib/catalog';
+import { GOLD_OPTIONS } from '@/lib/resolve';
 import type { AssetClass } from '@/lib/data';
 
 /**
  * Henüz sahip olunmayan bir enstrümanı kataloğa ekler.
- * Para birimi, takvim, ritim ve kaynak zinciri varlık sınıfından türetilir —
- * kullanıcı yalnız sembol + ad girer.
+ * Kullanıcı yalnız varlık sınıfı + sembol girer (altında sabit bir listeden
+ * seçer) — görünen ad ve kaynak kodu sunucu tarafında otomatik çözülür.
  */
 export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
   const [open, setOpen] = useState(false);
@@ -17,8 +18,7 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
   const [symbol, setSymbol] = useState('');
 
   const def = CLASS_DEFAULTS[cls];
-  const sym = symbol.trim().toUpperCase();
-  const preview = def && sym ? def.sources(sym, '‹kaynak kodu›') : [];
+  const isGold = cls === 'gold';
 
   const reset = () => { setOpen(false); setMsg(''); setSymbol(''); };
 
@@ -48,7 +48,7 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
 
             <p className="col-span-2 text-[11px] -mt-2" style={{ color: 'var(--faint)' }}>
               Henüz almadığın bir varlığı ekle; izleme listesinde durur, fiyatı çekilmeye başlar.
-              İlk alımı girdiğinde kendiliğinden pozisyona döner.
+              İlk alımı girdiğinde kendiliğinden pozisyona döner. Ad ve kaynak otomatik çözülür.
             </p>
 
             <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
@@ -60,38 +60,29 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
               </select>
             </label>
 
-            <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
-              Sembol
-              <input
-                name="symbol" required className="field mt-1 tnum uppercase"
-                value={symbol} onChange={(e) => setSymbol(e.target.value)}
-                autoCapitalize="characters" autoCorrect="off" spellCheck={false}
-              />
-              <span className="block mt-1" style={{ color: 'var(--faint)' }}>{def?.symbolHint}</span>
-            </label>
-
-            <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
-              Görünen Ad
-              <input name="display_name" required className="field mt-1" />
-            </label>
-
-            {def?.providerHint && (
+            {isGold ? (
               <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
-                Kaynak Kodu
+                Altın Türü
+                <select name="gold_code" className="field mt-1" required defaultValue="">
+                  <option value="" disabled>Seç…</option>
+                  {GOLD_OPTIONS.map((g) => <option key={g.code} value={g.code}>{g.display_name}</option>)}
+                </select>
+              </label>
+            ) : (
+              <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+                Sembol
                 <input
-                  name="provider_symbol" required={def.needsProviderSymbol}
-                  className="field mt-1" autoCorrect="off" spellCheck={false}
+                  name="symbol" required className="field mt-1 tnum uppercase"
+                  value={symbol} onChange={(e) => setSymbol(e.target.value)}
+                  autoCapitalize="characters" autoCorrect="off" spellCheck={false}
                 />
-                <span className="block mt-1" style={{ color: 'var(--faint)' }}>{def.providerHint}</span>
+                <span className="block mt-1" style={{ color: 'var(--faint)' }}>{def?.symbolHint}</span>
               </label>
             )}
 
-            {def && (
+            {def && !isGold && (
               <div className="col-span-2 text-[11px] tnum" style={{ color: 'var(--faint)' }}>
                 {def.currency} · {def.calendar} · {def.cadence}
-                {preview.length > 0 && (
-                  <> · kaynak: {preview.map((s) => `${s.provider}(${s.providerSymbol})`).join(' → ')}</>
-                )}
               </div>
             )}
 

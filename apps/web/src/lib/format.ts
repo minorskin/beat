@@ -5,6 +5,13 @@ export const usd = (n: number) =>
 export const num = (n: number, d = 2) =>
   new Intl.NumberFormat('tr-TR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
 export const pct = (n: number) => `${n >= 0 ? '+' : ''}${num(n, 2)}%`;
+export const dateStr = (iso: string) => {
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}.${mm}.${yy}`;
+};
 export const timeAgo = (iso: string) => {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return `${s}sn önce`;

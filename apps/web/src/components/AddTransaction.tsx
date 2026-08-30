@@ -4,7 +4,7 @@ import { addTransaction } from '@/app/actions';
 import { num } from '@/lib/format';
 import type { Instrument } from '@/lib/data';
 
-export default function AddTransaction({ instruments }: { instruments: Instrument[] }) {
+export default function AddTransaction({ instruments, locations }: { instruments: Instrument[]; locations: string[] }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState('');
@@ -117,6 +117,17 @@ export default function AddTransaction({ instruments }: { instruments: Instrumen
                 <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
                   Tarih
                   <input name="executed_at" type="datetime-local" className="field mt-1" />
+                </label>
+
+                <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                  Konum
+                  <input
+                    name="location" list="location-options" autoComplete="off"
+                    className="field mt-1" placeholder="ör. İş Yatırım"
+                  />
+                  <datalist id="location-options">
+                    {locations.map((l) => <option key={l} value={l} />)}
+                  </datalist>
                 </label>
 
                 {(type === 'buy' || type === 'sell') && (
