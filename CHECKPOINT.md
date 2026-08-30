@@ -87,6 +87,22 @@ a03678e  style: grafiklerde renk geri, sticky header + Dashboard/Portföy bölü
 edfbe44  style: siyah-tema redesign — border'sız, düşük radius, responsive
 ```
 
+## ⚠️ Olay kaydı: şifre sızıntısı ve rotasyonu (2026-08-30, aynı oturumda)
+
+Bu dosyanın ilk sürümü yanlışlıkla dashboard şifresini düz metin içeriyordu ve
+public repoya push edildi (commit 77144dc). Fark edilir edilmez: (1) dosya
+redakte edilip yeni commit atıldı (bf7bc9c), (2) şifre Vercel'de derhal
+DÖNDÜRÜLDÜ ve redeploy ile canlıya alındı, (3) eski şifrenin artık çalışmadığı
+doğrulandı (307), yeni şifrenin çalıştığı doğrulandı (200).
+
+**Ders / kural:** Bu dosyaya (ya da repodaki HİÇBİR dosyaya) gerçek şifre,
+token veya bağlantı string'i asla düz metin yazılmaz — repo public. Şifre
+şu an Vercel env `APP_PASSWORD`'de; sadece dashboard/CLI'dan okunur, buraya
+yazılmaz. Kullanıcı şifreyi unutursa: `npx vercel env ls` ile hangi ortamlarda
+tanımlı olduğu görülür, değeri görmek için Vercel dashboard → proje →
+Settings → Environment Variables (orada değer maskeli gösterilir, "Reveal"
+ile açılır — bu ekran da public değil, sadece proje sahibine).
+
 ## Detaylı proje hafızası
 
 Bu dosya bir özet/checkpoint'tir. Mimari kararlar, veri modeli, tam kaynak listesi ve
