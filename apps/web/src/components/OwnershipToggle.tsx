@@ -20,9 +20,11 @@ export default function OwnershipToggle({ own }: { own: boolean }) {
       <button
         onClick={() => setParam('own', '1')}
         aria-pressed={own}
+        title="Bana Ait — emanet pay düşülmüş"
+        aria-label="Bana Ait"
         className={`seg ${own ? 'seg-on' : ''}`}
       >
-        Bana Ait
+        BT
       </button>
     </div>
   );

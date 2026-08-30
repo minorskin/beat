@@ -155,6 +155,15 @@ html { scroll-behavior: smooth; }
   .sheet { border-radius: var(--r); }
 }
 
+/* Açılır filtre menüsü — tablo başlığındaki huni ikonuna sabitlenir.
+   Tablo overflow'u kırpmasın diye position:fixed ile çizilir. */
+.menu {
+  background: var(--panel-2);
+  border-radius: var(--r-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+.menu label:hover { background: var(--panel-3); }
+
 /* Aralık girdisi */
 input[type="range"] {
   -webkit-appearance: none;

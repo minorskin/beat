@@ -142,13 +142,61 @@ export async function updateTransaction(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
-/** Kataloğa kayıtlı bir enstrümanın görünen adını düzenler. */
+/**
+ * Kataloğa kayıtlı bir varlığın adını, grubunu, dövizini ve konumunu düzenler.
+ * Sembol ve fiyat kaynakları dokunulmaz — onlar ekleme anında çözülüyor.
+ *
+ * Konum şemada TRANSACTION'a bağlı (bkz. 0003_location.sql); buradan girilen
+ * değer varlığın tüm işlemlerine yazılır. Kullanıcı alanı değiştirmediyse
+ * (orig_location ile aynıysa) işlemlere hiç dokunulmaz — böylece işlem işlem
+ * ayrılmış konumlar yanlışlıkla tek değere ezilmez.
+ */
 export async function updateInstrument(formData: FormData): Promise<Result> {
   const instrument_id = String(formData.get('instrument_id') || '');
   if (!instrument_id) return { ok: false, error: 'Enstrüman yok' };
   const display_name = String(formData.get('display_name') || '').trim();
   if (!display_name) return { ok: false, error: 'Ad zorunlu' };
-  await q(`update instruments set display_name=$2 where id=$1`, [instrument_id, display_name]);
+
+  const class_code = String(formData.get('class_code') || '').trim();
+  if (!class_code) return { ok: false, error: 'Grup zorunlu' };
+  const cls = await q<{ code: string }>(`select code from asset_classes where code=$1`, [class_code]);
+  if (!cls.length) return { ok: false, error: 'Geçersiz grup' };
+
+  const currency = String(formData.get('currency') || '').trim().toUpperCase();
+  if (currency !== 'TRY' && currency !== 'USD') return { ok: false, error: 'Döviz TRY veya USD olmalı' };
+
+  const location = String(formData.get('location') || '').trim();
+  const orig_location = String(formData.get('orig_location') || '').trim();
+
+  // Grup değişince takvim/periyot da o grubun varsayılanına çekilir; aksi halde
+  // motor varlığı yanlış saatlerde çekmeye devam ederdi.
+  const def = CLASS_DEFAULTS[class_code];
+
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    if (def) {
+      await client.query(
+        `update instruments set display_name=$2, class_code=$3, currency=$4, calendar_code=$5, cadence=$6 where id=$1`,
+        [instrument_id, display_name, class_code, currency, def.calendar, def.cadence]);
+    } else {
+      await client.query(
+        `update instruments set display_name=$2, class_code=$3, currency=$4 where id=$1`,
+        [instrument_id, display_name, class_code, currency]);
+    }
+    if (location !== orig_location) {
+      await client.query(
+        `update transactions set location=$2 where instrument_id=$1`,
+        [instrument_id, location || null]);
+    }
+    await client.query('commit');
+  } catch (e) {
+    await client.query('rollback');
+    return { ok: false, error: e instanceof Error ? e.message : 'Güncellenemedi' };
+  } finally {
+    client.release();
+  }
+
   revalidatePath('/');
   return { ok: true };
 }

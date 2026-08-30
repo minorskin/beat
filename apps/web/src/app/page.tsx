@@ -133,7 +133,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             </div>
           </div>
 
-          <PositionsTable rows={rows} own={own} transactions={transactions} locations={locations} />
+          <PositionsTable rows={rows} own={own} transactions={transactions} locations={locations} classes={classes} />
           </section>
         </>
       )}
