@@ -1,18 +1,24 @@
 # beat-cron — Cloudflare Worker watchdog
 
 GitHub scheduled cron bu repoda ateşlemiyor (dispatch çalışıyor). Bu Worker her 30 dk'da
-`fetch.yml`'i `workflow_dispatch` ile tetikler.
+`fetch.yml`'i `workflow_dispatch` ile tetikler. Worker motoru çalıştırmaz; sadece güvenilir tetikleyici.
+
+**Güvenlik:** `workers_dev: false` → public HTTP yüzeyi YOK, sadece cron. `/trigger` yalnız
+opsiyonel `TRIGGER_KEY` secret'ı ayarlıysa ve `X-Beat-Key` başlığı eşleşirse çalışır; aksi halde 404.
 
 ## Kurulum
 ```bash
 cd infra/cron-worker
 npm install
-# 1) Cloudflare girişi (tarayıcı açılır, yetkilendir):
-npx wrangler login
-# 2) GitHub fine-grained PAT'ı secret olarak ekle (repo: minorskin/beat, Actions: R+W):
-npx wrangler secret put GH_TOKEN
-# 3) Deploy:
+npx wrangler login                 # tarayıcı açılır, Cloudflare'ı yetkilendir
+npx wrangler secret put GH_TOKEN   # GitHub fine-grained PAT (repo: minorskin/beat, Actions: R+W)
 npx wrangler deploy
 ```
-Doğrulama: `npx wrangler tail` (cron log) VE Supabase `fetch_runs` yeni satır (workflow yeşili yetmez).
-Manuel test: deploy sonrası `<worker-url>/trigger` → 200 + GitHub'da yeni koşu.
+
+## Doğrulama (tek yeşil koşu YETMEZ)
+- `npx wrangler tail` → her 30 dk "dispatch ok (204)" logu
+- Supabase `fetch_runs` → started_at'lerin ~30 dk'da bir DÜZENLİ olduğunu gör
+- GitHub Actions → workflow_dispatch koşuları düzenli geliyor mu
+
+## GH token
+Fine-grained PAT · yalnız `minorskin/beat` · Permissions → Actions: Read and write · kısa süreli.

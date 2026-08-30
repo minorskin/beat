@@ -6,7 +6,8 @@
  */
 export interface Env {
   GH_TOKEN: string;
-  REPO?: string;   // "owner/repo" (vars'ta; yoksa default)
+  REPO?: string;        // "owner/repo" (vars'ta; yoksa default)
+  TRIGGER_KEY?: string; // opsiyonel: ayarlıysa /trigger bu sırla korunur; yoksa /trigger kapalı
 }
 
 const DEFAULT_REPO = 'minorskin/beat';
@@ -41,12 +42,15 @@ export default {
       }),
     );
   },
-  // Manuel test / sağlık: GET ile elle tetikle.
+  // HTTP yüzeyi varsayılan KAPALI (workers_dev:false). Bir route eklenirse bile
+  // savunma: /trigger yalnız TRIGGER_KEY ayarlıysa ve X-Beat-Key eşleşirse çalışır;
+  // aksi halde 404 (varlığı ele vermemek için 403 değil).
   async fetch(req: Request, env: Env): Promise<Response> {
-    if (new URL(req.url).pathname === '/trigger') {
+    const url = new URL(req.url);
+    if (url.pathname === '/trigger' && env.TRIGGER_KEY && req.headers.get('X-Beat-Key') === env.TRIGGER_KEY) {
       const r = await dispatch(env);
       return new Response(JSON.stringify(r), { status: r.ok ? 200 : 502, headers: { 'content-type': 'application/json' } });
     }
-    return new Response('beat-cron alive. POST-trigger: /trigger', { status: 200 });
+    return new Response('Not found', { status: 404 });
   },
 };
