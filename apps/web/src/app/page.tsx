@@ -4,6 +4,7 @@ import PortfolioChart from '@/components/PortfolioChart';
 import AllocationDonut from '@/components/AllocationDonut';
 import AddTransaction from '@/components/AddTransaction';
 import Projection from '@/components/Projection';
+import { logout } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             {lastFetch ? `Son güncelleme ${timeAgo(lastFetch.finished_at)} · ${lastFetch.status}` : 'Henüz veri yok'}
           </p>
         </div>
-        <AddTransaction instruments={instruments} />
+        <div className="flex items-center gap-2">
+          <AddTransaction instruments={instruments} />
+          <form action={logout}>
+            <button type="submit" className="px-3 py-2 rounded-lg text-sm" style={{ background: 'var(--panel-2)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
+              Çıkış
+            </button>
+          </form>
+        </div>
       </div>
 
       {!snap ? (

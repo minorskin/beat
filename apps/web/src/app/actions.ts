@@ -19,3 +19,11 @@ export async function addTransaction(formData: FormData) {
   revalidatePath('/');
   return { ok: true };
 }
+
+export async function logout() {
+  'use server';
+  const { cookies } = await import('next/headers');
+  (await cookies()).delete('beat_auth');
+  const { redirect } = await import('next/navigation');
+  redirect('/login');
+}
