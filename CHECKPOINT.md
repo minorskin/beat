@@ -8,7 +8,7 @@ Yeni bir oturum açıldığında önce burayı oku.
 ```
 📡 Motor        GitHub Actions (fetch.yml) — CF Worker tarafından her 30dk tetikleniyor
 🗄️  Veritabanı   Supabase Postgres (Frankfurt) — jcbikyquijcealtqafvk
-📊 Dashboard    Vercel (Frankfurt) — https://web-kohl-one-20.vercel.app · şifre 31223122
+📊 Dashboard    Vercel (Frankfurt) — https://web-kohl-one-20.vercel.app · şifre — bkz. Vercel env APP_PASSWORD (buraya asla yazma)
 ⏰ Cron         Cloudflare Worker (beat-cron) — GH schedule ölü olduğu için asıl tetikleyici bu
 ```
 
