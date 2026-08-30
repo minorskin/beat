@@ -5,7 +5,7 @@ name: Fiyat Çek + Snapshot (saatlik)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '3,33 * * * *'    # saatte 2 kez (GH cron drop'larına karşı yedek; snapshot saatlik bucket, 2. koşu tazeler)
+    - cron: '*/10 * * * *'    # her 10 dk (public repo = sınırsız Actions dk; GH drop'larına karşı 6x/saat, pratikte hiç kaçmaz)
 
 concurrency:
   group: fetch
