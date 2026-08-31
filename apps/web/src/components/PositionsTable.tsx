@@ -116,7 +116,7 @@ export default function PositionsTable({
   }[] = [
     // w-[1%]: tablo hücresi içeriğine göre daralsın — sütun genişliğini varlık
     // KODU belirlesin, altındaki uzun görünen ad değil (o zaten kırpılıyor).
-    { key: 'symbol', label: 'Varlık', align: 'left', cls: 'px-4 sm:px-5 w-[1%] whitespace-nowrap', sortVal: (p) => p.symbol },
+    { key: 'symbol', label: 'Varlık', align: 'left', cls: 'px-4 sm:px-5 w-[1%]', sortVal: (p) => p.symbol },
     { key: 'class', label: 'Grup', align: 'left', cls: 'px-3 hidden md:table-cell', filter: 'class', sortVal: (p) => p.class_name },
     { key: 'currency', label: 'Döviz', align: 'left', cls: 'px-3 hidden md:table-cell', filter: 'currency', sortVal: (p) => p.currency },
     { key: 'location', label: 'Konum', align: 'left', cls: 'px-3 hidden lg:table-cell', filter: 'location', sortVal: (p) => p.locations.join(', ') },
@@ -295,8 +295,11 @@ export default function PositionsTable({
                     className="cursor-pointer"
                     aria-expanded={isOpen}
                   >
-                    <td className="px-4 sm:px-5 py-3 w-[1%] whitespace-nowrap">
-                      <div className="font-medium flex items-center gap-2">
+                    {/* nowrap hücrede DEĞİL içerikte: hücrede olursa içinde
+                        render edilen düzenleme popup'ı da miras alıyor ve
+                        dar ekranda metinleri kırpıyor. */}
+                    <td className="px-4 sm:px-5 py-3 w-[1%]">
+                      <div className="font-medium flex items-center gap-2 whitespace-nowrap">
                         {p.symbol}
                         {p.pending && <span title="Fiyat bekleniyor — bir sonraki turda gelir" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--c3)' }} />}
                         {!p.pending && p.is_stale && <span title="Taşınmış fiyat (piyasa kapalı)" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--faint)' }} />}

@@ -48,16 +48,20 @@ export const tefasProvider: PriceProvider = {
   async fetchQuotes(syms, ctx: FetchContext): Promise<ProviderResult> {
     const quotes: Quote[] = [];
     const errors: ProviderResult['errors'] = [];
-    // NAV geç yayınlanabilir; 7 günlük pencere çekip en yeni satırı alıyoruz.
+    // NAV geç yayınlanabilir; 14 günlük pencere çekip en yeni GEÇERLİ satırı
+    // alıyoruz. Serbest fonlar her gün NAV yayınlamıyor ve TEFAS o günler için
+    // fiyat=0 satırı döndürüyor — körlemesine "en yeni satır" alınırsa fon
+    // kalıcı olarak fiyatsız kalıyor (DFI böyle düşmüştü).
     const end = ctx.now;
-    const start = new Date(end.getTime() - 7 * 864e5);
+    const start = new Date(end.getTime() - 14 * 864e5);
 
     for (const s of syms) {
       try {
         const rows = await queryFund(s.providerSymbol, start, end);
         if (!rows.length) { errors.push({ symbol: s.symbol, message: 'veri yok' }); continue; }
-        rows.sort((a, b) => a.tarih.localeCompare(b.tarih));
-        const last = rows[rows.length - 1];
+        const valid = rows.filter((r) => r.fiyat > 0).sort((a, b) => a.tarih.localeCompare(b.tarih));
+        if (!valid.length) { errors.push({ symbol: s.symbol, message: 'son 14 günde NAV yayınlanmamış' }); continue; }
+        const last = valid[valid.length - 1];
         quotes.push({
           symbol: s.symbol,
           price: last.fiyat,

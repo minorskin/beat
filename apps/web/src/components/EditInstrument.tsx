@@ -43,7 +43,7 @@ export default function EditInstrument({
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 whitespace-normal text-left normal-case tracking-normal"
           style={{ background: 'rgba(0,0,0,0.65)' }}
           onClick={(e) => { e.stopPropagation(); reset(); }}
         >

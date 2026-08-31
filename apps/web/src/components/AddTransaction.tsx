@@ -18,6 +18,10 @@ export default function AddTransaction({ instruments, locations }: { instruments
 
   const sel = instruments.find((i) => i.id === insId);
   const isTransfer = type === 'transfer';
+  // Gayrimenkulde adet = 1 (mülkün kendisi) ve "birim fiyat" aslında ALIŞ
+  // BEDELİ. Güncel değerleme varlığın kendisinde durur; ikisi farklı sayılar
+  // ve kâr/zarar aradaki farktır — form bunu açıkça söylemeli.
+  const isRealty = sel?.class_code === 'realty';
   // Emanet düzeltmesinde kullanıcı YENİ TOPLAMI girer; sunucuya delta gider.
   const extDelta = isTransfer ? (Number(extTarget) || 0) - (sel?.external_quantity ?? 0) : 0;
 
@@ -102,14 +106,26 @@ export default function AddTransaction({ instruments, locations }: { instruments
             ) : (
               <>
                 <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
-                  Adet
-                  <input name="quantity" type="number" step="any" required inputMode="decimal" className="field mt-1 tnum" />
+                  {isRealty ? 'Adet (mülk sayısı)' : 'Adet'}
+                  <input
+                    key={isRealty ? 'qty-realty' : 'qty'}
+                    name="quantity" type="number" step="any" required inputMode="decimal"
+                    defaultValue={isRealty ? 1 : undefined} className="field mt-1 tnum"
+                  />
                 </label>
 
                 <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
-                  Birim Fiyat ({cur})
+                  {isRealty ? `Alış Bedeli (${cur})` : `Birim Fiyat (${cur})`}
                   <input name="unit_price" type="number" step="any" inputMode="decimal" className="field mt-1 tnum" />
                 </label>
+
+                {isRealty && (
+                  <p className="col-span-2 text-[11px] -mt-1" style={{ color: 'var(--faint)' }}>
+                    Buraya mülkü <b style={{ color: 'var(--muted)' }}>kaça aldığını</b> yaz. Bugünkü değerlemesi
+                    varlığın kendisinde duruyor (satırdaki ✎ ile güncellenir); kâr/zarar bu ikisinin farkı.
+                    Mülkün bir kısmı başkasınınsa aşağıdaki “bana ait olmayan kısım” alanını kullan (ör. yarısı için 0,5).
+                  </p>
+                )}
 
                 <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
                   Tarih
