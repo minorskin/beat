@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
 
 export const TABS = [
   { id: 'ozet', label: 'Özet' },
@@ -21,12 +21,12 @@ export function useTabs() {
  * geçiş anında olsun. İki panel de DOM'da kalır (yalnız gizlenir) — grafikler
  * her geçişte sıfırdan çizilmez.
  *
- * Mobil: yatay kaydırma sekme değiştirir. Eşik dikey harekete göre ölçülür,
- * yoksa sayfayı aşağı kaydırırken kazara sekme atlıyor.
+ * Sekme YALNIZCA üst bardaki düğmelerle değişir. Kaydırma jesti bilerek yok:
+ * tablo yatay kayıyor, grafiklerin kendi dokunma davranışı var; jest ikisiyle
+ * çakışıp istemeden sekme atlatıyordu.
  */
 export default function TabsProvider({ children }: { children: React.ReactNode }) {
   const [tab, setTabState] = useState<TabId>('ozet');
-  const start = useRef<{ x: number; y: number } | null>(null);
 
   const setTab = useCallback((t: TabId) => {
     setTabState((prev) => {
@@ -37,34 +37,8 @@ export default function TabsProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
-  const move = (dir: 1 | -1) => {
-    const i = TABS.findIndex((t) => t.id === tab);
-    const next = TABS[i + dir];
-    if (next) setTab(next.id);
-  };
-
   return (
-    <Ctx.Provider value={{ tab, setTab }}>
-      <div
-        style={{ touchAction: 'pan-y' }}
-        onTouchStart={(e) => {
-          const t = e.touches[0];
-          start.current = { x: t.clientX, y: t.clientY };
-        }}
-        onTouchEnd={(e) => {
-          const s = start.current;
-          start.current = null;
-          if (!s) return;
-          const t = e.changedTouches[0];
-          const dx = t.clientX - s.x;
-          const dy = t.clientY - s.y;
-          if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-          move(dx < 0 ? 1 : -1);
-        }}
-      >
-        {children}
-      </div>
-    </Ctx.Provider>
+    <Ctx.Provider value={{ tab, setTab }}>{children}</Ctx.Provider>
   );
 }
 
