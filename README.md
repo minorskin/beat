@@ -80,7 +80,8 @@ npm run probe             # kaynak sağlığı (buluttan çalıştırmak esas)
 npm run typecheck
 ```
 
-Şema: `supabase/migrations/0001_init.sql` → `0002_ownership_watchlist.sql` → `0003_location.sql` → ardından `supabase/seed.sql`.
+Şema: `supabase/migrations/0001_init.sql` → `0002_ownership_watchlist.sql` → `0003_location.sql` →
+`0004_tax_rate.sql` → ardından `supabase/seed.sql`.
 Migration'lar sıralı ve idempotent'e yakındır (`add column if not exists`); mevcut kurulumda
 yalnız yeni olanı çalıştırmak yeterli.
 

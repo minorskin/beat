@@ -77,6 +77,16 @@ export async function addInstrument(formData: FormData): Promise<Result> {
     provider_symbol = resolved.provider_symbol;
   }
 
+  // Kâr vergisi oranı isteğe bağlı: boş bırakılırsa NULL ("girilmedi") yazılır.
+  // 0 girmek ayrı bir bilgi ("vergi yok"), bu yüzden boş ≠ 0.
+  const taxRaw = String(formData.get('tax_rate') || '').trim().replace(',', '.');
+  let tax_rate: number | null = null;
+  if (taxRaw) {
+    const n = Number(taxRaw);
+    if (!Number.isFinite(n) || n < 0 || n > 100) return { ok: false, error: 'Vergi oranı 0 ile 100 arasında olmalı' };
+    tax_rate = n;
+  }
+
   const dup = await q<{ symbol: string }>(`select symbol from instruments where symbol=$1`, [symbol]);
   if (dup.length) return { ok: false, error: `${symbol} zaten kayıtlı` };
 
@@ -85,9 +95,9 @@ export async function addInstrument(formData: FormData): Promise<Result> {
   try {
     await client.query('begin');
     const ins = await client.query<{ id: string }>(
-      `insert into instruments (class_code, symbol, display_name, currency, calendar_code, cadence)
-       values ($1,$2,$3,$4,$5,$6) returning id`,
-      [class_code, symbol, display_name, def.currency, def.calendar, def.cadence]);
+      `insert into instruments (class_code, symbol, display_name, currency, calendar_code, cadence, tax_rate)
+       values ($1,$2,$3,$4,$5,$6,$7) returning id`,
+      [class_code, symbol, display_name, def.currency, def.calendar, def.cadence, tax_rate]);
     const id = ins.rows[0].id;
     for (const s of sources) {
       await client.query(

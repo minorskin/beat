@@ -80,6 +80,22 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
               </label>
             )}
 
+            <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+              Kâr Vergisi (%) <span style={{ color: 'var(--faint)' }}>— isteğe bağlı</span>
+              {/* type=number DEĞİL: tarayıcı yerel ayarı İngilizce olduğunda
+                  "12,5" geçersiz sayılıp alan sessizce boşalıyor. Metin olarak
+                  alınıp sunucuda virgül noktaya çevriliyor. */}
+              <input
+                name="tax_rate" type="text" inputMode="decimal"
+                pattern="[0-9]{1,3}([.,][0-9]{1,3})?" placeholder="ör. 10"
+                title="0 ile 100 arası bir oran (ör. 10 veya 12,5)"
+                className="field mt-1 tnum"
+              />
+              <span className="block mt-1" style={{ color: 'var(--faint)' }}>
+                Kâr üzerinden kesilecek vergi oranı. Bilmiyorsan boş bırak.
+              </span>
+            </label>
+
             {def && !isGold && (
               <div className="col-span-2 text-[11px] tnum" style={{ color: 'var(--faint)' }}>
                 {def.currency} · {def.calendar} · {def.cadence}
