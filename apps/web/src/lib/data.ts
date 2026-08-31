@@ -19,6 +19,10 @@ export interface Position {
   opened_at: string | null; closed_at: string | null; locations: string[];
   // Kâr üzerinden kesilecek vergi oranı (%) — girilmemişse null.
   tax_rate: number | null;
+  // Fiyat kaynağının bildirdiği para birimi (prices.currency). Enstrümana
+  // elle seçilen para biriminden farklıysa değer kurla yanlış çarpılıyor
+  // demektir; düzenleme formu bunu uyarı olarak gösteriyor.
+  price_currency: string | null;
   // Tutuluyor ama motor henüz fiyat çekmedi — bir sonraki turda gelir, o ana kadar değer/K-Z/ağırlık "—".
   pending: boolean;
 }
@@ -92,17 +96,22 @@ export async function getPositions(): Promise<Position[]> {
     -- çekmemiş olsa bile (snapshot yoksa fiyat/değer/ağırlık null → arayüzde "—"/"bekliyor").
     select i.id as instrument_id, i.symbol, i.display_name, i.class_code, ac.name as class_name, ac.ui_group,
            i.tax_rate,
+           (select p.currency from prices p where p.instrument_id = i.id order by p.ts desc limit 1) as price_currency,
            h.quantity, ps.price, i.currency, ps.price_ts, coalesce(ps.is_stale, false) as is_stale,
            ps.value_try, ps.value_usd, ps.weight_pct,
            h.own_quantity, ps.own_value_try, ps.own_value_usd, ps.own_weight_pct,
            coalesce(h.external_qty, 0) as external_quantity,
            h.avg_cost,
-           (ps.value_try - coalesce(h.avg_cost,0) * h.quantity *
-              case when i.currency='USD' then (select rate from fx) else 1 end
-           ) as pnl_try,
-           (ps.own_value_try - coalesce(h.avg_cost,0) * h.own_quantity *
-              case when i.currency='USD' then (select rate from fx) else 1 end
-           ) as own_pnl_try,
+           -- Alış fiyatı girilmemişse maliyet 0 DEĞİL meçhuldür: K/Z null kalır,
+           -- yoksa varlığın tamamı kâr gibi görünür.
+           case when h.avg_cost > 0 then
+             ps.value_try - h.avg_cost * h.quantity *
+               case when i.currency='USD' then (select rate from fx) else 1 end
+           end as pnl_try,
+           case when h.avg_cost > 0 then
+             ps.own_value_try - h.avg_cost * h.own_quantity *
+               case when i.currency='USD' then (select rate from fx) else 1 end
+           end as own_pnl_try,
            case when h.avg_cost > 0 and ps.price is not null then
              ((ps.price - h.avg_cost) / h.avg_cost) * 100 end as pnl_pct,
            cs.opened_at, cs.closed_at, coalesce(cs.locations, '{}') as locations,

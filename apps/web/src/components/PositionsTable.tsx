@@ -364,7 +364,7 @@ export default function PositionsTable({
                         <EditInstrument
                           id={p.instrument_id} symbol={p.symbol} displayName={p.display_name}
                           classCode={p.class_code} currency={p.currency} price={p.price}
-                          taxRate={p.tax_rate}
+                          taxRate={p.tax_rate} priceCurrency={p.price_currency}
                           txCount={(transactions[p.instrument_id] ?? []).length}
                           positionLocations={p.locations}
                           classes={classes} locations={locations}

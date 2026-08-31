@@ -9,23 +9,16 @@ import type { AnnualClosing } from '@/lib/data';
  * olarak biliyor; varlık kırılımı yok. Bu yüzden ayrı bir tabloda duruyor ve
  * grafikte yalnız "TÜM" aralığında, tek çizgi olarak çiziliyor.
  */
-export default function AnnualClosings({ rows }: { rows: AnnualClosing[] }) {
-  const [open, setOpen] = useState(false);
+export default function AnnualClosingsDialog({ rows, onClose }: { rows: AnnualClosing[]; onClose: () => void }) {
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState('');
   const [edit, setEdit] = useState<AnnualClosing | null>(null);
 
-  const reset = () => { setOpen(false); setMsg(''); setEdit(null); };
+  const reset = () => { setMsg(''); setEdit(null); onClose(); };
   const thisYear = new Date().getFullYear();
 
   return (
-    <>
-      <button onClick={() => setOpen(true)} className="btn btn-ghost" title="Geçmiş yıl kapanışları">
-        Yıl Kapanışı
-      </button>
-
-      {open && (
-        <div
+    <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
           style={{ background: 'rgba(0,0,0,0.65)' }}
           onClick={reset}
@@ -131,9 +124,7 @@ export default function AnnualClosings({ rows }: { rows: AnnualClosing[] }) {
                 {msg && <span className="text-xs" style={{ color: 'var(--muted)' }}>{msg}</span>}
               </div>
             </form>
-          </div>
-        </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }

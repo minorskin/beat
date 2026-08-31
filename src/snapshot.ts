@@ -52,6 +52,11 @@ async function main() {
   }[] = [];
   let totalTry = 0, totalUsd = 0, totalCostTry = 0;
   let ownTry = 0, ownUsd = 0, ownCostTry = 0;
+  // Maliyeti BİLİNEN pozisyonların değeri. Kâr/zarar yalnız bunlar üzerinden
+  // hesaplanır: alış fiyatı girilmemiş bir varlığın maliyeti 0 değil, MEÇHUL.
+  // İkisini eşitlemek portföyün tamamını "kâr" gösteriyordu (20M girişte
+  // +17,7M kâr gibi).
+  let costedTry = 0, ownCostedTry = 0;
   const missing: string[] = [];
 
   for (const r of rows) {
@@ -76,17 +81,25 @@ async function main() {
       const native = (r.avg_cost ?? 0) * qty;
       return r.currency === 'USD' ? native * usdtry : native;
     };
-    const costTry = cost(r.quantity);
+    const hasCost = (r.avg_cost ?? 0) > 0;
 
-    totalTry += valueTry; totalUsd += valueUsd; totalCostTry += costTry;
-    ownTry += ownValueTry; ownUsd += ownValueUsd; ownCostTry += cost(r.own_quantity);
+    totalTry += valueTry; totalUsd += valueUsd;
+    ownTry += ownValueTry; ownUsd += ownValueUsd;
+    if (hasCost) {
+      totalCostTry += cost(r.quantity);
+      ownCostTry += cost(r.own_quantity);
+      costedTry += valueTry;
+      ownCostedTry += ownValueTry;
+    }
     positions.push({ instrument_id: r.instrument_id, quantity: r.quantity, own_quantity: r.own_quantity,
       price: r.price, price_ts: new Date(r.price_ts), is_stale: isStale,
       value_try: valueTry, value_usd: valueUsd, own_value_try: ownValueTry, own_value_usd: ownValueUsd });
   }
 
-  const unrealizedTry = totalTry - totalCostTry;
-  const ownUnrealizedTry = ownTry - ownCostTry;
+  // Kâr/zarar = maliyeti bilinen pozisyonların değeri − maliyeti. Meçhul
+  // maliyetli pozisyonlar toplam büyüklüğe girer ama bu farka karışmaz.
+  const unrealizedTry = costedTry - totalCostTry;
+  const ownUnrealizedTry = ownCostedTry - ownCostTry;
 
   // Saat başına yuvarlanmış tek snapshot (idempotent).
   const client = await pool.connect();

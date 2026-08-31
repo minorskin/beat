@@ -170,6 +170,7 @@ html { scroll-behavior: smooth; }
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
 }
 .menu label:hover { background: var(--panel-3); }
+.menu .menu-item:hover { background: var(--panel-3); color: var(--text); }
 
 /* Aralık girdisi */
 input[type="range"] {

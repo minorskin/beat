@@ -13,11 +13,9 @@ import PositionsTable from '@/components/PositionsTable';
 import Projection from '@/components/Projection';
 import SectionNav from '@/components/SectionNav';
 import TabsProvider, { TabPanel } from '@/components/Tabs';
-import OwnershipToggle from '@/components/OwnershipToggle';
 import SettingsMenu from '@/components/SettingsMenu';
 import RangeSwitcher from '@/components/RangeSwitcher';
 import Movers from '@/components/Movers';
-import AnnualClosings from '@/components/AnnualClosings';
 import { logout } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -65,6 +63,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     (cur === 'USD' ? (own ? p.own_value_usd : p.value_usd) : (own ? p.own_value_try : p.value_try)) ?? 0;
 
   const staleCount = rows.filter((p) => p.is_stale).length;
+  // Alış fiyatı girilmemiş pozisyonlar: maliyetleri meçhul olduğu için maliyet
+  // ve değişim hesabının dışında kalıyorlar. Kart bunu söylemeli, yoksa
+  // "maliyet neden portföyden küçük" sorusu havada kalır.
+  const noCostCount = rows.filter((p) => (p.avg_cost ?? 0) <= 0 && (valOf(p) ?? 0) > 0).length;
 
   // Dağılım kutucukları: alan = büyüklük, kutu grubunun rengiyle boyanır.
   const alloc = rows
@@ -97,8 +99,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
         <div className="w-full px-3 sm:px-5 lg:px-8 py-2 sm:py-0 sm:h-14 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <SectionNav />
           <div className="shrink-0 flex items-center gap-2">
-            <OwnershipToggle own={own} />
-            <SettingsMenu cur={cur} logoutAction={logout} />
+            <SettingsMenu cur={cur} own={own} closings={closings} logoutAction={logout} />
             <RangeSwitcher range={range} />
           </div>
         </div>
@@ -163,6 +164,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                   color={up ? 'var(--up)' : 'var(--down)'}
                 />
                 <StatLine label="Pozisyon" value={staleCount ? `${rows.length} · ${staleCount} taşınmış` : String(rows.length)} />
+                {noCostCount > 0 && (
+                  <p className="text-[11px] pt-1" style={{ color: 'var(--faint)' }}>
+                    {noCostCount} pozisyonda alış fiyatı yok — maliyet ve değişim onlar hariç.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -214,7 +220,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
               </p>
             </div>
             <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
-              <AnnualClosings rows={closings} />
               <AddInstrument classes={classes} />
               <AddTransaction instruments={instruments} locations={locations} />
             </div>
