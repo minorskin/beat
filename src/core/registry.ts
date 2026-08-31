@@ -7,10 +7,12 @@ import { coingeckoProvider } from '../providers/coingecko.js';
 import { truncgilProvider } from '../providers/truncgil.js';
 import { tcmbProvider } from '../providers/tcmb.js';
 import { goldapiProvider } from '../providers/goldapi.js';
+import { constantProvider } from '../providers/constant.js';
 
 export const PROVIDERS: PriceProvider[] = [
   yahooProvider, twelvedataProvider, tefasProvider,
   coingeckoProvider, truncgilProvider, tcmbProvider, goldapiProvider,
+  constantProvider,
 ];
 
 const BY_ID = new Map(PROVIDERS.map((p) => [p.id, p]));

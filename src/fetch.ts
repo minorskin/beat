@@ -26,8 +26,10 @@ async function main() {
   const fxRows: { base: string; quote: string; q: Quote }[] = [];
   for (const [instrumentId, q] of out.quotes) {
     const cand = plan.get(instrumentId)?.[0];
-    if (cand?.classCode === 'fx' && cand.symbol.length === 6) {
-      fxRows.push({ base: cand.symbol.slice(0, 3), quote: cand.symbol.slice(3), q });
+    // Nakit (TRYTRY) bir kur değil: TRY/TRY=1 satırı fx_rates'e yazılmaz.
+    const base = cand?.symbol.slice(0, 3), quote = cand?.symbol.slice(3);
+    if (cand?.classCode === 'fx' && cand.symbol.length === 6 && base !== quote) {
+      fxRows.push({ base: base!, quote: quote!, q });
     }
   }
   const fxWritten = await writeFxRates(fxRows);

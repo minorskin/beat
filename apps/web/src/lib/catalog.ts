@@ -55,7 +55,7 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
   },
   fx: {
     currency: 'TRY', calendar: 'FX_24_5', cadence: 'hourly',
-    symbolHint: '6 harf — GBPTRY, CHFTRY',
+    symbolHint: '6 harf — GBPTRY, CHFTRY · nakit TL için TRYTRY',
     // truncgil/tcmb baz para birimini bekler: GBPTRY -> GBP
     sources: (s) => [
       { provider: 'truncgil', providerSymbol: s.slice(0, 3), priority: 10 },
@@ -68,6 +68,38 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
     sources: (_s, ps) => [{ provider: 'coingecko', providerSymbol: ps, priority: 10 }],
   },
 };
+
+/**
+ * Nakit = para biriminin kendisi (TRYTRY, USDUSD). Fiyatı tanım gereği 1;
+ * hiçbir kur servisi bu satırı döndürmediği için sabit sağlayıcıya bağlanır.
+ */
+export const isCash = (classCode: string, symbol: string) =>
+  classCode === 'fx' && symbol.length === 6 && symbol.slice(0, 3) === symbol.slice(3, 6);
+
+/**
+ * Sınıf varsayılanlarını SEMBOLE göre çözer. Nakit, döviz sınıfının içinde
+ * yaşayan bir istisna: para birimi kendi kodundan gelir (TRYTRY -> TRY),
+ * takvimi 7/24'tür (nakit "kapanmaz", yoksa hafta sonu "taşınmış fiyat"
+ * damgası yer) ve fiyatı sabit sağlayıcıdan okunur.
+ */
+export function defaultsFor(classCode: string, symbol: string, providerSymbol = '') {
+  const def = CLASS_DEFAULTS[classCode];
+  if (!def) return null;
+  if (isCash(classCode, symbol)) {
+    return {
+      currency: symbol.slice(0, 3),
+      calendar: 'CRYPTO_24_7',
+      cadence: 'hourly' as const,
+      sources: [{ provider: 'constant', providerSymbol: '1', priority: 10 }],
+    };
+  }
+  return {
+    currency: def.currency,
+    calendar: def.calendar,
+    cadence: def.cadence,
+    sources: def.sources(symbol, providerSymbol),
+  };
+}
 
 /** Enstrüman sembolü: harf/rakam/nokta/tire, 2-20 karakter. */
 export const SYMBOL_RE = /^[A-Z0-9.\-]{2,20}$/;

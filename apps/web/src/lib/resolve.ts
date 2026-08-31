@@ -38,7 +38,7 @@ export const GOLD_OPTIONS: { code: string; symbol: string; display_name: string 
 ];
 
 const CCY_NAMES: Record<string, string> = {
-  USD: 'ABD Doları', EUR: 'Euro', GBP: 'İngiliz Sterlini', CHF: 'İsviçre Frangı',
+  TRY: 'Türk Lirası', USD: 'ABD Doları', EUR: 'Euro', GBP: 'İngiliz Sterlini', CHF: 'İsviçre Frangı',
   JPY: 'Japon Yeni', CAD: 'Kanada Doları', AUD: 'Avustralya Doları', SEK: 'İsveç Kronu',
   NOK: 'Norveç Kronu', DKK: 'Danimarka Kronu', RUB: 'Rus Rublesi', CNY: 'Çin Yuanı',
   SAR: 'Suudi Riyali', AED: 'BAE Dirhemi', QAR: 'Katar Riyali',
@@ -108,6 +108,9 @@ function resolveFx(symbol: string): ResolveResult {
   const base = symbol.slice(0, 3).toUpperCase();
   const quote = symbol.slice(3, 6).toUpperCase();
   const baseName = CCY_NAMES[base] ?? base;
+  // TRYTRY gibi kendi kendine eşit çift = nakit. "Türk Lirası / Türk Lirası"
+  // saçma görünür; kaynak kodu da sabit fiyatın kendisidir.
+  if (base === quote) return { display_name: `${baseName} (nakit)`, provider_symbol: '1' };
   const quoteName = quote === 'TRY' ? 'TL' : (CCY_NAMES[quote] ?? quote);
   return { display_name: `${baseName} / ${quoteName}`, provider_symbol: base };
 }

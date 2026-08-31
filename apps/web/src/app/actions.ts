@@ -1,6 +1,6 @@
 'use server';
 import { q, pool } from '@/lib/db';
-import { CLASS_DEFAULTS, SYMBOL_RE } from '@/lib/catalog';
+import { CLASS_DEFAULTS, SYMBOL_RE, defaultsFor } from '@/lib/catalog';
 import { resolveInstrumentMeta, GOLD_OPTIONS } from '@/lib/resolve';
 import { revalidatePath } from 'next/cache';
 
@@ -90,14 +90,17 @@ export async function addInstrument(formData: FormData): Promise<Result> {
   const dup = await q<{ symbol: string }>(`select symbol from instruments where symbol=$1`, [symbol]);
   if (dup.length) return { ok: false, error: `${symbol} zaten kayıtlı` };
 
-  const sources = def.sources(symbol, provider_symbol);
+  // Takvim/ritim/para birimi ve kaynak zinciri sembole göre çözülür — nakit
+  // (TRYTRY) döviz sınıfının içinde yaşayan bir istisna.
+  const d = defaultsFor(class_code, symbol, provider_symbol)!;
+  const sources = d.sources;
   const client = await pool.connect();
   try {
     await client.query('begin');
     const ins = await client.query<{ id: string }>(
       `insert into instruments (class_code, symbol, display_name, currency, calendar_code, cadence, tax_rate)
        values ($1,$2,$3,$4,$5,$6,$7) returning id`,
-      [class_code, symbol, display_name, def.currency, def.calendar, def.cadence, tax_rate]);
+      [class_code, symbol, display_name, d.currency, d.calendar, d.cadence, tax_rate]);
     const id = ins.rows[0].id;
     for (const s of sources) {
       await client.query(
@@ -179,8 +182,10 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
   const orig_location = String(formData.get('orig_location') || '').trim();
 
   // Grup değişince takvim/periyot da o grubun varsayılanına çekilir; aksi halde
-  // motor varlığı yanlış saatlerde çekmeye devam ederdi.
-  const def = CLASS_DEFAULTS[class_code];
+  // motor varlığı yanlış saatlerde çekmeye devam ederdi. Nakit sembolleri
+  // (TRYTRY) için varsayılan sembolden çözülür, sınıftan değil.
+  const cur = await q<{ symbol: string }>(`select symbol from instruments where id=$1`, [instrument_id]);
+  const def = cur.length ? defaultsFor(class_code, cur[0].symbol) : null;
 
   const client = await pool.connect();
   try {

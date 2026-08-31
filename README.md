@@ -70,6 +70,7 @@ DST durumunu da kapsar ve GH cron'un 15–30 dk sapmasına geniş tolerans bıra
 | `truncgil` | Döviz + Kapalıçarşı altın | Tek istekte 86 alan |
 | `tcmb` | Resmi kurlar | `truncgil` yedeği |
 | `goldapi` | XAU/USD | Gram TL'ye türetir; `truncgil` GRA ile çapraz doğrulanır (fark %0,07) |
+| `constant` | Nakit (`TRYTRY`, `USDUSD`) | Ağa çıkmaz; bir para biriminin kendi cinsinden fiyatı tanım gereği 1 |
 
 ## Kurulum
 
