@@ -186,9 +186,6 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
   const cls = await q<{ code: string }>(`select code from asset_classes where code=$1`, [class_code]);
   if (!cls.length) return { ok: false, error: 'Geçersiz grup' };
 
-  const currency = String(formData.get('currency') || '').trim().toUpperCase();
-  if (currency !== 'TRY' && currency !== 'USD') return { ok: false, error: 'Döviz TRY veya USD olmalı' };
-
   const location = String(formData.get('location') || '').trim();
   const orig_location = String(formData.get('orig_location') || '').trim();
 
@@ -205,6 +202,10 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
   // (TRYTRY) için varsayılan sembolden çözülür, sınıftan değil.
   const cur = await q<{ symbol: string }>(`select symbol from instruments where id=$1`, [instrument_id]);
   const def = cur.length ? defaultsFor(class_code, cur[0].symbol) : null;
+  // Para birimi kullanıcı tercihi DEĞİL: fiyatın hangi cinsten geldiğini
+  // kaynak belirler. Elle seçilebildiğinde yanlış seçim değeri sessizce kurla
+  // ikinci kez çarpıyordu (450 gr altın 3,1M yerine 148M TL).
+  const currency = def?.currency ?? 'TRY';
 
   const client = await pool.connect();
   try {
