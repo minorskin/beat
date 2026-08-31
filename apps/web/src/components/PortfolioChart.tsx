@@ -17,7 +17,7 @@ const PALETTE = [
   '#3987e5', '#d95926', '#199e70', '#c98500',
   '#d55181', '#008300', '#9085e9', '#e66767',
 ];
-const TOTAL_COLOR = '#ededed';
+const TOTAL_COLOR = '#f4f4f4';
 const TOTAL_KEY = '__total';
 
 /**
@@ -114,7 +114,7 @@ export default function PortfolioChart({
   return (
     <div className="panel p-3 sm:p-5">
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-        <h2 className="text-sm font-medium" style={{ color: 'var(--muted)' }}>
+        <h2 className="text-[15px] font-medium" style={{ color: 'var(--muted)' }}>
           Varlık Değişimi
           {yearly
             ? <span style={{ color: 'var(--faint)' }}> · yıl kapanışları</span>
@@ -135,8 +135,8 @@ export default function PortfolioChart({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ left: 0, right: 6, top: 4, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="#232323" />
-            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#8a8a8a' }} minTickGap={40} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={fmtY} tick={{ fontSize: 10, fill: '#8a8a8a' }} width={46} axisLine={false} tickLine={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#a8a8a8' }} minTickGap={40} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={fmtY} tick={{ fontSize: 11, fill: '#a8a8a8' }} width={52} axisLine={false} tickLine={false} />
             {mode === 'pct' && <ReferenceLine y={0} stroke="#3d3d3d" />}
             <Tooltip
               cursor={{ stroke: '#3d3d3d', strokeWidth: 1 }}
@@ -161,7 +161,7 @@ export default function PortfolioChart({
       </div>
 
       {yearly && (
-        <p className="text-[11px] mt-2" style={{ color: 'var(--faint)' }}>
+        <p className="text-[12.5px] mt-2" style={{ color: 'var(--faint)' }}>
           Elle girilen yıl sonu toplamları + bugünkü değer. Bu yıllarda varlık
           kırılımı yok; emanet ayrımı da uygulanmaz (toplam gösterilir).
         </p>
@@ -191,7 +191,7 @@ function LegendChip({ label, color, dashed, on, onClick }: {
       onClick={onClick}
       aria-pressed={on}
       title={on ? `${label} — gizle` : `${label} — göster`}
-      className="flex items-center gap-1.5 text-[11px] leading-none py-0.5 cursor-pointer transition-opacity"
+      className="flex items-center gap-1.5 text-[12.5px] leading-none py-0.5 cursor-pointer transition-opacity"
       style={{ opacity: on ? 1 : 0.35, color: on ? color : 'var(--muted)' }}
     >
       <span
@@ -217,21 +217,21 @@ function ChartTooltip({ active, payload, label, fmt }:
   const shown = items.slice(0, 8);
   return (
     <div style={{
-      background: '#1c1c1c', borderRadius: 4, fontSize: 12, padding: '8px 10px',
+      background: '#1c1c1c', borderRadius: 4, fontSize: 13, padding: '8px 10px',
       boxShadow: '0 4px 16px rgba(0,0,0,0.5)', minWidth: 140,
     }}>
-      <div style={{ color: '#8a8a8a', marginBottom: 4 }}>{label}</div>
+      <div style={{ color: '#a8a8a8', marginBottom: 4 }}>{label}</div>
       {shown.map((p) => (
         <div key={String(p.dataKey)} className="flex items-baseline justify-between gap-3">
-          <span className="flex items-center gap-1.5" style={{ color: '#ededed' }}>
+          <span className="flex items-center gap-1.5" style={{ color: '#f4f4f4' }}>
             <span style={{ width: 8, height: 8, borderRadius: 2, background: p.color, display: 'inline-block' }} />
             {p.name}
           </span>
-          <span className="tnum" style={{ color: '#ededed' }}>{fmt(Number(p.value))}</span>
+          <span className="tnum" style={{ color: '#f4f4f4' }}>{fmt(Number(p.value))}</span>
         </div>
       ))}
       {items.length > shown.length && (
-        <div style={{ color: '#5c5c5c', marginTop: 4 }}>+{items.length - shown.length} daha</div>
+        <div style={{ color: '#7d7d7d', marginTop: 4 }}>+{items.length - shown.length} daha</div>
       )}
     </div>
   );

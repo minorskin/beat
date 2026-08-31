@@ -36,8 +36,8 @@ export default function ConfirmDialog({
         onClick={(e) => e.stopPropagation()}
         className="sheet w-full sm:max-w-sm p-4 sm:p-5"
       >
-        <h2 className="text-sm font-medium mb-2">{title}</h2>
-        <div className="text-[12px] mb-4" style={{ color: 'var(--muted)' }}>{message}</div>
+        <h2 className="text-[15px] font-medium mb-2">{title}</h2>
+        <div className="text-[13.5px] mb-4" style={{ color: 'var(--muted)' }}>{message}</div>
         <div className="flex gap-2 justify-end">
           <button type="button" onClick={onCancel} disabled={pending} className="btn btn-ghost">
             {cancelLabel}

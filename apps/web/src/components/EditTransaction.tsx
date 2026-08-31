@@ -24,7 +24,7 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="shrink-0 text-[11px] leading-none opacity-50 hover:opacity-100"
+        className="shrink-0 text-[12.5px] leading-none opacity-50 hover:opacity-100"
         style={{ color: 'var(--muted)' }}
         title="İşlemi düzenle"
         aria-label="İşlemi düzenle"
@@ -48,14 +48,14 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
             className="sheet w-full sm:max-w-md p-4 sm:p-5 grid grid-cols-2 gap-3 max-h-[90vh] overflow-y-auto"
           >
             <div className="col-span-2 flex items-center justify-between mb-1">
-              <h2 className="text-sm font-medium">İşlemi Düzenle</h2>
-              <button type="button" onClick={reset} className="seg text-[15px] leading-none" aria-label="Kapat">✕</button>
+              <h2 className="text-[15px] font-medium">İşlemi Düzenle</h2>
+              <button type="button" onClick={reset} className="seg text-[16px] leading-none" aria-label="Kapat">✕</button>
             </div>
 
             <input type="hidden" name="id" value={tx.id} />
             <input type="hidden" name="currency" value={tx.currency} />
 
-            <label className={`${isTransfer ? 'col-span-2' : 'col-span-2 sm:col-span-1'} text-[11px]`} style={{ color: 'var(--muted)' }}>
+            <label className={`${isTransfer ? 'col-span-2' : 'col-span-2 sm:col-span-1'} text-[12.5px]`} style={{ color: 'var(--muted)' }}>
               İşlem
               <select
                 name="type" className="field mt-1" value={type}
@@ -68,7 +68,7 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
             </label>
 
             {isTransfer ? (
-              <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+              <label className="col-span-2 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                 Emanet adedi değişimi (delta)
                 <input
                   name="external_quantity" type="number" step="any" inputMode="decimal"
@@ -77,7 +77,7 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
               </label>
             ) : (
               <>
-                <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 sm:col-span-1 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                   Adet
                   <input
                     name="quantity" type="number" step="any" required inputMode="decimal"
@@ -85,7 +85,7 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
                   />
                 </label>
 
-                <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 sm:col-span-1 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                   Birim Fiyat ({tx.currency})
                   <input
                     name="unit_price" type="number" step="any" inputMode="decimal"
@@ -93,7 +93,7 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
                   />
                 </label>
 
-                <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 sm:col-span-1 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                   Tarih
                   <input
                     name="executed_at" type="datetime-local"
@@ -101,7 +101,7 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
                   />
                 </label>
 
-                <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 sm:col-span-1 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                   Konum
                   <input
                     name="location" list={`edit-location-options-${tx.id}`} autoComplete="off"
@@ -113,7 +113,7 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
                 </label>
 
                 {(type === 'buy' || type === 'sell') && (
-                  <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+                  <label className="col-span-2 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                     Bu adetin bana ait olmayan kısmı
                     <input
                       name="external_quantity" type="number" step="any" min="0"
@@ -129,7 +129,7 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
               <button type="submit" disabled={pending} className="btn btn-primary flex-1 sm:flex-none">
                 {pending ? 'Kaydediliyor…' : 'Kaydet'}
               </button>
-              {msg && <span className="text-xs" style={{ color: 'var(--muted)' }}>{msg}</span>}
+              {msg && <span className="text-[13.5px]" style={{ color: 'var(--muted)' }}>{msg}</span>}
             </div>
           </form>
         </div>

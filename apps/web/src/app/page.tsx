@@ -110,27 +110,27 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           gizlemesi demekti — kullanıcı hiçbir şey giremiyordu. */}
           <TabPanel id="ozet">
           {!snap ? (
-            <div className="panel p-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
+            <div className="panel p-8 text-center text-[15px]" style={{ color: 'var(--muted)' }}>
               Henüz snapshot yok.<br />
-              <span className="text-[12px]" style={{ color: 'var(--faint)' }}>
+              <span className="text-[13.5px]" style={{ color: 'var(--faint)' }}>
                 Varlık sekmesinden enstrümanını ve ilk işlemini ekle; motor bir sonraki turda (≤30 dk) fiyatı çeker.
               </span>
             </div>
           ) : (
           <>
           <div className="mb-3 sm:mb-4">
-            <h2 className="text-base sm:text-lg font-semibold tracking-tight">Özet</h2>
+            <h2 className="text-[17px] sm:text-[19px] font-semibold tracking-tight">Özet</h2>
             {/* timeAgo Date.now()'a bakar: sunucudaki render ile tarayıcıdaki
                 hydration arasında saniyeler geçtiği için metin kaçınılmaz
                 olarak farklı çıkar ("12sn önce" / "14sn önce"). Bu tek satır
                 için uyuşmazlığı bastırıyoruz. */}
-            <p className="text-[11px] sm:text-xs truncate" style={{ color: 'var(--muted)' }} suppressHydrationWarning>
+            <p className="text-[12.5px] sm:text-[13.5px] truncate" style={{ color: 'var(--muted)' }} suppressHydrationWarning>
               {lastFetch ? `Son güncelleme ${timeAgo(lastFetch.finished_at)} · ${lastFetch.status}` : 'Henüz veri yok'}
             </p>
           </div>
 
           {emanet !== 0 && (
-            <p className="text-[11px] mb-3 tnum" style={{ color: 'var(--faint)' }}>
+            <p className="text-[12.5px] mb-3 tnum" style={{ color: 'var(--faint)' }}>
               {own
                 ? `${money(emanet, cur)} emanet düşüldü · ${emanetCount} pozisyon`
                 : `${money(emanet, cur)}’si emanet (${emanetCount} pozisyon) — “BT” ile hariç tut`}
@@ -142,11 +142,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
 
             {/* 1 — Toplam varlık */}
             <div className="panel p-3 sm:p-4 flex flex-col">
-              <div className="text-[11px] mb-1 truncate" style={{ color: 'var(--muted)' }}>
+              <div className="text-[12.5px] mb-1 truncate" style={{ color: 'var(--muted)' }}>
                 {own ? 'Bana Ait Varlık' : 'Toplam Varlık'}
               </div>
-              <div className="text-xl sm:text-2xl font-semibold tnum truncate">{money(value, cur)}</div>
-              <div className="text-[11px] mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{money(altValue, altCur)}</div>
+              <div className="text-[21px] sm:text-[25px] font-semibold tnum truncate">{money(value, cur)}</div>
+              <div className="text-[12.5px] mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{money(altValue, altCur)}</div>
               <div className="mt-auto pt-3 space-y-1.5">
                 {/* Tutar ve oran ayrı satırda: ikisi farklı soruyu cevaplıyor
                     ("ne kadar kazandım" / "ne kadar büyüdüm") ve tek satıra
@@ -163,7 +163,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                 />
                 <StatLine label="Pozisyon" value={staleCount ? `${rows.length} · ${staleCount} taşınmış` : String(rows.length)} />
                 {noCostCount > 0 && (
-                  <p className="text-[11px] pt-1" style={{ color: 'var(--faint)' }}>
+                  <p className="text-[12.5px] pt-1" style={{ color: 'var(--faint)' }}>
                     {noCostCount} pozisyonda alış fiyatı yok — değişim onlar hariç.
                   </p>
                 )}
@@ -172,7 +172,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
 
             {/* 2 — Dönemsel kâr/zarar: 3 satır × 2 eşit kutu */}
             <div className="panel p-3 sm:p-4 flex flex-col">
-              <div className="text-[11px] mb-2 truncate" style={{ color: 'var(--muted)' }}>Kâr / Zarar — Dönemsel</div>
+              <div className="text-[12.5px] mb-2 truncate" style={{ color: 'var(--muted)' }}>Kâr / Zarar — Dönemsel</div>
               <div className="grid grid-cols-2 grid-rows-3 gap-1.5 flex-1">
                 <PeriodBox label="Saatlik"   c={own ? changes.hour.own : changes.hour.total}       cur={cur} rate={rate} />
                 <PeriodBox label="Günlük"    c={own ? changes.day.own : changes.day.total}         cur={cur} rate={rate} />
@@ -210,8 +210,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           <TabPanel id="varlik">
           <div className="mb-3 sm:mb-4 flex items-end justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-semibold tracking-tight">Varlık</h2>
-              <p className="text-[11px] sm:text-xs" style={{ color: 'var(--muted)' }}>
+              <h2 className="text-[17px] sm:text-[19px] font-semibold tracking-tight">Varlık</h2>
+              <p className="text-[12.5px] sm:text-[13.5px]" style={{ color: 'var(--muted)' }}>
                 {rows.length === 0
                   ? `Henüz pozisyon yok · katalogda ${instruments.length} enstrüman`
                   : `${rows.length} pozisyon · ${money(value, cur)}${own ? ' · yalnız bana ait' : ''}`}
@@ -224,11 +224,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           </div>
 
           {rows.length === 0 ? (
-            <div className="panel p-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
+            <div className="panel p-8 text-center text-[15px]" style={{ color: 'var(--muted)' }}>
               {instruments.length === 0 ? (
                 <>
                   Katalog boş.<br />
-                  <span className="text-[12px]" style={{ color: 'var(--faint)' }}>
+                  <span className="text-[13.5px]" style={{ color: 'var(--faint)' }}>
                     Önce <b style={{ color: 'var(--muted)' }}>+ Enstrüman</b> ile varlığı tanımla (ad ve fiyat kaynağı
                     otomatik çözülür), sonra <b style={{ color: 'var(--muted)' }}>+ İşlem</b> ile alımını gir.
                   </span>
@@ -236,7 +236,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
               ) : (
                 <>
                   Henüz işlem yok.<br />
-                  <span className="text-[12px]" style={{ color: 'var(--faint)' }}>
+                  <span className="text-[13.5px]" style={{ color: 'var(--faint)' }}>
                     <b style={{ color: 'var(--muted)' }}>+ İşlem</b> ile ilk alımını gir; pozisyon burada listelenir.
                   </span>
                 </>
@@ -253,7 +253,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
 
 function StatLine({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-2 text-[13px]">
+    <div className="flex items-baseline justify-between gap-2 text-[14.5px]">
       <span className="shrink-0" style={{ color: 'var(--muted)' }}>{label}</span>
       <span className="tnum truncate text-right font-medium" style={{ color: color ?? 'var(--text)' }}>{value}</span>
     </div>
@@ -267,12 +267,12 @@ function PeriodBox({ label, c, cur, rate }: { label: string; c: Change | null; c
   const tone = !has ? 'tone-flat' : good ? 'tone-up' : 'tone-down';
   return (
     <div className={`${tone} rounded-[var(--r-sm)] px-2 py-1.5 flex flex-col justify-center min-w-0`}>
-      <div className="text-[10px] leading-none truncate" style={{ color: 'var(--muted)' }}>{label}</div>
-      <div className="text-[13px] font-semibold tnum leading-tight mt-1 truncate">
+      <div className="text-[11px] leading-none truncate" style={{ color: 'var(--muted)' }}>{label}</div>
+      <div className="text-[14.5px] font-semibold tnum leading-tight mt-1 truncate">
         {has ? `${good ? '+' : ''}${num(c!.pct as number, 2)}%` : '—'}
       </div>
       {has && (
-        <div className="text-[10px] leading-none tnum truncate opacity-80">
+        <div className="text-[11px] leading-none tnum truncate opacity-80">
           {good ? '+' : ''}{money(conv(c!.abs, cur, rate), cur)}
         </div>
       )}

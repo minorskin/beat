@@ -261,7 +261,7 @@ export default function PositionsTable({
     <>
     <div className="panel overflow-hidden">
       {activeCount > 0 && (
-        <div className="px-4 sm:px-5 pt-3 flex items-center gap-3 text-[11px]" style={{ color: 'var(--muted)' }}>
+        <div className="px-4 sm:px-5 pt-3 flex items-center gap-3 text-[12.5px]" style={{ color: 'var(--muted)' }}>
           <span>{displayRows.length} / {rows.length} pozisyon</span>
           <button
             type="button"
@@ -273,9 +273,9 @@ export default function PositionsTable({
         </div>
       )}
       <div className="overflow-x-auto">
-        <table className="tbl w-full text-sm min-w-[720px]">
+        <table className="tbl w-full text-[15px] min-w-[760px]">
           <thead>
-            <tr style={{ color: 'var(--muted)' }} className="text-[11px] uppercase tracking-wide">
+            <tr style={{ color: 'var(--muted)' }} className="text-[12.5px] uppercase tracking-wide">
               {columns.map((c) => {
                 const on = c.filter ? filters[c.filter].length > 0 : false;
                 return (
@@ -305,7 +305,7 @@ export default function PositionsTable({
                         className="inline-flex items-center gap-1 min-w-0"
                       >
                         <span className="truncate">{c.label}</span>
-                        <span className="tnum shrink-0 text-[13px] leading-none" style={{ opacity: sortKey === c.key ? 1 : 0.3 }}>
+                        <span className="tnum shrink-0 text-[14.5px] leading-none" style={{ opacity: sortKey === c.key ? 1 : 0.3 }}>
                           {sortKey === c.key ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
                         </span>
                       </button>
@@ -322,22 +322,22 @@ export default function PositionsTable({
                 K/Z oranı ağırlıklı: toplam K/Z ÷ toplam maliyet. */}
             {displayRows.length > 0 && (
               <tr className="tbl-total">
-                <td className="px-4 sm:px-5 py-2 text-[11px] font-medium">
+                <td className="px-4 sm:px-5 py-2 text-[12.5px] font-medium">
                   Toplam
-                  <div className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>
+                  <div className="text-[12.5px] font-normal" style={{ color: 'var(--muted)' }}>
                     {displayRows.length} pozisyon
                   </div>
                 </td>
                 <td className="px-3 py-2 hidden md:table-cell" />
                 <td className="px-3 py-2 hidden md:table-cell" />
                 <td className="px-3 py-2 hidden lg:table-cell" />
-                <td className="text-right px-3 py-2 text-[11px]" style={{ color: 'var(--faint)' }}>—</td>
-                <td className="text-right px-3 py-2 text-[11px]" style={{ color: 'var(--faint)' }}>—</td>
-                <td className="text-right px-3 py-2 tnum text-[12px] font-medium whitespace-nowrap">
+                <td className="text-right px-3 py-2 text-[12.5px]" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="text-right px-3 py-2 text-[12.5px]" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="text-right px-3 py-2 tnum text-[13.5px] font-medium whitespace-nowrap">
                   {money(totals.value, cur)}
                 </td>
                 <td
-                  className="text-right px-3 py-2 tnum text-[12px] hidden sm:table-cell whitespace-nowrap"
+                  className="text-right px-3 py-2 tnum text-[13.5px] hidden sm:table-cell whitespace-nowrap"
                   style={{ color: totals.pnlPct == null ? 'var(--faint)' : totals.pnlPct >= 0 ? 'var(--up)' : 'var(--down)' }}
                   title={totals.pnlPct == null
                     ? `${totals.noCost} pozisyonda alış fiyatı girilmemiş — toplam oran hesaplanamıyor`
@@ -345,7 +345,7 @@ export default function PositionsTable({
                 >
                   {totals.pnlPct != null ? pct(totals.pnlPct) : '—'}
                 </td>
-                <td className="text-right px-3 py-2 tnum text-[12px] hidden sm:table-cell whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                <td className="text-right px-3 py-2 tnum text-[13.5px] hidden sm:table-cell whitespace-nowrap" style={{ color: 'var(--muted)' }}>
                   %{num(totals.weight, 1)}
                 </td>
                 <td className="px-3 py-2 hidden lg:table-cell" />
@@ -354,7 +354,7 @@ export default function PositionsTable({
             )}
             {displayRows.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-4 sm:px-5 py-6 text-center text-[11px]" style={{ color: 'var(--faint)' }}>
+                <td colSpan={11} className="px-4 sm:px-5 py-6 text-center text-[12.5px]" style={{ color: 'var(--faint)' }}>
                   Filtreye uyan pozisyon yok.
                 </td>
               </tr>
@@ -387,23 +387,23 @@ export default function PositionsTable({
                           classes={classes} locations={locations}
                         />
                       </div>
-                      <div className="text-[11px] truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
-                      <div className="text-[11px] mt-0.5 md:hidden truncate max-w-[84px]" style={{ color: 'var(--faint)' }}>{p.class_name} · {p.currency}</div>
-                      <div className="text-[11px] tnum mt-0.5 sm:hidden" style={{ color: (p.pnl_pct ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
+                      <div className="text-[12.5px] truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
+                      <div className="text-[12.5px] mt-0.5 md:hidden truncate max-w-[84px]" style={{ color: 'var(--faint)' }}>{p.class_name} · {p.currency}</div>
+                      <div className="text-[12.5px] tnum mt-0.5 sm:hidden" style={{ color: (p.pnl_pct ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
                         {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
                       </div>
                     </td>
-                    <td className="px-3 py-3 hidden md:table-cell text-[11px]" style={{ color: 'var(--muted)' }}>{p.class_name}</td>
+                    <td className="px-3 py-3 hidden md:table-cell text-[12.5px]" style={{ color: 'var(--muted)' }}>{p.class_name}</td>
                     <td className="px-3 py-3 hidden md:table-cell text-center">
                       <CurrencyDot currency={p.currency} />
                     </td>
-                    <td className="px-3 py-3 hidden lg:table-cell text-[11px]" style={{ color: 'var(--muted)' }}>
+                    <td className="px-3 py-3 hidden lg:table-cell text-[12.5px]" style={{ color: 'var(--muted)' }}>
                       {p.locations.length ? p.locations.join(', ') : '—'}
                     </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap">
                       {num(qtyOf(p), Math.abs(qtyOf(p)) < 1 ? 4 : 2)}
                       {p.external_quantity > 0 && (
-                        <div className="text-[11px]" style={{ color: 'var(--faint)' }}>
+                        <div className="text-[12.5px]" style={{ color: 'var(--faint)' }}>
                           {own
                             ? `${num(p.quantity, p.quantity < 1 ? 4 : 2)} toplam`
                             : `${num(p.external_quantity, p.external_quantity < 1 ? 4 : 2)} emanet`}
@@ -431,7 +431,7 @@ export default function PositionsTable({
                   </tr>
                   {(isOpen || isClosing) && tx.length === 0 && (
                     <tr className={`tx-row ${isClosing ? 'tx-row-out' : ''}`}>
-                      <td colSpan={11} className="px-4 sm:px-5 py-3 text-[11px]" style={{ color: 'var(--faint)' }}>İşlem kaydı yok.</td>
+                      <td colSpan={11} className="px-4 sm:px-5 py-3 text-[12.5px]" style={{ color: 'var(--faint)' }}>İşlem kaydı yok.</td>
                     </tr>
                   )}
                   {(isOpen || isClosing) && tx.map((t) => {
@@ -441,33 +441,33 @@ export default function PositionsTable({
                     const dateInOpen = t.type !== 'sell';
                     return (
                       <tr key={t.id} className={`tx-row ${isClosing ? 'tx-row-out' : ''}`}>
-                        <td className="px-4 sm:px-5 py-2 text-[12px] font-medium">
+                        <td className="px-4 sm:px-5 py-2 text-[13.5px] font-medium">
                           <div className="flex items-center gap-2">
                             {TX_LABEL[t.type] ?? t.type}
                             <EditTransaction tx={t} locations={locations} />
                           </div>
                         </td>
-                        <td className="px-3 py-2 hidden md:table-cell text-[11px]" style={{ color: 'var(--muted)' }}>—</td>
+                        <td className="px-3 py-2 hidden md:table-cell text-[12.5px]" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="px-3 py-2 hidden md:table-cell text-center">
                           <CurrencyDot currency={t.currency} />
                         </td>
-                        <td className="px-3 py-2 hidden lg:table-cell text-[11px]" style={{ color: 'var(--muted)' }}>{t.location ?? '—'}</td>
-                        <td className="text-right px-3 py-2 tnum whitespace-nowrap text-[12px]">
+                        <td className="px-3 py-2 hidden lg:table-cell text-[12.5px]" style={{ color: 'var(--muted)' }}>{t.location ?? '—'}</td>
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap text-[13.5px]">
                           {num(t.quantity, Math.abs(t.quantity) < 1 ? 4 : 2)}
                           {t.external_quantity > 0 && (
-                            <div className="text-[11px]" style={{ color: 'var(--faint)' }}>{num(t.external_quantity, 2)} emanet</div>
+                            <div className="text-[12.5px]" style={{ color: 'var(--faint)' }}>{num(t.external_quantity, 2)} emanet</div>
                           )}
                         </td>
-                        <td className="text-right px-3 py-2 tnum whitespace-nowrap text-[12px]">
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap text-[13.5px]">
                           {t.unit_price != null ? `${num(t.unit_price, 2)} ${t.currency === 'USD' ? '$' : '₺'}` : '—'}
                         </td>
-                        <td className="text-right px-3 py-2 tnum whitespace-nowrap text-[12px]" style={{ color: 'var(--muted)' }}>—</td>
-                        <td className="text-right px-3 py-2 tnum hidden sm:table-cell whitespace-nowrap text-[12px]" style={{ color: 'var(--muted)' }}>—</td>
-                        <td className="text-right px-3 py-2 tnum hidden sm:table-cell whitespace-nowrap text-[12px]" style={{ color: 'var(--muted)' }}>—</td>
-                        <td className="px-3 py-2 hidden lg:table-cell text-[12px] whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap text-[13.5px]" style={{ color: 'var(--muted)' }}>—</td>
+                        <td className="text-right px-3 py-2 tnum hidden sm:table-cell whitespace-nowrap text-[13.5px]" style={{ color: 'var(--muted)' }}>—</td>
+                        <td className="text-right px-3 py-2 tnum hidden sm:table-cell whitespace-nowrap text-[13.5px]" style={{ color: 'var(--muted)' }}>—</td>
+                        <td className="px-3 py-2 hidden lg:table-cell text-[13.5px] whitespace-nowrap" style={{ color: 'var(--muted)' }}>
                           {dateInOpen ? dateStr(t.executed_at) : '—'}
                         </td>
-                        <td className="px-4 sm:px-5 py-2 hidden lg:table-cell text-[12px] whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                        <td className="px-4 sm:px-5 py-2 hidden lg:table-cell text-[13.5px] whitespace-nowrap" style={{ color: 'var(--muted)' }}>
                           {dateInOpen ? '—' : dateStr(t.executed_at)}
                         </td>
                       </tr>
@@ -488,7 +488,7 @@ export default function PositionsTable({
           style={{ left: pos.x, top: pos.y }}
         >
           {options[menu].length === 0 ? (
-            <div className="px-2 py-1.5 text-[11px]" style={{ color: 'var(--faint)' }}>Seçenek yok</div>
+            <div className="px-2 py-1.5 text-[12.5px]" style={{ color: 'var(--faint)' }}>Seçenek yok</div>
           ) : (
             <>
               {options[menu].map((o) => {
@@ -496,7 +496,7 @@ export default function PositionsTable({
                 return (
                   <label
                     key={o.id}
-                    className="flex items-center gap-2 px-2 py-1.5 text-[12px] cursor-pointer rounded"
+                    className="flex items-center gap-2 px-2 py-1.5 text-[13.5px] cursor-pointer rounded"
                     style={{ background: checked ? 'var(--panel-3)' : undefined }}
                   >
                     <input
@@ -512,7 +512,7 @@ export default function PositionsTable({
                 <button
                   type="button"
                   onClick={() => setFilters((f) => ({ ...f, [menu]: [] }))}
-                  className="w-full text-left px-2 py-1.5 mt-1 text-[11px] hover:opacity-80"
+                  className="w-full text-left px-2 py-1.5 mt-1 text-[12.5px] hover:opacity-80"
                   style={{ color: 'var(--muted)' }}
                 >
                   Seçimi temizle

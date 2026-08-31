@@ -47,11 +47,11 @@ export default function AddTransaction({ instruments, locations }: { instruments
             className="sheet w-full sm:max-w-md p-4 sm:p-5 grid grid-cols-2 gap-3 max-h-[90vh] overflow-y-auto"
           >
             <div className="col-span-2 flex items-center justify-between mb-1">
-              <h2 className="text-sm font-medium">{isTransfer ? 'Emanet Düzelt' : 'İşlem Ekle'}</h2>
-              <button type="button" onClick={reset} className="seg text-[15px] leading-none" aria-label="Kapat">✕</button>
+              <h2 className="text-[15px] font-medium">{isTransfer ? 'Emanet Düzelt' : 'İşlem Ekle'}</h2>
+              <button type="button" onClick={reset} className="seg text-[16px] leading-none" aria-label="Kapat">✕</button>
             </div>
 
-            <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 text-[12.5px]" style={{ color: 'var(--muted)' }}>
               Enstrüman
               <select
                 name="instrument_id" required className="field mt-1" value={insId}
@@ -67,13 +67,13 @@ export default function AddTransaction({ instruments, locations }: { instruments
             </label>
 
             {sel && (
-              <div className="col-span-2 text-[11px] tnum -mt-1" style={{ color: 'var(--faint)' }}>
+              <div className="col-span-2 text-[12.5px] tnum -mt-1" style={{ color: 'var(--faint)' }}>
                 Mevcut: {num(sel.quantity, sel.quantity < 1 ? 4 : 2)} adet
                 {sel.external_quantity > 0 && ` · ${num(sel.external_quantity, sel.external_quantity < 1 ? 4 : 2)} emanet`}
               </div>
             )}
 
-            <label className={`${isTransfer ? 'col-span-2' : 'col-span-2 sm:col-span-1'} text-[11px]`} style={{ color: 'var(--muted)' }}>
+            <label className={`${isTransfer ? 'col-span-2' : 'col-span-2 sm:col-span-1'} text-[12.5px]`} style={{ color: 'var(--muted)' }}>
               İşlem
               <select
                 name="type" className="field mt-1" value={type}
@@ -87,7 +87,7 @@ export default function AddTransaction({ instruments, locations }: { instruments
 
             {isTransfer ? (
               <>
-                <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                   Bana ait olmayan adet (yeni toplam)
                   <input
                     type="number" step="any" min="0" inputMode="decimal" className="field mt-1 tnum"
@@ -96,7 +96,7 @@ export default function AddTransaction({ instruments, locations }: { instruments
                   />
                 </label>
                 <input type="hidden" name="external_quantity" value={extDelta} />
-                <p className="col-span-2 text-[11px] -mt-1" style={{ color: 'var(--faint)' }}>
+                <p className="col-span-2 text-[12.5px] -mt-1" style={{ color: 'var(--faint)' }}>
                   Adet değişmez, yalnız sahiplik payı güncellenir.
                   {sel && extTarget !== '' && (
                     <> Bana ait kalan: <span className="tnum">{num(sel.quantity - (Number(extTarget) || 0), 2)}</span></>
@@ -105,7 +105,7 @@ export default function AddTransaction({ instruments, locations }: { instruments
               </>
             ) : (
               <>
-                <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 sm:col-span-1 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                   {isRealty ? 'Adet (mülk sayısı)' : 'Adet'}
                   <input
                     key={isRealty ? 'qty-realty' : 'qty'}
@@ -114,25 +114,25 @@ export default function AddTransaction({ instruments, locations }: { instruments
                   />
                 </label>
 
-                <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 sm:col-span-1 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                   {isRealty ? `Alış Bedeli (${cur})` : `Birim Fiyat (${cur})`}
                   <input name="unit_price" type="number" step="any" inputMode="decimal" className="field mt-1 tnum" />
                 </label>
 
                 {isRealty && (
-                  <p className="col-span-2 text-[11px] -mt-1" style={{ color: 'var(--faint)' }}>
+                  <p className="col-span-2 text-[12.5px] -mt-1" style={{ color: 'var(--faint)' }}>
                     Buraya mülkü <b style={{ color: 'var(--muted)' }}>kaça aldığını</b> yaz. Bugünkü değerlemesi
                     varlığın kendisinde duruyor (satırdaki ✎ ile güncellenir); kâr/zarar bu ikisinin farkı.
                     Mülkün bir kısmı başkasınınsa aşağıdaki “bana ait olmayan kısım” alanını kullan (ör. yarısı için 0,5).
                   </p>
                 )}
 
-                <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 sm:col-span-1 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                   Tarih
                   <input name="executed_at" type="datetime-local" className="field mt-1" />
                 </label>
 
-                <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 sm:col-span-1 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                   Konum
                   <input
                     name="location" list="location-options" autoComplete="off"
@@ -145,7 +145,7 @@ export default function AddTransaction({ instruments, locations }: { instruments
 
                 {(type === 'buy' || type === 'sell') && (
                   showExt ? (
-                    <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+                    <label className="col-span-2 text-[12.5px]" style={{ color: 'var(--muted)' }}>
                       Bu adetin bana ait olmayan kısmı
                       <input
                         name="external_quantity" type="number" step="any" min="0" defaultValue=""
@@ -173,7 +173,7 @@ export default function AddTransaction({ instruments, locations }: { instruments
               <button type="submit" disabled={pending} className="btn btn-primary flex-1 sm:flex-none">
                 {pending ? 'Kaydediliyor…' : 'Kaydet'}
               </button>
-              {msg && <span className="text-xs" style={{ color: 'var(--muted)' }}>{msg}</span>}
+              {msg && <span className="text-[13.5px]" style={{ color: 'var(--muted)' }}>{msg}</span>}
             </div>
           </form>
         </div>
