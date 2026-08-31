@@ -99,6 +99,8 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 }
 .seg:hover { background: var(--panel-2); color: var(--text); }
 .seg-on { background: var(--panel-3); color: var(--text); }
+/* Üst bardaki iki satırlı dönem seçicisine sığan dar varyant. */
+.seg-xs { padding: 0.15rem 0.3rem; font-size: 0.625rem; line-height: 1rem; }
 .seg-on:hover { background: var(--panel-3); }
 
 /* Tablo — çizgi yok, tüm ana satırlar aynı koyu ton + hover */
@@ -141,8 +143,6 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 .navlink:hover { background: var(--panel-2); color: var(--text); }
 .navlink-on { background: var(--panel-3); color: var(--text); }
 
-/* Sticky bar altında kalmasın */
-[id="dashboard"], [id="portfoy"] { scroll-margin-top: 72px; }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
@@ -193,3 +193,9 @@ input[type="range"]::-moz-range-thumb {
 
 /* Recharts odak halkasını kapat */
 .recharts-wrapper *:focus { outline: none; }
+
+/* Kâr/zarar kutuları — nötr panel üzerinde hafif renk tonu.
+   Renk tek başına anlam taşımasın diye kutuda ayrıca +/- işareti var. */
+.tone-up   { background: rgba(34, 197, 94, 0.12);  color: var(--up); }
+.tone-down { background: rgba(239, 68, 68, 0.12);  color: var(--down); }
+.tone-flat { background: var(--panel-2);           color: var(--muted); }

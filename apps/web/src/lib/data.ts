@@ -25,7 +25,12 @@ export interface TxRow {
   quantity: number; unit_price: number | null; currency: string;
   executed_at: string; location: string | null; external_quantity: number;
 }
-export interface HistoryPoint { ts: string; try: number; usd: number; own_try: number; own_usd: number }
+export interface SeriesPoint {
+  ts: string; try: number; usd: number; own_try: number; own_usd: number;
+  /** sembol → [value_try, value_usd, own_value_try, own_value_usd] */
+  s: Record<string, [number, number, number, number]>;
+}
+export interface HistoryBundle { points: SeriesPoint[]; symbols: string[] }
 export interface Instrument {
   id: string; symbol: string; display_name: string; class_code: string; currency: string;
   quantity: number; external_quantity: number;
@@ -126,16 +131,67 @@ export async function getLocations(): Promise<string[]> {
   return rows.map((r) => r.location);
 }
 
-export async function getHistory(range: string): Promise<HistoryPoint[]> {
-  const interval: Record<string, string> = {
-    '1G': '1 day', '1H': '7 days', '1A': '1 month', '1Y': '1 year', 'TUM': '100 years',
-  };
-  return q<HistoryPoint>(`
-    select ts, total_value_try as try, total_value_usd as usd,
-           own_value_try as own_try, own_value_usd as own_usd
-    from portfolio_snapshots
-    where ts >= now() - ($1)::interval
-    order by ts`, [interval[range] ?? '1 month']);
+// Aralık → geriye bakış penceresi. Kova genişliği burada SABİT DEĞİL; aşağıda
+// elimizdeki verinin gerçek uzunluğundan türetiliyor (bkz. sorgudaki `b`).
+const RANGE_INTERVAL: Record<string, string> = {
+  'S': '1 hour', 'G': '1 day', 'H': '7 days', 'A': '30 days', '3A': '90 days', '1Y': '365 days',
+};/**
+ * Portföy geçmişi + her enstrümanın kendi değer serisi.
+ * Kova başına SON snapshot alınır (ortalama değil) — böylece son nokta
+ * her zaman gerçekten gözlenmiş bir andır, uydurma bir ara değer değil.
+ */
+export async function getHistory(range: string): Promise<HistoryBundle> {
+  const interval = RANGE_INTERVAL[range] ?? RANGE_INTERVAL['A'];
+  const rows = await q<{
+    ts: string; t_try: number; t_usd: number; o_try: number; o_usd: number;
+    symbol: string | null; p_try: number | null; p_usd: number | null;
+    p_own_try: number | null; p_own_usd: number | null;
+  }>(`
+    with win as (
+      select id, ts, total_value_try, total_value_usd, own_value_try, own_value_usd
+      from portfolio_snapshots
+      where ts >= now() - ($1)::interval
+    ),
+    b as (
+      -- Kova, aralığın NOMİNAL uzunluğundan değil verinin GERÇEK uzunluğundan
+      -- türetiliyor (~120 nokta hedefi). Aksi halde portföy 1 günlükken "1Y"
+      -- seçilince her şey tek kovaya düşüyor, tek noktalı çizgi de çizilmiyor.
+      select greatest(60, coalesce(extract(epoch from (max(ts) - min(ts))), 0) / 120) as bucket
+      from win
+    ),
+    snaps as (
+      select distinct on (floor(extract(epoch from w.ts) / b.bucket))
+        w.id, w.ts, w.total_value_try, w.total_value_usd, w.own_value_try, w.own_value_usd
+      from win w cross join b
+      order by floor(extract(epoch from w.ts) / b.bucket), w.ts desc
+    )
+    select s.ts,
+           s.total_value_try t_try, s.total_value_usd t_usd,
+           s.own_value_try o_try,   s.own_value_usd o_usd,
+           i.symbol, pos.value_try p_try, pos.value_usd p_usd,
+           pos.own_value_try p_own_try, pos.own_value_usd p_own_usd
+    from snaps s
+    left join position_snapshots pos on pos.snapshot_id = s.id
+    left join instruments i on i.id = pos.instrument_id
+    order by s.ts`, [interval]);
+
+  const byTs = new Map<string, SeriesPoint>();
+  const symbols = new Set<string>();
+  for (const r of rows) {
+    const key = new Date(r.ts).toISOString();
+    let pt = byTs.get(key);
+    if (!pt) {
+      pt = { ts: key, try: r.t_try, usd: r.t_usd, own_try: r.o_try, own_usd: r.o_usd, s: {} };
+      byTs.set(key, pt);
+    }
+    if (r.symbol) {
+      symbols.add(r.symbol);
+      pt.s[r.symbol] = [r.p_try ?? 0, r.p_usd ?? 0, r.p_own_try ?? 0, r.p_own_usd ?? 0];
+    }
+  }
+  // Renk ataması sembol sırasına bağlı: alfabetik sıra render'dan render'a
+  // değişmez, yani bir varlığın rengi bugün mavi yarın turuncu olmaz.
+  return { points: [...byTs.values()], symbols: [...symbols].sort() };
 }
 
 /** İşlem formu için: tüm aktif enstrümanlar + mevcut adet/emanet durumu. */
@@ -159,6 +215,13 @@ export async function getWatchlist(): Promise<WatchItem[]> {
     order by ui_group, symbol`);
 }
 
+/** Güncel USD/TRY — TL cinsinden saklanan büyüklükleri USD görünümüne çevirmek için. */
+export async function getUsdTry(): Promise<number> {
+  const r = await q<{ rate: number }>(
+    `select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1`);
+  return r[0]?.rate ?? 0;
+}
+
 export async function getAssetClasses(): Promise<AssetClass[]> {
   return q<AssetClass>(`select code, name, ui_group from asset_classes order by sort_order`);
 }
@@ -169,54 +232,123 @@ export async function getLastFetch(): Promise<{ kind: string; status: string; fi
   return r[0] ?? null;
 }
 
-// ── Dönemsel değişim (gün/hafta/ay/başından beri) ──────────────────────────
+// ── Dönemsel değişim (saat/gün/hafta/ay/çeyrek/yıl) ───────────────────────
 // Hem toplam hem own_* için; own görünümünde payda da own alınır (yoksa yanlış oran).
 export interface Change { abs: number; pct: number | null }
-export interface PeriodChanges {
-  day: { total: Change | null; own: Change | null };
-  week: { total: Change | null; own: Change | null };
-  month: { total: Change | null; own: Change | null };
-  all: { total: Change | null; own: Change | null; since: string | null };
-}
+export type PeriodKey = 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
+export type PeriodChanges = Record<PeriodKey, { total: Change | null; own: Change | null }>;
 
 export async function getPeriodChanges(): Promise<PeriodChanges> {
   const rows = await q<{
     t_now: number; o_now: number;
+    t_h: number | null; o_h: number | null;
     t_d: number | null; o_d: number | null;
     t_w: number | null; o_w: number | null;
     t_m: number | null; o_m: number | null;
-    t_a: number | null; o_a: number | null; a_ts: string | null;
+    t_q: number | null; o_q: number | null;
+    t_y: number | null; o_y: number | null;
   }>(`
     with cur as (
       select ts, total_value_try, own_value_try
       from portfolio_snapshots where granularity='hourly' order by ts desc limit 1
     )
     select cur.total_value_try t_now, cur.own_value_try o_now,
+      bh.total_value_try t_h,  bh.own_value_try o_h,
       b1.total_value_try t_d,  b1.own_value_try o_d,
       b7.total_value_try t_w,  b7.own_value_try o_w,
       b30.total_value_try t_m, b30.own_value_try o_m,
-      bf.total_value_try t_a,  bf.own_value_try o_a, bf.ts a_ts
+      b90.total_value_try t_q, b90.own_value_try o_q,
+      b365.total_value_try t_y, b365.own_value_try o_y
     from cur
     left join lateral (select total_value_try, own_value_try from portfolio_snapshots
-      where granularity='hourly' and ts <= cur.ts - interval '1 day'  order by ts desc limit 1) b1 on true
+      where granularity='hourly' and ts <= cur.ts - interval '1 hour'   order by ts desc limit 1) bh on true
     left join lateral (select total_value_try, own_value_try from portfolio_snapshots
-      where granularity='hourly' and ts <= cur.ts - interval '7 days' order by ts desc limit 1) b7 on true
+      where granularity='hourly' and ts <= cur.ts - interval '1 day'    order by ts desc limit 1) b1 on true
     left join lateral (select total_value_try, own_value_try from portfolio_snapshots
-      where granularity='hourly' and ts <= cur.ts - interval '30 days' order by ts desc limit 1) b30 on true
-    left join lateral (select total_value_try, own_value_try, ts from portfolio_snapshots
-      where granularity='hourly' order by ts asc limit 1) bf on true`);
+      where granularity='hourly' and ts <= cur.ts - interval '7 days'   order by ts desc limit 1) b7 on true
+    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
+      where granularity='hourly' and ts <= cur.ts - interval '30 days'  order by ts desc limit 1) b30 on true
+    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
+      where granularity='hourly' and ts <= cur.ts - interval '90 days'  order by ts desc limit 1) b90 on true
+    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
+      where granularity='hourly' and ts <= cur.ts - interval '365 days' order by ts desc limit 1) b365 on true`);
 
   const r = rows[0];
   const mk = (now: number, base: number | null): Change | null =>
     base == null ? null : { abs: now - base, pct: base ? ((now - base) / base) * 100 : null };
+  const empty = { total: null, own: null };
   if (!r) {
-    const n = { total: null, own: null };
-    return { day: n, week: n, month: n, all: { total: null, own: null, since: null } };
+    return { hour: empty, day: empty, week: empty, month: empty, quarter: empty, year: empty };
   }
   return {
-    day: { total: mk(r.t_now, r.t_d), own: mk(r.o_now, r.o_d) },
-    week: { total: mk(r.t_now, r.t_w), own: mk(r.o_now, r.o_w) },
-    month: { total: mk(r.t_now, r.t_m), own: mk(r.o_now, r.o_m) },
-    all: { total: mk(r.t_now, r.t_a), own: mk(r.o_now, r.o_a), since: r.a_ts ?? null },
+    hour:    { total: mk(r.t_now, r.t_h), own: mk(r.o_now, r.o_h) },
+    day:     { total: mk(r.t_now, r.t_d), own: mk(r.o_now, r.o_d) },
+    week:    { total: mk(r.t_now, r.t_w), own: mk(r.o_now, r.o_w) },
+    month:   { total: mk(r.t_now, r.t_m), own: mk(r.o_now, r.o_m) },
+    quarter: { total: mk(r.t_now, r.t_q), own: mk(r.o_now, r.o_q) },
+    year:    { total: mk(r.t_now, r.t_y), own: mk(r.o_now, r.o_y) },
   };
+}
+
+// ── Dönem bazında varlık kâr/zararı (öne çıkanlar kartları) ────────────────
+// "Alımdan bu yana" değil, SEÇİLEN DÖNEMDE ne oldu sorusunun cevabı.
+//
+// Ölçü birimi: TL cinsinden birim değer = value_try / quantity. Neden ham
+// `price` değil: USD'li bir varlık dolar bazında yatay dursa bile TL zayıflarsa
+// bu portföy için gerçek bir kazançtır; value_try ikisini birden içeriyor.
+// Adet farkı (dönem içi alım/satım) oranı bozmasın diye birim değer üzerinden
+// hesaplanıyor; tutar ise GÜNCEL adetle çarpılıyor.
+export interface MoverRow { symbol: string; pct: number; abs: number; own_abs: number }
+export type PeriodMovers = Record<PeriodKey, MoverRow[]>;
+
+export async function getPeriodMovers(): Promise<PeriodMovers> {
+  const rows = await q<{
+    period: PeriodKey; symbol: string;
+    quantity: number; own_quantity: number;
+    now_unit: number; base_unit: number | null;
+  }>(`
+    with cur as (
+      select id, ts from portfolio_snapshots where granularity='hourly' order by ts desc limit 1
+    ),
+    periods(k, iv) as (
+      values ('hour', interval '1 hour'), ('day', interval '1 day'), ('week', interval '7 days'),
+             ('month', interval '30 days'), ('quarter', interval '90 days'), ('year', interval '365 days')
+    ),
+    bases as (
+      select p.k, b.id as base_id
+      from periods p
+      cross join cur c
+      left join lateral (
+        select ps.id from portfolio_snapshots ps
+        where ps.granularity='hourly' and ps.ts <= c.ts - p.iv
+        order by ps.ts desc limit 1
+      ) b on true
+    ),
+    now_pos as (
+      select pos.instrument_id, i.symbol, pos.quantity, pos.own_quantity,
+             pos.value_try / nullif(pos.quantity, 0) as unit_try
+      from position_snapshots pos
+      join cur c on c.id = pos.snapshot_id
+      join instruments i on i.id = pos.instrument_id
+    )
+    select b.k as period, n.symbol, n.quantity, n.own_quantity,
+           n.unit_try as now_unit,
+           bp.value_try / nullif(bp.quantity, 0) as base_unit
+    from bases b
+    join position_snapshots bp on bp.snapshot_id = b.base_id
+    join now_pos n on n.instrument_id = bp.instrument_id
+    where n.unit_try is not null`);
+
+  const out = { hour: [], day: [], week: [], month: [], quarter: [], year: [] } as PeriodMovers;
+  for (const r of rows) {
+    if (r.base_unit == null || r.base_unit === 0) continue;
+    const delta = r.now_unit - r.base_unit;
+    out[r.period].push({
+      symbol: r.symbol,
+      pct: (delta / r.base_unit) * 100,
+      abs: delta * r.quantity,
+      own_abs: delta * r.own_quantity,
+    });
+  }
+  return out;
 }

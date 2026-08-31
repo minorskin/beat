@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { tl, num, pct, dateStr } from '@/lib/format';
+import { money, num, pct, dateStr, curSymbol, type Cur } from '@/lib/format';
 import type { AssetClass, Position, TxRow } from '@/lib/data';
 import EditInstrument from './EditInstrument';
 import EditTransaction from './EditTransaction';
@@ -37,9 +37,9 @@ function FunnelIcon() {
 }
 
 export default function PositionsTable({
-  rows, own, transactions, locations, classes,
+  rows, own, cur, transactions, locations, classes,
 }: {
-  rows: Position[]; own: boolean; transactions: Record<string, TxRow[]>;
+  rows: Position[]; own: boolean; cur: Cur; transactions: Record<string, TxRow[]>;
   locations: string[]; classes: AssetClass[];
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -104,20 +104,25 @@ export default function PositionsTable({
   };
 
   const qtyOf = (p: Position) => (own ? p.own_quantity : p.quantity);
-  const valOf = (p: Position) => (own ? p.own_value_try : p.value_try);
+  // Değer snapshot'ta iki para biriminde de duruyor — çevirmiyoruz, üst bardaki
+  // seçime karşılık gelen kolonu okuyoruz.
+  const valOf = (p: Position) =>
+    cur === 'USD' ? (own ? p.own_value_usd : p.value_usd) : (own ? p.own_value_try : p.value_try);
   const wOf = (p: Position) => (own ? p.own_weight_pct : p.weight_pct);
 
   const columns: {
     key: ColKey; label: string; align: 'left' | 'right'; cls: string;
     filter?: FilterKey; sortVal: (p: Position) => string | number;
   }[] = [
-    { key: 'symbol', label: 'Varlık', align: 'left', cls: 'px-4 sm:px-5', sortVal: (p) => p.symbol },
+    // w-[1%]: tablo hücresi içeriğine göre daralsın — sütun genişliğini varlık
+    // KODU belirlesin, altındaki uzun görünen ad değil (o zaten kırpılıyor).
+    { key: 'symbol', label: 'Varlık', align: 'left', cls: 'px-4 sm:px-5 w-[1%] whitespace-nowrap', sortVal: (p) => p.symbol },
     { key: 'class', label: 'Grup', align: 'left', cls: 'px-3 hidden md:table-cell', filter: 'class', sortVal: (p) => p.class_name },
     { key: 'currency', label: 'Döviz', align: 'left', cls: 'px-3 hidden md:table-cell', filter: 'currency', sortVal: (p) => p.currency },
     { key: 'location', label: 'Konum', align: 'left', cls: 'px-3 hidden lg:table-cell', filter: 'location', sortVal: (p) => p.locations.join(', ') },
     { key: 'qty', label: 'Adet', align: 'right', cls: 'px-3', sortVal: (p) => qtyOf(p) },
     { key: 'price', label: 'Fiyat', align: 'right', cls: 'px-3', sortVal: (p) => p.price ?? -Infinity },
-    { key: 'value', label: 'Değer (₺)', align: 'right', cls: 'px-3', sortVal: (p) => valOf(p) ?? -Infinity },
+    { key: 'value', label: `Değer (${curSymbol(cur)})`, align: 'right', cls: 'px-3', sortVal: (p) => valOf(p) ?? -Infinity },
     { key: 'pnl', label: 'Kar/Zarar', align: 'right', cls: 'px-3 hidden sm:table-cell', sortVal: (p) => p.pnl_pct ?? -Infinity },
     { key: 'weight', label: 'Ağırlık', align: 'right', cls: 'px-3 hidden sm:table-cell', filter: 'weight', sortVal: (p) => wOf(p) ?? -Infinity },
     { key: 'opened', label: 'Açılış', align: 'left', cls: 'px-3 hidden lg:table-cell', sortVal: (p) => p.opened_at ?? '' },
@@ -290,7 +295,7 @@ export default function PositionsTable({
                     className="cursor-pointer"
                     aria-expanded={isOpen}
                   >
-                    <td className="px-4 sm:px-5 py-3">
+                    <td className="px-4 sm:px-5 py-3 w-[1%] whitespace-nowrap">
                       <div className="font-medium flex items-center gap-2">
                         {p.symbol}
                         {p.pending && <span title="Fiyat bekleniyor — bir sonraki turda gelir" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--c3)' }} />}
@@ -301,8 +306,8 @@ export default function PositionsTable({
                           classes={classes} locations={locations}
                         />
                       </div>
-                      <div className="text-[11px] truncate max-w-[120px] sm:max-w-[180px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
-                      <div className="text-[11px] mt-0.5 md:hidden" style={{ color: 'var(--faint)' }}>{p.class_name} · {p.currency}</div>
+                      <div className="text-[11px] truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
+                      <div className="text-[11px] mt-0.5 md:hidden truncate max-w-[84px]" style={{ color: 'var(--faint)' }}>{p.class_name} · {p.currency}</div>
                       <div className="text-[11px] tnum mt-0.5 sm:hidden" style={{ color: (p.pnl_pct ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
                         {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
                       </div>
@@ -325,7 +330,7 @@ export default function PositionsTable({
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap">
                       {p.price != null ? `${num(p.price, 2)} ${p.currency === 'USD' ? '$' : '₺'}` : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
                     </td>
-                    <td className="text-right px-3 py-3 tnum whitespace-nowrap">{valOf(p) != null ? tl(valOf(p)!) : '—'}</td>
+                    <td className="text-right px-3 py-3 tnum whitespace-nowrap">{valOf(p) != null ? money(valOf(p)!, cur) : '—'}</td>
                     <td className="text-right px-3 py-3 tnum hidden sm:table-cell whitespace-nowrap" style={{ color: (p.pnl_pct ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
                       {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
                     </td>

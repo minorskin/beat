@@ -25,10 +25,7 @@ export default function AddTransaction({ instruments, locations }: { instruments
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="btn btn-primary">
-        <span className="sm:hidden">+ İşlem</span>
-        <span className="hidden sm:inline">+ İşlem Ekle</span>
-      </button>
+      <button onClick={() => setOpen(true)} className="btn btn-primary">+ İşlem</button>
 
       {open && (
         <div

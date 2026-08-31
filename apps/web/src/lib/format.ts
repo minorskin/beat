@@ -24,3 +24,14 @@ export const timeAgo = (iso: string) => {
   if (s < 86400) return `${Math.floor(s / 3600)}sa önce`;
   return `${Math.floor(s / 86400)}g önce`;
 };
+
+// ── Para birimi ──────────────────────────────────────────────────────────
+// Sayfanın tamamı tek bir görüntüleme birimine bakar (?cur=USD). TL cinsinden
+// tutulan büyüklükler (maliyet, K/Z, dönemsel tutarlar) güncel USD/TRY ile
+// çevrilir; snapshot'ta ikisi de saklanan büyüklükler (portföy/pozisyon değeri)
+// doğrudan kendi kolonundan okunur — çevrim hatası birikmesin.
+export type Cur = 'TRY' | 'USD';
+export const curSymbol = (c: Cur) => (c === 'USD' ? '$' : '₺');
+export const money = (n: number, c: Cur) => (c === 'USD' ? usd(n) : tl(n));
+export const conv = (tryValue: number, c: Cur, rate: number) =>
+  c === 'USD' ? (rate > 0 ? tryValue / rate : 0) : tryValue;

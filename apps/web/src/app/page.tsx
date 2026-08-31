@@ -1,65 +1,96 @@
 import {
   getLatestSnapshot, getPositions, getHistory, getInstruments,
-  getLastFetch, getAssetClasses, getPeriodChanges, getTransactionsByInstrument, getLocations,
+  getLastFetch, getAssetClasses, getPeriodChanges, getPeriodMovers,
+  getTransactionsByInstrument, getLocations, getUsdTry,
   type Change,
 } from '@/lib/data';
-import { tl, usd, num, pct, timeAgo } from '@/lib/format';
+import { money, conv, num, pct, timeAgo, type Cur } from '@/lib/format';
 import PortfolioChart from '@/components/PortfolioChart';
-import AllocationDonut from '@/components/AllocationDonut';
+import AllocationTreemap from '@/components/AllocationTreemap';
 import AddTransaction from '@/components/AddTransaction';
 import AddInstrument from '@/components/AddInstrument';
 import PositionsTable from '@/components/PositionsTable';
 import Projection from '@/components/Projection';
 import SectionNav from '@/components/SectionNav';
+import TabsProvider, { TabPanel } from '@/components/Tabs';
 import OwnershipToggle from '@/components/OwnershipToggle';
+import CurrencyToggle from '@/components/CurrencyToggle';
+import RangeSwitcher from '@/components/RangeSwitcher';
+import Movers from '@/components/Movers';
 import { logout } from './actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ range?: string; own?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ range?: string; own?: string; cur?: string }> }) {
   const sp = await searchParams;
-  const range = sp.range ?? '1A';
-  // ?own=1 → emanet (başkası adına tutulan) pay düşülmüş büyüklükler.
-  // Sayfadaki her sayı tek bu bayrağa bakar; karışık görünüm olmaz.
-  const own = sp.own === '1';
+  const range = sp.range ?? 'A';
+  // ?own=0 → emanet (başkası adına tutulan) pay dahil toplam büyüklük.
+  // VARSAYILAN bana ait (BT); sayfadaki her sayı tek bu bayrağa bakar.
+  const own = sp.own !== '0';
+  // ?cur=USD → tüm sayfa dolar üzerinden değerlendirilir.
+  const cur: Cur = sp.cur === 'USD' ? 'USD' : 'TRY';
 
-  const [snap, positions, history, instruments, lastFetch, classes, changes, transactions, locations] = await Promise.all([
-    getLatestSnapshot(), getPositions(), getHistory(range), getInstruments(),
-    getLastFetch(), getAssetClasses(), getPeriodChanges(), getTransactionsByInstrument(), getLocations(),
-  ]);
+  const [snap, positions, history, instruments, lastFetch, classes, changes, movers, transactions, locations, rate] =
+    await Promise.all([
+      getLatestSnapshot(), getPositions(), getHistory(range), getInstruments(),
+      getLastFetch(), getAssetClasses(), getPeriodChanges(), getPeriodMovers(),
+      getTransactionsByInstrument(), getLocations(), getUsdTry(),
+    ]);
 
-  const value = own ? (snap?.own_value_try ?? 0) : (snap?.total_value_try ?? 0);
+  // Portföy değeri snapshot'ta iki para biriminde de duruyor — çevirmiyoruz,
+  // ilgili kolonu okuyoruz. Maliyet/K-Z yalnız TL tutulduğu için güncel kurla.
+  const valueTry = own ? (snap?.own_value_try ?? 0) : (snap?.total_value_try ?? 0);
   const valueUsd = own ? (snap?.own_value_usd ?? 0) : (snap?.total_value_usd ?? 0);
-  const cost = own ? (snap?.own_cost_try ?? 0) : (snap?.total_cost_try ?? 0);
-  const pnl = own ? (snap?.own_unrealized_pnl_try ?? 0) : (snap?.unrealized_pnl_try ?? 0);
-  const pnlPct = cost > 0 ? (pnl / cost) * 100 : 0;
+  const value = cur === 'USD' ? valueUsd : valueTry;
+  const altValue = cur === 'USD' ? valueTry : valueUsd;
+  const altCur: Cur = cur === 'USD' ? 'TRY' : 'USD';
+  const costTry = own ? (snap?.own_cost_try ?? 0) : (snap?.total_cost_try ?? 0);
+  const pnlTry = own ? (snap?.own_unrealized_pnl_try ?? 0) : (snap?.unrealized_pnl_try ?? 0);
+  const cost = conv(costTry, cur, rate);
+  const pnl = conv(pnlTry, cur, rate);
+  const pnlPct = costTry > 0 ? (pnlTry / costTry) * 100 : 0;
   const up = pnl >= 0;
 
   // Emanet: toplam ile bana-ait arasındaki fark. Anahtarın ne kadar şey
   // gizlediğini/gösterdiğini kullanıcıya sayıyla söylemek gerekiyor.
-  const emanetTry = (snap?.total_value_try ?? 0) - (snap?.own_value_try ?? 0);
+  const emanet = cur === 'USD'
+    ? (snap?.total_value_usd ?? 0) - (snap?.own_value_usd ?? 0)
+    : (snap?.total_value_try ?? 0) - (snap?.own_value_try ?? 0);
   const emanetCount = positions.filter((p) => p.external_quantity > 0).length;
 
   // "Bana ait" görünümünde payı sıfırlanmış pozisyonlar listede yer tutmasın.
   const rows = own ? positions.filter((p) => p.own_quantity !== 0) : positions;
-  const valOf = (p: (typeof positions)[number]) => (own ? p.own_value_try : p.value_try);
+  const valOf = (p: (typeof positions)[number]) =>
+    (cur === 'USD' ? (own ? p.own_value_usd : p.value_usd) : (own ? p.own_value_try : p.value_try)) ?? 0;
 
-  // Donut: ui_group bazında topla
-  const byGroup = new Map<string, number>();
-  for (const p of rows) byGroup.set(p.ui_group, (byGroup.get(p.ui_group) ?? 0) + (valOf(p) ?? 0));
-  const alloc = [...byGroup].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  const staleCount = rows.filter((p) => p.is_stale).length;
+
+  // Dağılım kutucukları: alan = büyüklük, kutu grubunun rengiyle boyanır.
+  const alloc = rows
+    .filter((p) => valOf(p) > 0)
+    .map((p) => ({ symbol: p.symbol, name: p.display_name, group: p.ui_group, value: valOf(p) }))
+    .sort((a, b) => b.value - a.value);
 
   return (
-    <>
-      {/* Sticky üst bar */}
+    <TabsProvider>
+      {/* Sticky üst bar — sol: sekmeler + çıkış · orta: para birimi ·
+          sağ: sahiplik + dönem. Dar ekranda gruplar alt satıra sarar. */}
       <div className="appbar">
-        <div className="w-full px-3 sm:px-5 lg:px-8 h-14 flex items-center justify-between gap-2">
-          <SectionNav />
-          <div className="flex items-center gap-2 shrink-0">
-            <OwnershipToggle own={own} />
-            <form action={logout}>
-              <button type="submit" className="btn btn-ghost">Çıkış</button>
+        <div className="w-full px-3 sm:px-5 lg:px-8 py-2 sm:py-0 sm:h-14 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 sm:grid sm:grid-cols-[1fr_auto_1fr]">
+          <div className="flex items-center gap-1 min-w-0">
+            <SectionNav />
+            <form action={logout} className="shrink-0 flex">
+              <button type="submit" className="navlink inline-flex items-center px-2" title="Çıkış" aria-label="Çıkış">
+                <LogoutIcon />
+              </button>
             </form>
+          </div>
+          <div className="sm:justify-self-center">
+            <CurrencyToggle cur={cur} />
+          </div>
+          <div className="sm:justify-self-end shrink-0 flex items-center gap-2">
+            <OwnershipToggle own={own} />
+            <RangeSwitcher range={range} />
           </div>
         </div>
       </div>
@@ -71,10 +102,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
         </div>
       ) : (
         <>
-          {/* Dashboard — sayfanın başı */}
-          <section id="dashboard" className="pt-4 sm:pt-6">
+          <TabPanel id="ozet">
           <div className="mb-3 sm:mb-4">
-            <h2 className="text-base sm:text-lg font-semibold tracking-tight">Dashboard</h2>
+            <h2 className="text-base sm:text-lg font-semibold tracking-tight">Özet</h2>
             {/* timeAgo Date.now()'a bakar: sunucudaki render ile tarayıcıdaki
                 hydration arasında saniyeler geçtiği için metin kaçınılmaz
                 olarak farklı çıkar ("12sn önce" / "14sn önce"). Bu tek satır
@@ -84,51 +114,74 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             </p>
           </div>
 
-          {emanetTry !== 0 && (
+          {emanet !== 0 && (
             <p className="text-[11px] mb-3 tnum" style={{ color: 'var(--faint)' }}>
               {own
-                ? `${tl(emanetTry)} emanet düşüldü · ${emanetCount} pozisyon`
-                : `${tl(emanetTry)}’si emanet (${emanetCount} pozisyon) — “Bana Ait” ile hariç tut`}
+                ? `${money(emanet, cur)} emanet düşüldü · ${emanetCount} pozisyon`
+                : `${money(emanet, cur)}’si emanet (${emanetCount} pozisyon) — “BT” ile hariç tut`}
             </p>
           )}
 
-          {/* KPI */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <Kpi label={own ? 'Bana Ait Değer' : 'Toplam Değer'} value={tl(value)} sub={usd(valueUsd)} />
-            <Kpi label="Maliyet" value={tl(cost)} sub={own ? 'bana ait alım' : 'toplam alım'} />
-            <Kpi label="Kâr / Zarar" value={`${up ? '+' : ''}${tl(pnl)}`} sub={pct(pnlPct)} tone={up ? 'up' : 'down'} />
-            <Kpi label="Pozisyon" value={String(rows.length)} sub={`${rows.filter((p) => p.is_stale).length} taşınmış fiyat`} />
+          {/* KPI — dört kart: varlık · dönemsel K/Z · oransal öne çıkanlar · tutarsal öne çıkanlar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4 items-stretch">
+
+            {/* 1 — Toplam varlık */}
+            <div className="panel p-3 sm:p-4 flex flex-col">
+              <div className="text-[11px] mb-1 truncate" style={{ color: 'var(--muted)' }}>
+                {own ? 'Bana Ait Varlık' : 'Toplam Varlık'}
+              </div>
+              <div className="text-xl sm:text-2xl font-semibold tnum truncate">{money(value, cur)}</div>
+              <div className="text-[11px] mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{money(altValue, altCur)}</div>
+              <div className="mt-auto pt-3 space-y-1">
+                <StatLine label="Maliyet" value={money(cost, cur)} />
+                <StatLine
+                  label="Kâr / Zarar"
+                  value={`${up ? '+' : ''}${money(pnl, cur)} · ${pct(pnlPct)}`}
+                  color={up ? 'var(--up)' : 'var(--down)'}
+                />
+                <StatLine label="Pozisyon" value={staleCount ? `${rows.length} · ${staleCount} taşınmış` : String(rows.length)} />
+              </div>
+            </div>
+
+            {/* 2 — Dönemsel kâr/zarar: 3 satır × 2 eşit kutu */}
+            <div className="panel p-3 sm:p-4 flex flex-col">
+              <div className="text-[11px] mb-2 truncate" style={{ color: 'var(--muted)' }}>Kâr / Zarar — Dönemsel</div>
+              <div className="grid grid-cols-2 grid-rows-3 gap-1.5 flex-1">
+                <PeriodBox label="Saatlik"   c={own ? changes.hour.own : changes.hour.total}       cur={cur} rate={rate} />
+                <PeriodBox label="Günlük"    c={own ? changes.day.own : changes.day.total}         cur={cur} rate={rate} />
+                <PeriodBox label="Haftalık"  c={own ? changes.week.own : changes.week.total}       cur={cur} rate={rate} />
+                <PeriodBox label="Aylık"     c={own ? changes.month.own : changes.month.total}     cur={cur} rate={rate} />
+                <PeriodBox label="Çeyreklik" c={own ? changes.quarter.own : changes.quarter.total} cur={cur} rate={rate} />
+                <PeriodBox label="Yıllık"    c={own ? changes.year.own : changes.year.total}       cur={cur} rate={rate} />
+              </div>
+            </div>
+
+            {/* 3 & 4 — Öne çıkanlar (oran + tutar). Dönem seçicisi ikisinde ortak. */}
+            <Movers data={movers} range={range} own={own} cur={cur} rate={rate} />
           </div>
 
-          {/* Dönemsel değişim */}
-          <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <ChangeCell label="Gün" c={own ? changes.day.own : changes.day.total} />
-            <ChangeCell label="Hafta" c={own ? changes.week.own : changes.week.total} />
-            <ChangeCell label="Ay" c={own ? changes.month.own : changes.month.total} />
-            <ChangeCell label="Başından" c={own ? changes.all.own : changes.all.total} />
-          </div>
-
-          {/* Grafik + Donut */}
+          {/* Grafik + dağılım */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4">
             <div className="lg:col-span-2 min-w-0">
-              <PortfolioChart data={history} range={range} currency="TRY" own={own} />
+              <PortfolioChart
+                data={history.points} symbols={history.symbols}
+                currency={cur} own={own} />
             </div>
-            <AllocationDonut data={alloc} />
+            <AllocationTreemap data={alloc} cur={cur} />
           </div>
 
           {/* Projeksiyon */}
           <div>
-            <Projection current={value} />
+            <Projection current={value} cur={cur} />
           </div>
-          </section>
+          </TabPanel>
 
-          {/* Portföy */}
-          <section id="portfoy" className="pt-8 sm:pt-10">
+          <TabPanel id="varlik">
           <div className="mb-3 sm:mb-4 flex items-end justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-semibold tracking-tight">Portföy</h2>
+              <h2 className="text-base sm:text-lg font-semibold tracking-tight">Varlık</h2>
               <p className="text-[11px] sm:text-xs" style={{ color: 'var(--muted)' }}>
-                {rows.length} pozisyon · {tl(value)}{own && ' · yalnız bana ait'}
+                {rows.length} pozisyon · {money(value, cur)}{own && ' · yalnız bana ait'}
               </p>
             </div>
             <div className="shrink-0 flex items-center gap-2">
@@ -137,40 +190,50 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             </div>
           </div>
 
-          <PositionsTable rows={rows} own={own} transactions={transactions} locations={locations} classes={classes} />
-          </section>
+          <PositionsTable rows={rows} own={own} cur={cur} transactions={transactions} locations={locations} classes={classes} />
+          </TabPanel>
         </>
       )}
       </main>
-    </>
+    </TabsProvider>
   );
 }
 
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'up' | 'down' }) {
-  const color = tone === 'up' ? 'var(--up)' : tone === 'down' ? 'var(--down)' : 'var(--text)';
+// Kapıdan çıkan ok — metin yerine ikon, bölüm anahtarının sonunda durur.
+function LogoutIcon() {
   return (
-    <div className="panel p-3 sm:p-4">
-      <div className="text-[11px] mb-1 truncate" style={{ color: 'var(--muted)' }}>{label}</div>
-      <div className="text-base sm:text-lg font-semibold tnum truncate" style={{ color }}>{value}</div>
-      {sub && <div className="text-[11px] mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{sub}</div>}
+    <svg viewBox="0 0 15 15" width="15" height="15" fill="none" stroke="currentColor"
+      strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 2H3.2A1.2 1.2 0 0 0 2 3.2v8.6A1.2 1.2 0 0 0 3.2 13H6" />
+      <path d="M10 10.5 13 7.5 10 4.5" />
+      <path d="M13 7.5H5.5" />
+    </svg>
+  );
+}
+
+function StatLine({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 text-[11px]">
+      <span className="shrink-0" style={{ color: 'var(--muted)' }}>{label}</span>
+      <span className="tnum truncate text-right" style={{ color: color ?? 'var(--text)' }}>{value}</span>
     </div>
   );
 }
 
-// Dönemsel değişim hücresi — baz yoksa (yeterli geçmiş yok) '—'.
-function ChangeCell({ label, c }: { label: string; c: Change | null }) {
+// Dönemsel kutu — baz snapshot yoksa (o kadar geçmiş birikmemiş) nötr ton + '—'.
+function PeriodBox({ label, c, cur, rate }: { label: string; c: Change | null; cur: Cur; rate: number }) {
   const has = c != null && c.pct != null;
   const good = has && (c!.pct as number) >= 0;
-  const color = !has ? 'var(--muted)' : good ? 'var(--up)' : 'var(--down)';
+  const tone = !has ? 'tone-flat' : good ? 'tone-up' : 'tone-down';
   return (
-    <div className="panel p-2.5 sm:p-3">
-      <div className="text-[11px] mb-0.5 truncate" style={{ color: 'var(--muted)' }}>{label}</div>
-      <div className="text-sm sm:text-base font-semibold tnum" style={{ color }}>
+    <div className={`${tone} rounded-[var(--r-sm)] px-2 py-1.5 flex flex-col justify-center min-w-0`}>
+      <div className="text-[10px] leading-none truncate" style={{ color: 'var(--muted)' }}>{label}</div>
+      <div className="text-[13px] font-semibold tnum leading-tight mt-1 truncate">
         {has ? `${good ? '+' : ''}${num(c!.pct as number, 2)}%` : '—'}
       </div>
       {has && (
-        <div className="text-[11px] mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>
-          {good ? '+' : ''}{tl(c!.abs)}
+        <div className="text-[10px] leading-none tnum truncate opacity-80">
+          {good ? '+' : ''}{money(conv(c!.abs, cur, rate), cur)}
         </div>
       )}
     </div>

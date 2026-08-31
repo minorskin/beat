@@ -1,11 +1,26 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { curSymbol, type Cur } from '@/lib/format';
 
-export default function Projection({ current }: { current: number }) {
+// Aylık ekleme kaydırıcısı seçilen birimde anlamlı olmalı: ₺10.000 ile $10.000
+// aynı şey değil. Adım/üst sınır da birimle birlikte ölçekleniyor.
+const MONTHLY: Record<Cur, { init: number; max: number; step: number }> = {
+  TRY: { init: 10000, max: 100000, step: 1000 },
+  USD: { init: 250, max: 2500, step: 50 },
+};
+
+export default function Projection({ current, cur }: { current: number; cur: Cur }) {
+  const unit = curSymbol(cur);
+  const cfg = MONTHLY[cur];
   const [rate, setRate] = useState(30);      // yıllık getiri %
-  const [monthly, setMonthly] = useState(10000); // aylık ekleme TL
+  const [monthly, setMonthly] = useState(cfg.init); // aylık ekleme (seçili birim)
   const [years, setYears] = useState(5);
+
+  // Birim değişince kaydırıcı değeri de o birime taşınır — yoksa USD'ye
+  // geçince "aylık 10.000 $" gibi kazara bir varsayım kalıyor.
+  const [lastCur, setLastCur] = useState<Cur>(cur);
+  if (lastCur !== cur) { setLastCur(cur); setMonthly(cfg.init); }
 
   const { data, final, contributed } = useMemo(() => {
     const r = rate / 100 / 12;
@@ -31,9 +46,9 @@ export default function Projection({ current }: { current: number }) {
       <h2 className="text-sm font-medium mb-3 sm:mb-4" style={{ color: 'var(--muted)' }}>Büyüme Projeksiyonu</h2>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
-        <Stat label={`${years} yıl sonra`} value={`${fmtC(final)} ₺`} tone="text" />
-        <Stat label="Yatırılan" value={`${fmtC(contributed)} ₺`} tone="muted" />
-        <Stat label="Getiri" value={`${fmtC(growth)} ₺`} tone="up" />
+        <Stat label={`${years} yıl sonra`} value={`${fmtC(final)} ${unit}`} tone="text" />
+        <Stat label="Yatırılan" value={`${fmtC(contributed)} ${unit}`} tone="muted" />
+        <Stat label="Getiri" value={`${fmtC(growth)} ${unit}`} tone="up" />
       </div>
 
       <div className="w-full h-[160px] sm:h-[190px]">
@@ -51,7 +66,7 @@ export default function Projection({ current }: { current: number }) {
               contentStyle={{ background: '#1c1c1c', border: 'none', borderRadius: 4, fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}
               labelStyle={{ color: '#8a8a8a' }}
               itemStyle={{ color: '#ededed' }}
-              formatter={(v, n) => [`${fmt(Number(v))} ₺`, n === 'deger' ? 'Değer' : 'Anapara'] as [string, string]} />
+              formatter={(v, n) => [`${fmt(Number(v))} ${unit}`, n === 'deger' ? 'Değer' : 'Anapara'] as [string, string]} />
             <Area type="monotone" dataKey="anapara" stroke="#6b6b6b" strokeWidth={1} strokeDasharray="3 3" fill="none" />
             <Area type="monotone" dataKey="deger" stroke="#22c55e" strokeWidth={2} fill="url(#pg)" />
           </AreaChart>
@@ -60,7 +75,7 @@ export default function Projection({ current }: { current: number }) {
 
       <div className="space-y-3 sm:space-y-4 mt-4">
         <Slider label="Yıllık getiri" value={`%${rate}`} min={0} max={100} step={1} v={rate} set={setRate} />
-        <Slider label="Aylık ekleme" value={`${fmt(monthly)} ₺`} min={0} max={100000} step={1000} v={monthly} set={setMonthly} />
+        <Slider label="Aylık ekleme" value={`${fmt(monthly)} ${unit}`} min={0} max={cfg.max} step={cfg.step} v={monthly} set={setMonthly} />
         <Slider label="Süre" value={`${years} yıl`} min={1} max={30} step={1} v={years} set={setYears} />
       </div>
     </div>
