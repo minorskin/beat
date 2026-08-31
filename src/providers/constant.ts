@@ -6,17 +6,20 @@
  * sorulursa "TRY yok" hatası döner ve enstrüman kalıcı olarak fiyatsız kalır.
  * Bu yüzden nakit, sabit fiyat yazan kendi sağlayıcısını kullanır.
  *
- * providerSymbol = fiyatın kendisi (varsayılan 1). Kur değil BİRİM sayısı
- * olduğu için zamanla değişmez; her turda yazılır ki pozisyon "taşınmış
- * fiyat" olarak işaretlenmesin.
+ * Aynı mekanizma gayrimenkulde de kullanılır: bir dairenin/AVM'nin piyasa
+ * fiyatını yayınlayan bir servis yok, değerlemeyi kullanıcı giriyor.
+ * providerSymbol = fiyatın kendisi (nakit için 1, gayrimenkul için güncel
+ * değerleme). Her turda yazılır ki pozisyon "taşınmış fiyat" damgası yemesin.
  */
 import { PriceProvider, ProviderResult } from '../core/types.js';
 
 export const constantProvider: PriceProvider = {
   id: 'constant',
-  supports: ['fx'],
+  supports: ['fx', 'realty'],
   capabilities: { batch: true, historical: false, rateLimit: { perMinute: 100_000 } },
-  canHandle: (s) => s.classCode === 'fx' && s.symbol.slice(0, 3) === s.symbol.slice(3, 6),
+  canHandle: (s) =>
+    s.classCode === 'realty' ||
+    (s.classCode === 'fx' && s.symbol.slice(0, 3) === s.symbol.slice(3, 6)),
 
   async fetchQuotes(syms, ctx): Promise<ProviderResult> {
     return {

@@ -12,15 +12,17 @@ import type { AssetClass } from '@/lib/data';
  * boş açılır ve yalnız kullanıcı gerçekten değiştirirse güncelleme yapılır.
  */
 export default function EditInstrument({
-  id, symbol, displayName, classCode, currency, positionLocations, classes, locations,
+  id, symbol, displayName, classCode, currency, price, positionLocations, classes, locations,
 }: {
   id: string; symbol: string; displayName: string; classCode: string; currency: string;
-  positionLocations: string[]; classes: AssetClass[]; locations: string[];
+  price: number | null; positionLocations: string[]; classes: AssetClass[]; locations: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState('');
 
+  // Gayrimenkulün "fiyatı" kullanıcının girdiği değerlemedir — buradan güncellenir.
+  const isRealty = classCode === 'realty';
   const single = positionLocations.length === 1 ? positionLocations[0] : '';
   const mixed = positionLocations.length > 1;
 
@@ -66,6 +68,20 @@ export default function EditInstrument({
               <input name="display_name" required defaultValue={displayName} className="field mt-1" />
             </label>
 
+            {isRealty && (
+              <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+                Güncel Değer (₺)
+                <input
+                  name="value" inputMode="decimal" className="field mt-1 tnum"
+                  defaultValue={price != null ? String(price) : ''}
+                  placeholder="ör. 25.000.000" autoComplete="off"
+                />
+                <span className="block mt-1" style={{ color: 'var(--faint)' }}>
+                  Yeni değerleme bir sonraki turda (≤30 dk) fiyata yansır.
+                </span>
+              </label>
+            )}
+
             <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
               Grup
               <select name="class_code" defaultValue={classCode} className="field mt-1">
@@ -100,7 +116,9 @@ export default function EditInstrument({
             </label>
 
             <p className="col-span-2 text-[11px]" style={{ color: 'var(--faint)' }}>
-              Grup ve döviz yalnız kayıt bilgisidir — fiyat kaynağı sembole bağlı ve değişmez.
+              {isRealty
+                ? 'Grup ve döviz yalnız kayıt bilgisidir. Gayrimenkulde fiyat kaynağı senin girdiğin değerlemedir.'
+                : 'Grup ve döviz yalnız kayıt bilgisidir — fiyat kaynağı sembole bağlı ve değişmez.'}
             </p>
 
             <div className="col-span-2 flex items-center gap-3 mt-1">

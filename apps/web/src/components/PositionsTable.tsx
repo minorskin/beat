@@ -302,7 +302,8 @@ export default function PositionsTable({
                         {!p.pending && p.is_stale && <span title="Taşınmış fiyat (piyasa kapalı)" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--faint)' }} />}
                         <EditInstrument
                           id={p.instrument_id} symbol={p.symbol} displayName={p.display_name}
-                          classCode={p.class_code} currency={p.currency} positionLocations={p.locations}
+                          classCode={p.class_code} currency={p.currency} price={p.price}
+                          positionLocations={p.locations}
                           classes={classes} locations={locations}
                         />
                       </div>

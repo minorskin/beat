@@ -62,12 +62,33 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
       { provider: 'tcmb', providerSymbol: s.slice(0, 3), priority: 20 },
     ],
   },
+  realty: {
+    // Fiyatını yayınlayan servis yok: değerlemeyi kullanıcı giriyor, sabit
+    // sağlayıcı her turda onu yazıyor. providerSymbol = değerlemenin kendisi.
+    currency: 'TRY', calendar: 'CRYPTO_24_7', cadence: 'hourly',
+    symbolHint: 'Mülkün adı — ör. Ataşehir AVM',
+    sources: (_s, ps) => [{ provider: 'constant', providerSymbol: ps, priority: 10 }],
+  },
   crypto: {
     currency: 'USD', calendar: 'CRYPTO_24_7', cadence: 'hourly',
     symbolHint: 'Kısa kod — SOL, AVAX',
     sources: (_s, ps) => [{ provider: 'coingecko', providerSymbol: ps, priority: 10 }],
   },
 };
+
+/** Kullanıcının verdiği addan kanonik sembol: "Ataşehir AVM" -> ATASEHIR-AVM. */
+export function symbolFromName(name: string): string {
+  const TR: Record<string, string> = { 'Ç': 'C', 'Ğ': 'G', 'İ': 'I', 'Ö': 'O', 'Ş': 'S', 'Ü': 'U' };
+  return name
+    .toLocaleUpperCase('tr-TR')
+    .replace(/[ÇĞİÖŞÜ]/g, (c) => TR[c])
+    // Kalan aksanları (Â, Î, Û…) taşıyıcı harfe indir: "Dükkân" -> DUKKAN,
+    // yoksa şapkalı harf ayraca dönüşüp "DUKK-N" gibi sembol üretiyordu.
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 20);
+}
 
 /**
  * Nakit = para biriminin kendisi (TRYTRY, USDUSD). Fiyatı tanım gereği 1;

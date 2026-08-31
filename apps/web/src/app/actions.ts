@@ -1,6 +1,7 @@
 'use server';
 import { q, pool } from '@/lib/db';
-import { CLASS_DEFAULTS, SYMBOL_RE, defaultsFor } from '@/lib/catalog';
+import { CLASS_DEFAULTS, SYMBOL_RE, defaultsFor, symbolFromName } from '@/lib/catalog';
+import { parseAmount } from '@/lib/format';
 import { resolveInstrumentMeta, GOLD_OPTIONS } from '@/lib/resolve';
 import { revalidatePath } from 'next/cache';
 
@@ -61,7 +62,17 @@ export async function addInstrument(formData: FormData): Promise<Result> {
 
   let symbol: string, display_name: string, provider_symbol: string;
 
-  if (class_code === 'gold') {
+  if (class_code === 'realty') {
+    // Gayrimenkulün borsa kodu yok: kullanıcı mülkü adlandırır, sembolü addan
+    // türetilir. Değerleme fiyat kaynağının kendisidir (constant sağlayıcı).
+    display_name = String(formData.get('display_name') || '').trim();
+    if (display_name.length < 2) return { ok: false, error: 'Mülkün adını yaz (ör. Ataşehir AVM)' };
+    symbol = symbolFromName(display_name);
+    if (!SYMBOL_RE.test(symbol)) return { ok: false, error: 'Ad en az 2 harf/rakam içermeli' };
+    const value = parseAmount(String(formData.get('value') || ''));
+    if (value == null || value <= 0) return { ok: false, error: 'Güncel değeri gir (ör. 25.000.000)' };
+    provider_symbol = String(value);
+  } else if (class_code === 'gold') {
     const goldCode = String(formData.get('gold_code') || '');
     const g = GOLD_OPTIONS.find((o) => o.code === goldCode);
     if (!g) return { ok: false, error: 'Altın türü seç' };
@@ -181,6 +192,14 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
   const location = String(formData.get('location') || '').trim();
   const orig_location = String(formData.get('orig_location') || '').trim();
 
+  // Yalnız gayrimenkul formunda var; boş bırakılırsa değerleme değişmez.
+  const rawValue = String(formData.get('value') || '').trim();
+  let newValue: number | null = null;
+  if (rawValue) {
+    newValue = parseAmount(rawValue);
+    if (newValue == null || newValue <= 0) return { ok: false, error: 'Değer geçersiz (ör. 25.000.000)' };
+  }
+
   // Grup değişince takvim/periyot da o grubun varsayılanına çekilir; aksi halde
   // motor varlığı yanlış saatlerde çekmeye devam ederdi. Nakit sembolleri
   // (TRYTRY) için varsayılan sembolden çözülür, sınıftan değil.
@@ -203,6 +222,15 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
       await client.query(
         `update transactions set location=$2 where instrument_id=$1`,
         [instrument_id, location || null]);
+    }
+    // Gayrimenkulde "fiyat" = kullanıcının girdiği değerleme; sabit
+    // sağlayıcının provider_symbol'ünde durur. Yeni değer bir sonraki fetch
+    // turunda (≤30 dk) fiyata yansır.
+    if (newValue != null) {
+      await client.query(
+        `update instrument_sources set provider_symbol=$2
+         where instrument_id=$1 and provider_id='constant'`,
+        [instrument_id, String(newValue)]);
     }
     await client.query('commit');
   } catch (e) {

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition } from 'react';
 import { addInstrument } from '@/app/actions';
-import { CLASS_DEFAULTS } from '@/lib/catalog';
+import { CLASS_DEFAULTS, defaultsFor, symbolFromName } from '@/lib/catalog';
 import { GOLD_OPTIONS } from '@/lib/resolve';
 import type { AssetClass } from '@/lib/data';
 
@@ -10,17 +10,32 @@ import type { AssetClass } from '@/lib/data';
  * Kullanıcı yalnız varlık sınıfı + sembol girer (altında sabit bir listeden
  * seçer) — görünen ad ve kaynak kodu sunucu tarafında otomatik çözülür.
  */
+// Teknik kodlar kullanıcıya bir şey anlatmıyor: "CRYPTO_24_7" gayrimenkulde
+// düpedüz kafa karıştırıcı. Aynı bilgiyi insan diliyle yazıyoruz.
+const CAL_LABEL: Record<string, string> = {
+  CRYPTO_24_7: '7/24', FX_24_5: 'hafta içi 7/24', BIST: 'BIST seansı',
+  NYSE: 'NYSE seansı', TEFAS_DAILY: 'TEFAS kapanışı',
+};
+const CADENCE_LABEL: Record<string, string> = {
+  hourly: 'saatlik', market_hours: 'seans içi saatlik', daily_close: 'günlük',
+};
+
 export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState('');
   const [cls, setCls] = useState('stock_us');
   const [symbol, setSymbol] = useState('');
+  const [name, setName] = useState('');
 
   const def = CLASS_DEFAULTS[cls];
   const isGold = cls === 'gold';
+  const isRealty = cls === 'realty';
+  // Bilgi satırı yazılan sembole göre çözülür: nakit (TRYTRY) döviz sınıfının
+  // içinde ama takvimi 7/24 — sınıf varsayılanını göstermek yanlış olurdu.
+  const eff = defaultsFor(cls, isRealty ? symbolFromName(name) : symbol.toUpperCase());
 
-  const reset = () => { setOpen(false); setMsg(''); setSymbol(''); };
+  const reset = () => { setOpen(false); setMsg(''); setSymbol(''); setName(''); };
 
   return (
     <>
@@ -47,8 +62,9 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
             </div>
 
             <p className="col-span-2 text-[11px] -mt-2" style={{ color: 'var(--faint)' }}>
-              Henüz almadığın bir varlığı ekle; izleme listesinde durur, fiyatı çekilmeye başlar.
-              İlk alımı girdiğinde kendiliğinden pozisyona döner. Ad ve kaynak otomatik çözülür.
+              {isRealty
+                ? 'Mülkü adıyla tanımla ve güncel değerini gir. Sonra “+ İşlem” ile adet 1, birim fiyat = alış bedeli olarak kaydet; kâr/zarar değerleme ile alış farkından çıkar.'
+                : 'Henüz almadığın bir varlığı ekle; izleme listesinde durur, fiyatı çekilmeye başlar. İlk alımı girdiğinde kendiliğinden pozisyona döner. Ad ve kaynak otomatik çözülür.'}
             </p>
 
             <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
@@ -60,7 +76,34 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
               </select>
             </label>
 
-            {isGold ? (
+            {isRealty ? (
+              <>
+                <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+                  Mülkün Adı
+                  <input
+                    name="display_name" required className="field mt-1"
+                    value={name} onChange={(e) => setName(e.target.value)}
+                    placeholder="ör. Ataşehir AVM" autoComplete="off"
+                  />
+                  <span className="block mt-1" style={{ color: 'var(--faint)' }}>
+                    {name.trim().length >= 2
+                      ? `Sembol: ${symbolFromName(name)}`
+                      : 'Sembol addan türetilir (Ataşehir AVM → ATASEHIR-AVM).'}
+                  </span>
+                </label>
+                <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+                  Güncel Değer (₺)
+                  <input
+                    name="value" required inputMode="decimal" className="field mt-1 tnum"
+                    placeholder="ör. 25.000.000" autoComplete="off"
+                  />
+                  <span className="block mt-1" style={{ color: 'var(--faint)' }}>
+                    Borsada işlem görmediği için fiyatı sen belirlersin; sonradan
+                    varlık satırındaki ✎ ile güncellersin.
+                  </span>
+                </label>
+              </>
+            ) : isGold ? (
               <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
                 Altın Türü
                 <select name="gold_code" className="field mt-1" required defaultValue="">
@@ -96,9 +139,11 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
               </span>
             </label>
 
-            {def && !isGold && (
-              <div className="col-span-2 text-[11px] tnum" style={{ color: 'var(--faint)' }}>
-                {def.currency} · {def.calendar} · {def.cadence}
+            {eff && !isGold && (
+              <div className="col-span-2 text-[11px]" style={{ color: 'var(--faint)' }}>
+                <span className="tnum">{eff.currency}</span> · fiyat {CADENCE_LABEL[eff.cadence] ?? eff.cadence}
+                {' · '}{CAL_LABEL[eff.calendar] ?? eff.calendar}
+                {eff.sources[0]?.provider === 'constant' && ' · sabit değer (kaynak yok)'}
               </div>
             )}
 

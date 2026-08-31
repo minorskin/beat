@@ -1,7 +1,7 @@
 /** Motorun kanonik tipleri. Çekirdek hiçbir zaman kaynağın adını bilmez. */
 
 export type AssetClass =
-  | 'stock_us' | 'etf_us' | 'stock_tr' | 'fund_tr' | 'gold' | 'fx' | 'crypto';
+  | 'stock_us' | 'etf_us' | 'stock_tr' | 'fund_tr' | 'gold' | 'fx' | 'crypto' | 'realty';
 
 export interface SymbolRef {
   instrumentId?: string;

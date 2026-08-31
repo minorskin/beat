@@ -35,3 +35,20 @@ export const curSymbol = (c: Cur) => (c === 'USD' ? '$' : '₺');
 export const money = (n: number, c: Cur) => (c === 'USD' ? usd(n) : tl(n));
 export const conv = (tryValue: number, c: Cur, rate: number) =>
   c === 'USD' ? (rate > 0 ? tryValue / rate : 0) : tryValue;
+
+/**
+ * Kullanıcının yazdığı tutarı sayıya çevirir: "25.000.000", "25000000",
+ * "1.234,56" ve "1234.56" hepsi çalışır. Ondalık ayırıcı SON nokta/virgüldür
+ * — ama ardından tam 3 basamak geliyorsa binlik ayırıcı sayılır ("1.500" =
+ * 1500, "25,50" = 25.5). Geçersizse null.
+ */
+export function parseAmount(raw: string): number | null {
+  const s = raw.trim().replace(/\s/g, '');
+  if (!s || !/^[0-9.,]+$/.test(s)) return null;
+  const dec = Math.max(s.lastIndexOf(','), s.lastIndexOf('.'));
+  const hasFrac = dec >= 0 && s.length - dec - 1 !== 3;
+  const intPart = (hasFrac ? s.slice(0, dec) : s).replace(/[.,]/g, '');
+  const frac = hasFrac ? s.slice(dec + 1).replace(/[.,]/g, '') : '';
+  const n = Number(frac ? `${intPart}.${frac}` : intPart);
+  return Number.isFinite(n) ? n : null;
+}
