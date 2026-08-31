@@ -33,7 +33,7 @@ function durText(m: number) {
 export default function Projection({ current, cur }: { current: number; cur: Cur }) {
   const unit = curSymbol(cur);
   const cfg = MONTHLY[cur];
-  const [rate, setRate] = useState(30);      // yıllık getiri %
+  const [rate, setRate] = useState(2.5);     // aylık getiri % — birikim de aylık işlediği için aynı periyotta
   const [monthly, setMonthly] = useState(cfg.init); // aylık ekleme (seçili birim)
   const [months, setMonths] = useState(60);  // süre — ay olarak, tek ay adımlarıyla
 
@@ -43,7 +43,7 @@ export default function Projection({ current, cur }: { current: number; cur: Cur
   if (lastCur !== cur) { setLastCur(cur); setMonthly(cfg.init); }
 
   const { data, final, contributed } = useMemo(() => {
-    const r = rate / 100 / 12;
+    const r = rate / 100;
     // Süre ay ay ayarlandığı için nokta aralığı da süreye göre seyrelir:
     // kısa vadede her ay, uzun vadede yılda bir işaret.
     const stride = Math.max(1, Math.ceil(months / 36));
@@ -65,6 +65,8 @@ export default function Projection({ current, cur }: { current: number; cur: Cur
 
   const fmtC = (n: number) => new Intl.NumberFormat('tr-TR', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
   const fmt = (n: number) => new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(n);
+  // Aylık oran 0,1 adımlarla değişiyor: ondalık basamağı Türkçe virgülle yaz.
+  const pct = (n: number) => new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n);
   const growth = final - contributed;
 
   return (
@@ -100,7 +102,7 @@ export default function Projection({ current, cur }: { current: number; cur: Cur
       </div>
 
       <div className="space-y-3 sm:space-y-4 mt-4">
-        <Slider label="Yıllık getiri" value={`%${rate}`} min={0} max={100} step={1} v={rate} set={setRate} />
+        <Slider label="Aylık getiri" value={`%${pct(rate)}`} min={0} max={20} step={0.1} v={rate} set={setRate} />
         <Slider label="Aylık ekleme" value={`${fmt(monthly)} ${unit}`} min={0} max={cfg.max} step={cfg.step} v={monthly} set={setMonthly} />
         <Slider label="Süre" value={durText(months)} min={1} max={MAX_MONTHS} step={1} v={months} set={setMonths} />
       </div>
