@@ -37,7 +37,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     ]);
 
   // Portföy değeri snapshot'ta iki para biriminde de duruyor — çevirmiyoruz,
-  // ilgili kolonu okuyoruz. Maliyet/K-Z yalnız TL tutulduğu için güncel kurla.
+  // ilgili kolonu okuyoruz. Maliyet/değişim yalnız TL tutulduğu için güncel kurla.
   const valueTry = own ? (snap?.own_value_try ?? 0) : (snap?.total_value_try ?? 0);
   const valueUsd = own ? (snap?.own_value_usd ?? 0) : (snap?.total_value_usd ?? 0);
   const value = cur === 'USD' ? valueUsd : valueTry;
@@ -45,7 +45,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const altCur: Cur = cur === 'USD' ? 'TRY' : 'USD';
   const costTry = own ? (snap?.own_cost_try ?? 0) : (snap?.total_cost_try ?? 0);
   const pnlTry = own ? (snap?.own_unrealized_pnl_try ?? 0) : (snap?.unrealized_pnl_try ?? 0);
-  const cost = conv(costTry, cur, rate);
   const pnl = conv(pnlTry, cur, rate);
   const pnlPct = costTry > 0 ? (pnlTry / costTry) * 100 : 0;
   const up = pnl >= 0;
@@ -149,7 +148,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
               <div className="text-xl sm:text-2xl font-semibold tnum truncate">{money(value, cur)}</div>
               <div className="text-[11px] mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{money(altValue, altCur)}</div>
               <div className="mt-auto pt-3 space-y-1.5">
-                <StatLine label="Maliyet" value={money(cost, cur)} />
                 {/* Tutar ve oran ayrı satırda: ikisi farklı soruyu cevaplıyor
                     ("ne kadar kazandım" / "ne kadar büyüdüm") ve tek satıra
                     sıkışınca ikisi de küçük punto kalıyordu. */}
@@ -166,7 +164,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                 <StatLine label="Pozisyon" value={staleCount ? `${rows.length} · ${staleCount} taşınmış` : String(rows.length)} />
                 {noCostCount > 0 && (
                   <p className="text-[11px] pt-1" style={{ color: 'var(--faint)' }}>
-                    {noCostCount} pozisyonda alış fiyatı yok — maliyet ve değişim onlar hariç.
+                    {noCostCount} pozisyonda alış fiyatı yok — değişim onlar hariç.
                   </p>
                 )}
               </div>
