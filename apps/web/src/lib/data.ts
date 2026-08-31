@@ -19,10 +19,6 @@ export interface Position {
   opened_at: string | null; closed_at: string | null; locations: string[];
   // Kâr üzerinden kesilecek vergi oranı (%) — girilmemişse null.
   tax_rate: number | null;
-  // Fiyat kaynağının bildirdiği para birimi (prices.currency). Enstrümana
-  // elle seçilen para biriminden farklıysa değer kurla yanlış çarpılıyor
-  // demektir; düzenleme formu bunu uyarı olarak gösteriyor.
-  price_currency: string | null;
   // Tutuluyor ama motor henüz fiyat çekmedi — bir sonraki turda gelir, o ana kadar değer/K-Z/ağırlık "—".
   pending: boolean;
 }
@@ -96,7 +92,6 @@ export async function getPositions(): Promise<Position[]> {
     -- çekmemiş olsa bile (snapshot yoksa fiyat/değer/ağırlık null → arayüzde "—"/"bekliyor").
     select i.id as instrument_id, i.symbol, i.display_name, i.class_code, ac.name as class_name, ac.ui_group,
            i.tax_rate,
-           (select p.currency from prices p where p.instrument_id = i.id order by p.ts desc limit 1) as price_currency,
            h.quantity, ps.price, i.currency, ps.price_ts, coalesce(ps.is_stale, false) as is_stale,
            ps.value_try, ps.value_usd, ps.weight_pct,
            h.own_quantity, ps.own_value_try, ps.own_value_usd, ps.own_weight_pct,

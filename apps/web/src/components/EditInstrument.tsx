@@ -13,11 +13,11 @@ import type { AssetClass } from '@/lib/data';
  * boş açılır ve yalnız kullanıcı gerçekten değiştirirse güncelleme yapılır.
  */
 export default function EditInstrument({
-  id, symbol, displayName, classCode, currency, price, taxRate, priceCurrency, txCount,
+  id, symbol, displayName, classCode, currency, price, taxRate, txCount,
   positionLocations, classes, locations,
 }: {
   id: string; symbol: string; displayName: string; classCode: string; currency: string;
-  price: number | null; taxRate: number | null; priceCurrency: string | null;
+  price: number | null; taxRate: number | null;
   txCount: number; positionLocations: string[];
   classes: AssetClass[]; locations: string[];
 }) {
@@ -25,10 +25,6 @@ export default function EditInstrument({
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState('');
   const [askDelete, setAskDelete] = useState(false);
-  // Seçim kaynağın bildirdiğinden farklıysa değer kurla bir kez daha çarpılır.
-  // Seçimi engellemiyoruz (istisnaları yalnız kullanıcı bilir) ama sonucunu
-  // seçim anında söylüyoruz.
-  const [curSel, setCurSel] = useState(currency);
 
   // Gayrimenkulün "fiyatı" kullanıcının girdiği değerlemedir — buradan güncellenir.
   const isRealty = classCode === 'realty';
@@ -100,21 +96,10 @@ export default function EditInstrument({
 
             <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
               Fiyat Para Birimi
-              <select
-                name="currency" value={curSel} onChange={(e) => setCurSel(e.target.value)}
-                className="field mt-1 tnum"
-              >
+              <select name="currency" defaultValue={currency} className="field mt-1 tnum">
                 <option value="TRY">TRY</option>
                 <option value="USD">USD</option>
               </select>
-              {priceCurrency && priceCurrency !== curSel && (
-                <span className="block mt-1" style={{ color: 'var(--down)' }}>
-                  Dikkat: kaynak son fiyatı <b className="tnum">{priceCurrency}</b> olarak verdi.
-                  {curSel === 'USD'
-                    ? ' USD seçilirse değer bir de kurla çarpılır (48 kat büyür).'
-                    : ' TRY seçilirse değer kurla çarpılmaz (48 kat küçülür).'}
-                </span>
-              )}
             </label>
 
             <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
