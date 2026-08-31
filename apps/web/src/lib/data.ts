@@ -19,6 +19,9 @@ export interface Position {
   opened_at: string | null; closed_at: string | null; locations: string[];
   // Kâr üzerinden kesilecek vergi oranı (%) — girilmemişse null.
   tax_rate: number | null;
+  // Fiyatın kote edildiği birim (prices.currency). currency alanı artık kur
+  // riski etiketi olduğu için para birimi bilgisi buradan okunur.
+  price_currency: string | null;
   // Tutuluyor ama motor henüz fiyat çekmedi — bir sonraki turda gelir, o ana kadar değer/K-Z/ağırlık "—".
   pending: boolean;
 }
@@ -55,6 +58,8 @@ export async function getLatestSnapshot(): Promise<Snapshot | null> {
 export async function getPositions(): Promise<Position[]> {
   return q<Position>(`
     with latest as (select id from portfolio_snapshots order by ts desc limit 1),
+         -- Fiyatın kote edildiği birim: değer ve maliyet çevrimi buna bakar.
+         pcur as (select distinct on (instrument_id) instrument_id, currency from prices order by instrument_id, ts desc),
          latest_ps as (select ps.* from position_snapshots ps join latest l on l.id = ps.snapshot_id),
          fx as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1),
          -- Güncel lot'un açılış/kapanış tarihi + konumları: buy/sell'i imzalı adet
@@ -91,7 +96,7 @@ export async function getPositions(): Promise<Position[]> {
     -- v_holdings tahrik eder: elde tutulan HER şey listelenir, motor fiyatı henüz
     -- çekmemiş olsa bile (snapshot yoksa fiyat/değer/ağırlık null → arayüzde "—"/"bekliyor").
     select i.id as instrument_id, i.symbol, i.display_name, i.class_code, ac.name as class_name, ac.ui_group,
-           i.tax_rate,
+           i.tax_rate, pc.currency as price_currency,
            h.quantity, ps.price, i.currency, ps.price_ts, coalesce(ps.is_stale, false) as is_stale,
            ps.value_try, ps.value_usd, ps.weight_pct,
            h.own_quantity, ps.own_value_try, ps.own_value_usd, ps.own_weight_pct,
@@ -101,11 +106,11 @@ export async function getPositions(): Promise<Position[]> {
            -- yoksa varlığın tamamı kâr gibi görünür.
            case when h.avg_cost > 0 then
              ps.value_try - h.avg_cost * h.quantity *
-               case when i.currency='USD' then (select rate from fx) else 1 end
+               case when pc.currency='USD' then (select rate from fx) else 1 end
            end as pnl_try,
            case when h.avg_cost > 0 then
              ps.own_value_try - h.avg_cost * h.own_quantity *
-               case when i.currency='USD' then (select rate from fx) else 1 end
+               case when pc.currency='USD' then (select rate from fx) else 1 end
            end as own_pnl_try,
            case when h.avg_cost > 0 and ps.price is not null then
              ((ps.price - h.avg_cost) / h.avg_cost) * 100 end as pnl_pct,
@@ -116,6 +121,7 @@ export async function getPositions(): Promise<Position[]> {
     join asset_classes ac on ac.code = i.class_code
     left join latest_ps ps on ps.instrument_id = h.instrument_id
     left join current_segment cs on cs.instrument_id = h.instrument_id
+    left join pcur pc on pc.instrument_id = h.instrument_id
     where h.quantity <> 0
     order by ps.value_try desc nulls last`);
 }

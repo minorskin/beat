@@ -80,11 +80,12 @@ async function main() {
     const ageSec = (now.getTime() - new Date(r.price_ts).getTime()) / 1000;
     const isStale = ageSec > (STALE_WINDOW[r.cadence] ?? 6 * 3600);
 
-    // Maliyet, kullanıcının işlemleri hangi cinsten girdiğine bağlı; orası
-    // enstrümanın para birimini izliyor (bkz. migration 0007).
+    // Maliyet de fiyatla AYNI birimden çevrilir: kullanıcı birim fiyatı
+    // piyasanın kote ettiği cinsten giriyor. instruments.currency artık para
+    // birimi değil kur riski etiketi (bkz. arayüzdeki "Kur Riski" sütunu).
     const cost = (qty: number) => {
       const native = (r.avg_cost ?? 0) * qty;
-      return r.currency === 'USD' ? native * usdtry : native;
+      return priceCur === 'USD' ? native * usdtry : native;
     };
     const hasCost = (r.avg_cost ?? 0) > 0;
 

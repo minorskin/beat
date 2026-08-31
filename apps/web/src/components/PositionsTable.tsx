@@ -28,6 +28,23 @@ const WEIGHT_BUCKETS = [
 // Sunucuda useLayoutEffect uyarı basar; ölçüm işi yalnız tarayıcıda anlamlı.
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
+/**
+ * Kur riski göstergesi: TL fiyatlı varlık kur karşısında açık pozisyondur
+ * (kırmızı), dolar fiyatlı olan korunaklıdır (yeşil). Renk tek başına anlam
+ * taşımasın diye kod hem title'da hem ekran okuyucu etiketinde duruyor.
+ */
+function CurrencyDot({ currency }: { currency: string }) {
+  const usd = currency === 'USD';
+  return (
+    <span
+      title={usd ? `${currency} — kur riski yok` : `${currency} — kur riski var`}
+      aria-label={currency}
+      className="inline-block w-2 h-2 rounded-full align-middle"
+      style={{ background: usd ? 'var(--up)' : 'var(--down)' }}
+    />
+  );
+}
+
 function FunnelIcon() {
   return (
     <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" className="shrink-0">
@@ -111,14 +128,14 @@ export default function PositionsTable({
   const wOf = (p: Position) => (own ? p.own_weight_pct : p.weight_pct);
 
   const columns: {
-    key: ColKey; label: string; align: 'left' | 'right'; cls: string;
+    key: ColKey; label: string; align: 'left' | 'right' | 'center'; cls: string;
     filter?: FilterKey; sortVal: (p: Position) => string | number;
   }[] = [
     // w-[1%]: tablo hücresi içeriğine göre daralsın — sütun genişliğini varlık
     // KODU belirlesin, altındaki uzun görünen ad değil (o zaten kırpılıyor).
     { key: 'symbol', label: 'Varlık', align: 'left', cls: 'px-4 sm:px-5 w-[1%]', sortVal: (p) => p.symbol },
     { key: 'class', label: 'Grup', align: 'left', cls: 'px-3 hidden md:table-cell', filter: 'class', sortVal: (p) => p.class_name },
-    { key: 'currency', label: 'Döviz', align: 'left', cls: 'px-3 hidden md:table-cell', filter: 'currency', sortVal: (p) => p.currency },
+    { key: 'currency', label: 'Kur Riski', align: 'center', cls: 'px-3 hidden md:table-cell', filter: 'currency', sortVal: (p) => p.currency },
     { key: 'location', label: 'Konum', align: 'left', cls: 'px-3 hidden lg:table-cell', filter: 'location', sortVal: (p) => p.locations.join(', ') },
     { key: 'qty', label: 'Adet', align: 'right', cls: 'px-3', sortVal: (p) => qtyOf(p) },
     { key: 'price', label: 'Fiyat', align: 'right', cls: 'px-3', sortVal: (p) => p.price ?? -Infinity },
@@ -263,7 +280,7 @@ export default function PositionsTable({
                 const on = c.filter ? filters[c.filter].length > 0 : false;
                 return (
                   <th key={c.key} className={`font-medium py-2.5 ${c.cls}`} style={{ textAlign: c.align }}>
-                    <div className={`flex items-center gap-1.5 ${c.align === 'right' ? 'justify-end' : ''}`}>
+                    <div className={`flex items-center gap-1.5 ${c.align === 'right' ? 'justify-end' : c.align === 'center' ? 'justify-center' : ''}`}>
                       {c.filter && (
                         <button
                           type="button"
@@ -377,7 +394,9 @@ export default function PositionsTable({
                       </div>
                     </td>
                     <td className="px-3 py-3 hidden md:table-cell text-[11px]" style={{ color: 'var(--muted)' }}>{p.class_name}</td>
-                    <td className="px-3 py-3 hidden md:table-cell text-[11px] tnum" style={{ color: 'var(--muted)' }}>{p.currency}</td>
+                    <td className="px-3 py-3 hidden md:table-cell text-center">
+                      <CurrencyDot currency={p.currency} />
+                    </td>
                     <td className="px-3 py-3 hidden lg:table-cell text-[11px]" style={{ color: 'var(--muted)' }}>
                       {p.locations.length ? p.locations.join(', ') : '—'}
                     </td>
@@ -392,7 +411,9 @@ export default function PositionsTable({
                       )}
                     </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap">
-                      {p.price != null ? `${num(p.price, 2)} ${p.currency === 'USD' ? '$' : '₺'}` : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
+                      {p.price != null
+                        ? `${num(p.price, 2)} ${p.price_currency === 'USD' ? '$' : '₺'}`
+                        : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
                     </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap">{valOf(p) != null ? money(valOf(p)!, cur) : '—'}</td>
                     <td className="text-right px-3 py-3 tnum hidden sm:table-cell whitespace-nowrap" style={{ color: (p.pnl_pct ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
@@ -427,7 +448,9 @@ export default function PositionsTable({
                           </div>
                         </td>
                         <td className="px-3 py-2 hidden md:table-cell text-[11px]" style={{ color: 'var(--muted)' }}>—</td>
-                        <td className="px-3 py-2 hidden md:table-cell text-[11px] tnum" style={{ color: 'var(--muted)' }}>{t.currency}</td>
+                        <td className="px-3 py-2 hidden md:table-cell text-center">
+                          <CurrencyDot currency={t.currency} />
+                        </td>
                         <td className="px-3 py-2 hidden lg:table-cell text-[11px]" style={{ color: 'var(--muted)' }}>{t.location ?? '—'}</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap text-[12px]">
                           {num(t.quantity, Math.abs(t.quantity) < 1 ? 4 : 2)}

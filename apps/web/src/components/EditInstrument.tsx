@@ -95,7 +95,7 @@ export default function EditInstrument({
             </label>
 
             <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
-              Fiyat Para Birimi
+              Kur Riski
               <select name="currency" defaultValue={currency} className="field mt-1 tnum">
                 <option value="TRY">TRY</option>
                 <option value="USD">USD</option>
@@ -132,10 +132,10 @@ export default function EditInstrument({
             </label>
 
             <p className="col-span-2 text-[11px]" style={{ color: 'var(--faint)' }}>
-              Para birimi, gelen FİYATIN hangi cinsten olduğudur — kaç liraya
-              aldığın değil. Kaynağın verdiği fiyat TL ise TRY seç: USD seçilirse
-              değer bir kez daha kurla çarpılır. Değiştirdiğinde bu varlığın tüm
-              işlemleri de aynı birime geçer.
+              Kur riski: varlığın hangi para birimine bağlı olduğunu sen
+              belirtirsin. Tabloda TRY kırmızı, USD yeşil nokta olarak görünür.
+              Değiştirdiğinde bu varlığın tüm işlemleri de aynı birime geçer;
+              portföy büyüklüğü etkilenmez (o, kaynağın verdiği fiyattan hesaplanır).
             </p>
 
             <div className="col-span-2 flex items-center gap-3 mt-1">
