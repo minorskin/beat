@@ -15,12 +15,13 @@ export const RANGES = [
   { id: 'A', long: 'son 1 ay' },
   { id: '3A', long: 'son 3 ay' },
   { id: '1Y', long: 'son 1 yıl' },
+  { id: 'TÜM', long: 'tüm geçmiş — elle girilen yıl kapanışları + bugün' },
 ] as const;
 
 export default function RangeSwitcher({ range }: { range: string }) {
   const setParam = useParamNav();
   return (
-    <div className="grid grid-cols-3 gap-0.5 shrink-0" role="group" aria-label="Dönem">
+    <div className="grid grid-cols-4 gap-0.5 shrink-0" role="group" aria-label="Dönem">
       {RANGES.map((r) => (
         <button
           key={r.id}

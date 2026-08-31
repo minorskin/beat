@@ -1,6 +1,7 @@
 'use client';
 import { useState, useTransition } from 'react';
-import { updateInstrument } from '@/app/actions';
+import { updateInstrument, removeInstrument } from '@/app/actions';
+import ConfirmDialog from './ConfirmDialog';
 import type { AssetClass } from '@/lib/data';
 
 /**
@@ -12,21 +13,23 @@ import type { AssetClass } from '@/lib/data';
  * boş açılır ve yalnız kullanıcı gerçekten değiştirirse güncelleme yapılır.
  */
 export default function EditInstrument({
-  id, symbol, displayName, classCode, currency, price, positionLocations, classes, locations,
+  id, symbol, displayName, classCode, currency, price, txCount, positionLocations, classes, locations,
 }: {
   id: string; symbol: string; displayName: string; classCode: string; currency: string;
-  price: number | null; positionLocations: string[]; classes: AssetClass[]; locations: string[];
+  price: number | null; txCount: number; positionLocations: string[];
+  classes: AssetClass[]; locations: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState('');
+  const [askDelete, setAskDelete] = useState(false);
 
   // Gayrimenkulün "fiyatı" kullanıcının girdiği değerlemedir — buradan güncellenir.
   const isRealty = classCode === 'realty';
   const single = positionLocations.length === 1 ? positionLocations[0] : '';
   const mixed = positionLocations.length > 1;
 
-  const reset = () => { setOpen(false); setMsg(''); };
+  const reset = () => { setOpen(false); setMsg(''); setAskDelete(false); };
 
   return (
     <>
@@ -122,10 +125,47 @@ export default function EditInstrument({
               <button type="submit" disabled={pending} className="btn btn-primary flex-1 sm:flex-none">
                 {pending ? 'Kaydediliyor…' : 'Kaydet'}
               </button>
+              {/* Silme kaydetmeden ayrı durur ve kendi onayını ister: geri
+                  alınamayan tek eylem bu. */}
+              <button
+                type="button" disabled={pending}
+                onClick={() => setAskDelete(true)}
+                className="btn btn-danger ml-auto"
+              >
+                Sil
+              </button>
               {msg && <span className="text-xs" style={{ color: 'var(--muted)' }}>{msg}</span>}
             </div>
           </form>
         </div>
+      )}
+
+      {askDelete && (
+        <ConfirmDialog
+          title={`${symbol} silinsin mi?`}
+          danger
+          confirmLabel="Kalıcı olarak sil"
+          pending={pending}
+          onCancel={() => setAskDelete(false)}
+          onConfirm={() => start(async () => {
+            const fd = new FormData();
+            fd.set('instrument_id', id);
+            fd.set('confirm', '1');
+            const r = await removeInstrument(fd);
+            if (r.ok) reset();
+            else { setAskDelete(false); setMsg(r.error || 'Silinemedi'); }
+          })}
+          message={
+            <>
+              <b style={{ color: 'var(--text)' }}>{displayName}</b> katalogdan kaldırılacak.
+              {txCount > 0
+                ? <> Bu varlığa ait <b style={{ color: 'var(--text)' }}>{txCount} işlem</b>, fiyat geçmişi ve
+                    geçmiş grafiklerdeki payı da silinir.</>
+                : <> Bu varlığın işlemi yok; yalnız katalog kaydı ve fiyat geçmişi silinir.</>}
+              <br />Bu işlem geri alınamaz.
+            </>
+          }
+        />
       )}
     </>
   );

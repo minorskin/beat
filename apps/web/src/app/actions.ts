@@ -251,13 +251,61 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
-/** İzleme listesinden çıkarır. İşlem geçmişi varsa reddeder — veri kaybı olmasın. */
+/**
+ * Varlığı katalogdan siler. İşlemleri, fiyat geçmişi ve geçmiş snapshot
+ * satırları şemadaki `on delete cascade` ile birlikte gider — geri alınamaz.
+ *
+ * Arayüz silmeden önce kaç işlemin gideceğini yazan bir onay kutusu gösterir;
+ * sunucu tarafında da açık onay bayrağı aranıyor ki yanlış bir POST tek başına
+ * veriyi silemesin.
+ */
 export async function removeInstrument(formData: FormData): Promise<Result> {
   const id = String(formData.get('instrument_id') || '');
   if (!id) return { ok: false, error: 'Enstrüman yok' };
-  const used = await q<{ id: string }>(`select id from transactions where instrument_id=$1 limit 1`, [id]);
-  if (used.length) return { ok: false, error: 'İşlem geçmişi var — silinemez' };
-  await q(`delete from instruments where id=$1`, [id]);
+  if (String(formData.get('confirm') || '') !== '1') return { ok: false, error: 'Onay yok' };
+  const gone = await q<{ symbol: string }>(`delete from instruments where id=$1 returning symbol`, [id]);
+  if (!gone.length) return { ok: false, error: 'Kayıt bulunamadı' };
+  revalidatePath('/');
+  return { ok: true };
+}
+
+/**
+ * Yıl kapanışı ekler/günceller. Aynı yıl ikinci kez girilirse üzerine yazar —
+ * "2023'ü yanlış girdim" durumunda ikinci bir satır değil düzeltme olmalı.
+ */
+export async function upsertAnnualClosing(formData: FormData): Promise<Result> {
+  const year = Number(String(formData.get('year') || ''));
+  if (!Number.isInteger(year) || year < 1990 || year > 2100) return { ok: false, error: 'Yıl geçersiz' };
+
+  const tryValue = parseAmount(String(formData.get('total_value_try') || ''));
+  if (tryValue == null || tryValue < 0) return { ok: false, error: 'Toplam değeri gir (ör. 1.250.000)' };
+
+  const usdRaw = String(formData.get('total_value_usd') || '').trim();
+  let usdValue: number | null = null;
+  if (usdRaw) {
+    usdValue = parseAmount(usdRaw);
+    if (usdValue == null || usdValue < 0) return { ok: false, error: 'USD değeri geçersiz' };
+  }
+
+  const note = String(formData.get('note') || '').trim() || null;
+
+  await q(
+    `insert into annual_closings (year, total_value_try, total_value_usd, note)
+     values ($1,$2,$3,$4)
+     on conflict (year) do update set
+       total_value_try = excluded.total_value_try,
+       total_value_usd = excluded.total_value_usd,
+       note = excluded.note,
+       updated_at = now()`,
+    [year, tryValue, usdValue, note]);
+  revalidatePath('/');
+  return { ok: true };
+}
+
+export async function removeAnnualClosing(formData: FormData): Promise<Result> {
+  const year = Number(String(formData.get('year') || ''));
+  if (!Number.isInteger(year)) return { ok: false, error: 'Yıl geçersiz' };
+  await q(`delete from annual_closings where year=$1`, [year]);
   revalidatePath('/');
   return { ok: true };
 }

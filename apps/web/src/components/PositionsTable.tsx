@@ -184,6 +184,28 @@ export default function PositionsTable({
     });
   }
 
+  // Toplamlar filtreden GEÇMİŞ satırlara göre: kullanıcı bir grubu süzdüğünde
+  // toplam da o grubun toplamı olmalı.
+  const totals = (() => {
+    let value = 0, weight = 0, pnl = 0, cost = 0, noCost = 0;
+    for (const p of displayRows) {
+      value += valOf(p) ?? 0;
+      weight += wOf(p) ?? 0;
+      const rowPnl = (own ? p.own_pnl_try : p.pnl_try) ?? 0;
+      const rowValueTry = (own ? p.own_value_try : p.value_try) ?? 0;
+      pnl += rowPnl;
+      cost += rowValueTry - rowPnl;
+      // Alış fiyatı girilmemiş işlem maliyeti 0 gösterir; böyle bir satır
+      // toplam oranı devasa şişirir (%760 gibi). Sayı üretmek yerine neden
+      // hesaplanamadığını söylüyoruz.
+      if (rowValueTry - rowPnl <= 0) noCost++;
+    }
+    return {
+      value, weight, pnl, noCost,
+      pnlPct: noCost === 0 && cost > 0 ? (pnl / cost) * 100 : null,
+    };
+  })();
+
   const activeCount = Object.values(filters).reduce((n, v) => n + v.length, 0);
 
   // Filtre satır sayısını düşürdüğünde belge kısalır, tarayıcı scrollTop'u
@@ -277,6 +299,42 @@ export default function PositionsTable({
             </tr>
           </thead>
           <tbody>
+            {/* Toplam satırı — başlıkların hemen altında ve FİLTRELENMİŞ
+                listeye göre. Yalnız toplanabilir büyüklükler yazılır: adet ve
+                fiyat farklı varlıklarda farklı birim, toplamı anlamsız olurdu.
+                K/Z oranı ağırlıklı: toplam K/Z ÷ toplam maliyet. */}
+            {displayRows.length > 0 && (
+              <tr className="tbl-total">
+                <td className="px-4 sm:px-5 py-2 text-[11px] font-medium">
+                  Toplam
+                  <div className="text-[11px] font-normal" style={{ color: 'var(--muted)' }}>
+                    {displayRows.length} pozisyon
+                  </div>
+                </td>
+                <td className="px-3 py-2 hidden md:table-cell" />
+                <td className="px-3 py-2 hidden md:table-cell" />
+                <td className="px-3 py-2 hidden lg:table-cell" />
+                <td className="text-right px-3 py-2 text-[11px]" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="text-right px-3 py-2 text-[11px]" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="text-right px-3 py-2 tnum text-[12px] font-medium whitespace-nowrap">
+                  {money(totals.value, cur)}
+                </td>
+                <td
+                  className="text-right px-3 py-2 tnum text-[12px] hidden sm:table-cell whitespace-nowrap"
+                  style={{ color: totals.pnlPct == null ? 'var(--faint)' : totals.pnlPct >= 0 ? 'var(--up)' : 'var(--down)' }}
+                  title={totals.pnlPct == null
+                    ? `${totals.noCost} pozisyonda alış fiyatı girilmemiş — toplam oran hesaplanamıyor`
+                    : 'Toplam kâr/zarar ÷ toplam maliyet'}
+                >
+                  {totals.pnlPct != null ? pct(totals.pnlPct) : '—'}
+                </td>
+                <td className="text-right px-3 py-2 tnum text-[12px] hidden sm:table-cell whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                  %{num(totals.weight, 1)}
+                </td>
+                <td className="px-3 py-2 hidden lg:table-cell" />
+                <td className="px-4 sm:px-5 py-2 hidden lg:table-cell" />
+              </tr>
+            )}
             {displayRows.length === 0 && (
               <tr>
                 <td colSpan={11} className="px-4 sm:px-5 py-6 text-center text-[11px]" style={{ color: 'var(--faint)' }}>
@@ -306,6 +364,7 @@ export default function PositionsTable({
                         <EditInstrument
                           id={p.instrument_id} symbol={p.symbol} displayName={p.display_name}
                           classCode={p.class_code} currency={p.currency} price={p.price}
+                          txCount={(transactions[p.instrument_id] ?? []).length}
                           positionLocations={p.locations}
                           classes={classes} locations={locations}
                         />

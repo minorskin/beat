@@ -1,8 +1,8 @@
 import {
   getLatestSnapshot, getPositions, getHistory, getInstruments,
   getLastFetch, getAssetClasses, getPeriodChanges, getPeriodMovers,
-  getTransactionsByInstrument, getLocations, getUsdTry,
-  type Change,
+  getTransactionsByInstrument, getLocations, getUsdTry, getAnnualClosings,
+  type Change, type SeriesPoint,
 } from '@/lib/data';
 import { money, conv, num, pct, timeAgo, type Cur } from '@/lib/format';
 import PortfolioChart from '@/components/PortfolioChart';
@@ -17,6 +17,8 @@ import OwnershipToggle from '@/components/OwnershipToggle';
 import CurrencyToggle from '@/components/CurrencyToggle';
 import RangeSwitcher from '@/components/RangeSwitcher';
 import Movers from '@/components/Movers';
+import AnnualClosings from '@/components/AnnualClosings';
+import LogoutButton from '@/components/LogoutButton';
 import { logout } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -30,11 +32,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // ?cur=USD → tüm sayfa dolar üzerinden değerlendirilir.
   const cur: Cur = sp.cur === 'USD' ? 'USD' : 'TRY';
 
-  const [snap, positions, history, instruments, lastFetch, classes, changes, movers, transactions, locations, rate] =
+  const [snap, positions, history, instruments, lastFetch, classes, changes, movers, transactions, locations, rate, closings] =
     await Promise.all([
       getLatestSnapshot(), getPositions(), getHistory(range), getInstruments(),
       getLastFetch(), getAssetClasses(), getPeriodChanges(), getPeriodMovers(),
-      getTransactionsByInstrument(), getLocations(), getUsdTry(),
+      getTransactionsByInstrument(), getLocations(), getUsdTry(), getAnnualClosings(),
     ]);
 
   // Portföy değeri snapshot'ta iki para biriminde de duruyor — çevirmiyoruz,
@@ -71,6 +73,22 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     .map((p) => ({ symbol: p.symbol, name: p.display_name, group: p.ui_group, value: valOf(p) }))
     .sort((a, b) => b.value - a.value);
 
+  // "TÜM" aralığı: motor öncesi yıl kapanışları + bugünkü değer. Bu seride
+  // varlık kırılımı YOK (kullanıcı o yılları yalnız toplam olarak biliyor),
+  // bu yüzden sembol serileri boş geçilir ve grafik tek çizgi çizer.
+  const yearly: SeriesPoint[] = closings.map((c) => {
+    const t = c.total_value_try;
+    const u = c.total_value_usd ?? (rate > 0 ? t / rate : 0);
+    return { ts: `${c.year}-12-31T20:59:59.000Z`, try: t, usd: u, own_try: t, own_usd: u, s: {} };
+  });
+  if (snap && yearly.length) {
+    yearly.push({
+      ts: snap.ts, try: snap.total_value_try, usd: snap.total_value_usd,
+      own_try: snap.own_value_try, own_usd: snap.own_value_usd, s: {},
+    });
+  }
+  const isAll = range === 'TÜM';
+
   return (
     <TabsProvider>
       {/* Sticky üst bar — sol: sekmeler + çıkış · orta: para birimi ·
@@ -79,11 +97,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
         <div className="w-full px-3 sm:px-5 lg:px-8 py-2 sm:py-0 sm:h-14 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 sm:grid sm:grid-cols-[1fr_auto_1fr]">
           <div className="flex items-center gap-1 min-w-0">
             <SectionNav />
-            <form action={logout} className="shrink-0 flex">
-              <button type="submit" className="navlink inline-flex items-center px-2" title="Çıkış" aria-label="Çıkış">
-                <LogoutIcon />
-              </button>
-            </form>
+            <LogoutButton action={logout} />
           </div>
           <div className="sm:justify-self-center">
             <CurrencyToggle cur={cur} />
@@ -170,7 +184,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4">
             <div className="lg:col-span-2 min-w-0">
               <PortfolioChart
-                data={history.points} symbols={history.symbols}
+                data={isAll ? yearly : history.points}
+                symbols={isAll ? [] : history.symbols}
+                yearly={isAll}
                 currency={cur} own={own} />
             </div>
             <AllocationTreemap data={alloc} cur={cur} />
@@ -194,7 +210,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                   : `${rows.length} pozisyon · ${money(value, cur)}${own ? ' · yalnız bana ait' : ''}`}
               </p>
             </div>
-            <div className="shrink-0 flex items-center gap-2">
+            <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
+              <AnnualClosings rows={closings} />
               <AddInstrument classes={classes} />
               <AddTransaction instruments={instruments} locations={locations} />
             </div>
@@ -225,18 +242,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           </TabPanel>
       </main>
     </TabsProvider>
-  );
-}
-
-// Kapıdan çıkan ok — metin yerine ikon, bölüm anahtarının sonunda durur.
-function LogoutIcon() {
-  return (
-    <svg viewBox="0 0 15 15" width="15" height="15" fill="none" stroke="currentColor"
-      strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 2H3.2A1.2 1.2 0 0 0 2 3.2v8.6A1.2 1.2 0 0 0 3.2 13H6" />
-      <path d="M10 10.5 13 7.5 10 4.5" />
-      <path d="M13 7.5H5.5" />
-    </svg>
   );
 }
 

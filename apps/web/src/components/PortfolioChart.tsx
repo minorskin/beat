@@ -33,8 +33,8 @@ type Mode = 'pct' | 'abs';
 type Row = Record<string, number | string | null>;
 
 export default function PortfolioChart({
-  data, symbols, currency, own,
-}: { data: SeriesPoint[]; symbols: string[]; currency: Cur; own: boolean }) {
+  data, symbols, currency, own, yearly = false,
+}: { data: SeriesPoint[]; symbols: string[]; currency: Cur; own: boolean; yearly?: boolean }) {
   // Kur seçimi artık üst bardaki genel anahtarda — grafiğin kendi düğmesi
   // kaldırıldı; sayfanın geri kalanıyla farklı birimde durması karışıklıktı.
   const cur = currency;
@@ -67,6 +67,8 @@ export default function PortfolioChart({
     const fmt = new Intl.DateTimeFormat('tr-TR',
       spanH < 6 ? { timeZone: tz, hour: '2-digit', minute: '2-digit' }
       : spanH < 72 ? { timeZone: tz, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }
+      // Yıllar boyunca uzanan seride gün/ay etiketi okunmaz; yıl ayırt edicidir.
+      : spanH > 24 * 400 ? { timeZone: tz, year: 'numeric', month: 'short' }
       : { timeZone: tz, day: '2-digit', month: 'short' });
 
     return data.map((d) => {
@@ -113,7 +115,10 @@ export default function PortfolioChart({
     <div className="panel p-3 sm:p-5">
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <h2 className="text-sm font-medium" style={{ color: 'var(--muted)' }}>
-          Varlık Değişimi{own && <span style={{ color: 'var(--faint)' }}> · bana ait</span>}
+          Varlık Değişimi
+          {yearly
+            ? <span style={{ color: 'var(--faint)' }}> · yıl kapanışları</span>
+            : own && <span style={{ color: 'var(--faint)' }}> · bana ait</span>}
         </h2>
         <div className="flex gap-2 shrink-0">
           <div className="flex gap-1">
@@ -154,6 +159,13 @@ export default function PortfolioChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {yearly && (
+        <p className="text-[11px] mt-2" style={{ color: 'var(--faint)' }}>
+          Elle girilen yıl sonu toplamları + bugünkü değer. Bu yıllarda varlık
+          kırılımı yok; emanet ayrımı da uygulanmaz (toplam gösterilir).
+        </p>
+      )}
 
       {/* Yatay lejant — tıklayınca ilgili çizgi açılıp kapanır */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3">

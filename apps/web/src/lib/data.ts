@@ -222,6 +222,14 @@ export async function getUsdTry(): Promise<number> {
   return r[0]?.rate ?? 0;
 }
 
+/** Elle girilmiş yıl sonu toplamları — motor öncesi geçmiş (yalnız toplam). */
+export interface AnnualClosing { year: number; total_value_try: number; total_value_usd: number | null; note: string | null }
+
+export async function getAnnualClosings(): Promise<AnnualClosing[]> {
+  return q<AnnualClosing>(
+    `select year, total_value_try, total_value_usd, note from annual_closings order by year`);
+}
+
 export async function getAssetClasses(): Promise<AssetClass[]> {
   return q<AssetClass>(`select code, name, ui_group from asset_classes order by sort_order`);
 }

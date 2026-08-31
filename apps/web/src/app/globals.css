@@ -84,6 +84,9 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 .btn-primary { background: var(--accent); color: var(--accent-fg); font-weight: 500; }
 .btn-primary:hover { background: #ffffff; }
 .btn-ghost { background: var(--panel-2); color: var(--muted); }
+/* Yıkıcı eylem — yalnız onay kutusunda ve silme düğmesinde. */
+.btn-danger { background: rgba(239, 68, 68, 0.15); color: var(--down); font-weight: 500; }
+.btn-danger:hover { background: rgba(239, 68, 68, 0.28); }
 .btn-ghost:hover { background: var(--panel-3); color: var(--text); }
 .btn:disabled { opacity: 0.5; cursor: default; }
 
@@ -107,6 +110,10 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 .tbl thead tr { background: var(--panel-2); }
 .tbl tbody tr { transition: background 0.12s ease; }
 .tbl tbody tr:hover { background: var(--panel-2); }
+
+/* Toplam satırı — başlık ile veri arasında ince bir ayraç gibi durur. */
+.tbl tbody tr.tbl-total { background: var(--panel-2); }
+.tbl tbody tr.tbl-total:hover { background: var(--panel-2); }
 
 /* Akordiyon: işlem satırları ana satırdan biraz daha açık, kısa bir açılış/kapanış animasyonu ile */
 .tbl tbody tr.tx-row { background: var(--panel-2); animation: tx-row-in 160ms ease; }
