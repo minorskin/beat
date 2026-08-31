@@ -22,7 +22,7 @@ const STALE_WINDOW: Record<string, number> = {
 interface Row {
   instrument_id: string; symbol: string; class_code: string; currency: string;
   quantity: number; external_qty: number; own_quantity: number; avg_cost: number | null;
-  price: number | null; price_ts: Date | null; cadence: string;
+  price: number | null; price_ts: Date | null; price_currency: string | null; cadence: string;
 }
 
 async function main() {
@@ -37,7 +37,7 @@ async function main() {
   const { rows } = await pool.query<Row>(`
     select h.instrument_id, h.symbol, h.class_code, h.currency,
            h.quantity, h.external_qty, h.own_quantity, h.avg_cost,
-           lp.price, lp.price_ts, i.cadence
+           lp.price, lp.price_ts, lp.currency as price_currency, i.cadence
     from v_holdings h
     join instruments i on i.id = h.instrument_id
     left join v_latest_price lp on lp.instrument_id = h.instrument_id
@@ -61,12 +61,16 @@ async function main() {
 
   for (const r of rows) {
     if (r.price == null || r.price_ts == null) { missing.push(r.symbol); continue; }
-    if (r.currency !== 'TRY' && r.currency !== 'USD') { missing.push(`${r.symbol}(${r.currency}?)`); continue; }
 
-    // Değeri enstrümanın para biriminden TRY'ye çevir. Aynı fiyat,
-    // iki farklı adet: toplam ve bana ait olan.
+    // Değer çevriminde FİYATIN kendi para birimi esastır (prices.currency —
+    // sağlayıcı ne cinsten verdiyse o). instruments.currency kullanıcının
+    // düzenleyebildiği bir kayıt alanı; değeri ona bağlamak, TL fiyatı olan
+    // bir varlık "USD" işaretlenince büyüklüğü kurla ikinci kez çarpıyordu.
+    const priceCur = r.price_currency ?? r.currency;
+    if (priceCur !== 'TRY' && priceCur !== 'USD') { missing.push(`${r.symbol}(${priceCur}?)`); continue; }
+
     const price = r.price;
-    const toTry = (qty: number) => (r.currency === 'USD' ? qty * price * usdtry : qty * price);
+    const toTry = (qty: number) => (priceCur === 'USD' ? qty * price * usdtry : qty * price);
 
     const valueTry = toTry(r.quantity);
     const valueUsd = valueTry / usdtry;
@@ -76,7 +80,8 @@ async function main() {
     const ageSec = (now.getTime() - new Date(r.price_ts).getTime()) / 1000;
     const isStale = ageSec > (STALE_WINDOW[r.cadence] ?? 6 * 3600);
 
-    // Maliyet (yaklaşık): ortalama maliyet × adet, güncel kurla TRY'ye.
+    // Maliyet, kullanıcının işlemleri hangi cinsten girdiğine bağlı; orası
+    // enstrümanın para birimini izliyor (bkz. migration 0007).
     const cost = (qty: number) => {
       const native = (r.avg_cost ?? 0) * qty;
       return r.currency === 'USD' ? native * usdtry : native;
