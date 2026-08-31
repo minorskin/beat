@@ -88,4 +88,4 @@ yalnız yeni olanı çalıştırmak yeterli.
 ## Bilinen eksik
 
 - **`DIF` fon kodu bulunamadı.** TEFAS kataloğundaki 2468 fonun tamamı 3 karakterli;
-  beş fon tipinde de (YAT/EMK/BYF/GYF/GSYF) eşleşme yok. Doğru kod netleşince seed'e eklenecek.
+  beş fon tipinde de (YAT/EMK/BYF/GYF/GSYF) eşleşme yok. Doğru kod netleşince arayüzden “+ Enstrüman” ile eklenecek.

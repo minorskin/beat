@@ -68,11 +68,11 @@ secret'ında — hiçbiri kodda değil.
 - **BIST failover yok** — tek kaynak Yahoo (buluttan çalıştığı doğrulandı). `bigpara`
   denendi, fiyat endpoint'leri 403 veriyor (bot koruması), kullanılamaz. truncgil'de
   de bireysel BIST hissesi yok (sadece XU100 endeksi). Şimdilik risk kabul edildi.
-- **Test verisi hâlâ DB'de** — `transactions` tablosunda `note='ornek'` etiketli 8
-  işlem var. Kullanıcı gerçek portföyünü girdiğinde şu SQL ile temizlenebilir:
-  ```sql
-  delete from transactions where note='ornek';
-  ```
+- ~~Test verisi DB'de~~ — **31.08.2026'da temizlendi.** Tohum portföy (13 enstrüman,
+  9 işlem) ve onlarla oluşmuş tüm snapshot/fiyat geçmişi canlıdan silindi; `seed.sql`
+  artık yalnız varlık sınıfları + piyasa takvimlerini kuruyor. Silinen satırların
+  yedeği: `~/Projects/beat-dummy-yedek-20260831.json` (repo dışında, public repo).
+  Katalog boş — kullanıcı kendi varlıklarını arayüzden ekliyor.
 - **Dönemsel değişim şeridi kısmen dolu** — Gün/Hafta/Ay pencereleri yeterli geçmiş
   snapshot birikince otomatik dolacak (şu an sadece "Başından" değeri var).
 
