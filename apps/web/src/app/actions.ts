@@ -224,6 +224,12 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
         `update transactions set location=$2 where instrument_id=$1`,
         [instrument_id, location || null]);
     }
+    // İşlemler enstrümanın para birimini izler: enstrüman TL fiyatlanıyorsa
+    // alış bedeli de TL'dir. Grup değişip para birimi kaydığında eski
+    // damgayla kalan işlemler maliyeti yanlış cinsten okuturdu.
+    await client.query(
+      `update transactions set currency=$2 where instrument_id=$1 and currency is distinct from $2`,
+      [instrument_id, currency]);
     // Gayrimenkulde "fiyat" = kullanıcının girdiği değerleme; sabit
     // sağlayıcının provider_symbol'ünde durur. Yeni değer bir sonraki fetch
     // turunda (≤30 dk) fiyata yansır.
