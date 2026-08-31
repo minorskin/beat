@@ -105,13 +105,18 @@ export async function addInstrument(formData: FormData): Promise<Result> {
   // (TRYTRY) döviz sınıfının içinde yaşayan bir istisna.
   const d = defaultsFor(class_code, symbol, provider_symbol)!;
   const sources = d.sources;
+  // Para birimi = fiyatın hangi cinsten geldiği. Sınıf iyi bir varsayılan
+  // veriyor ama son sözü kullanıcı söylüyor: aynı sınıfta TL ve dolar
+  // fiyatlanan varlıklar olabiliyor ve bunu ancak kullanıcı bilir.
+  const formCurrency = String(formData.get('currency') || '').trim().toUpperCase();
+  const currency = formCurrency === 'USD' || formCurrency === 'TRY' ? formCurrency : d.currency;
   const client = await pool.connect();
   try {
     await client.query('begin');
     const ins = await client.query<{ id: string }>(
       `insert into instruments (class_code, symbol, display_name, currency, calendar_code, cadence, tax_rate)
        values ($1,$2,$3,$4,$5,$6,$7) returning id`,
-      [class_code, symbol, display_name, d.currency, d.calendar, d.cadence, tax_rate]);
+      [class_code, symbol, display_name, currency, d.calendar, d.cadence, tax_rate]);
     const id = ins.rows[0].id;
     for (const s of sources) {
       await client.query(
@@ -202,22 +207,33 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
   // (TRYTRY) için varsayılan sembolden çözülür, sınıftan değil.
   const cur = await q<{ symbol: string }>(`select symbol from instruments where id=$1`, [instrument_id]);
   const def = cur.length ? defaultsFor(class_code, cur[0].symbol) : null;
-  // Para birimi kullanıcı tercihi DEĞİL: fiyatın hangi cinsten geldiğini
-  // kaynak belirler. Elle seçilebildiğinde yanlış seçim değeri sessizce kurla
-  // ikinci kez çarpıyordu (450 gr altın 3,1M yerine 148M TL).
-  const currency = def?.currency ?? 'TRY';
+  // Para birimi = fiyatın hangi cinsten geldiği. Kaynak çoğu zaman sınıftan
+  // bellidir ama istisnaları yalnız kullanıcı görebilir, o yüzden seçim onda.
+  // Yanlış seçilirse değer kurla ikinci kez çarpılır — form bunu yazıyor.
+  const currency = String(formData.get('currency') || '').trim().toUpperCase();
+  if (currency !== 'TRY' && currency !== 'USD') return { ok: false, error: 'Para birimi TRY veya USD olmalı' };
+
+  // Vergi oranı: boş = "girilmedi" (NULL). 0 ayrı bir bilgi ("vergi yok").
+  const taxRaw = String(formData.get('tax_rate') || '').trim().replace(',', '.');
+  let tax_rate: number | null = null;
+  if (taxRaw) {
+    const n = Number(taxRaw);
+    if (!Number.isFinite(n) || n < 0 || n > 100) return { ok: false, error: 'Vergi oranı 0 ile 100 arasında olmalı' };
+    tax_rate = n;
+  }
 
   const client = await pool.connect();
   try {
     await client.query('begin');
     if (def) {
       await client.query(
-        `update instruments set display_name=$2, class_code=$3, currency=$4, calendar_code=$5, cadence=$6 where id=$1`,
-        [instrument_id, display_name, class_code, currency, def.calendar, def.cadence]);
+        `update instruments set display_name=$2, class_code=$3, currency=$4, calendar_code=$5, cadence=$6, tax_rate=$7
+         where id=$1`,
+        [instrument_id, display_name, class_code, currency, def.calendar, def.cadence, tax_rate]);
     } else {
       await client.query(
-        `update instruments set display_name=$2, class_code=$3, currency=$4 where id=$1`,
-        [instrument_id, display_name, class_code, currency]);
+        `update instruments set display_name=$2, class_code=$3, currency=$4, tax_rate=$5 where id=$1`,
+        [instrument_id, display_name, class_code, currency, tax_rate]);
     }
     if (location !== orig_location) {
       await client.query(

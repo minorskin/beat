@@ -14,11 +14,10 @@ import Projection from '@/components/Projection';
 import SectionNav from '@/components/SectionNav';
 import TabsProvider, { TabPanel } from '@/components/Tabs';
 import OwnershipToggle from '@/components/OwnershipToggle';
-import CurrencyToggle from '@/components/CurrencyToggle';
+import SettingsMenu from '@/components/SettingsMenu';
 import RangeSwitcher from '@/components/RangeSwitcher';
 import Movers from '@/components/Movers';
 import AnnualClosings from '@/components/AnnualClosings';
-import LogoutButton from '@/components/LogoutButton';
 import { logout } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -91,19 +90,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
 
   return (
     <TabsProvider>
-      {/* Sticky üst bar — sol: sekmeler + çıkış · orta: para birimi ·
-          sağ: sahiplik + dönem. Dar ekranda gruplar alt satıra sarar. */}
+      {/* Sticky üst bar — sol: sekmeler · sağ: sahiplik + ayarlar + dönem.
+          Para birimi ve çıkış dişlinin içinde: ikisi de seyrek dokunulan
+          anahtarlar, barda yer kaplamalarına gerek yok. */}
       <div className="appbar">
-        <div className="w-full px-3 sm:px-5 lg:px-8 py-2 sm:py-0 sm:h-14 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 sm:grid sm:grid-cols-[1fr_auto_1fr]">
-          <div className="flex items-center gap-1 min-w-0">
-            <SectionNav />
-            <LogoutButton action={logout} />
-          </div>
-          <div className="sm:justify-self-center">
-            <CurrencyToggle cur={cur} />
-          </div>
-          <div className="sm:justify-self-end shrink-0 flex items-center gap-2">
+        <div className="w-full px-3 sm:px-5 lg:px-8 py-2 sm:py-0 sm:h-14 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <SectionNav />
+          <div className="shrink-0 flex items-center gap-2">
             <OwnershipToggle own={own} />
+            <SettingsMenu cur={cur} logoutAction={logout} />
             <RangeSwitcher range={range} />
           </div>
         </div>
@@ -152,11 +147,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
               </div>
               <div className="text-xl sm:text-2xl font-semibold tnum truncate">{money(value, cur)}</div>
               <div className="text-[11px] mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{money(altValue, altCur)}</div>
-              <div className="mt-auto pt-3 space-y-1">
+              <div className="mt-auto pt-3 space-y-1.5">
                 <StatLine label="Maliyet" value={money(cost, cur)} />
+                {/* Tutar ve oran ayrı satırda: ikisi farklı soruyu cevaplıyor
+                    ("ne kadar kazandım" / "ne kadar büyüdüm") ve tek satıra
+                    sıkışınca ikisi de küçük punto kalıyordu. */}
                 <StatLine
-                  label="Kâr / Zarar"
-                  value={`${up ? '+' : ''}${money(pnl, cur)} · ${pct(pnlPct)}`}
+                  label="Değişim Tutar"
+                  value={`${up ? '+' : ''}${money(pnl, cur)}`}
+                  color={up ? 'var(--up)' : 'var(--down)'}
+                />
+                <StatLine
+                  label="Değişim Oran"
+                  value={pct(pnlPct)}
                   color={up ? 'var(--up)' : 'var(--down)'}
                 />
                 <StatLine label="Pozisyon" value={staleCount ? `${rows.length} · ${staleCount} taşınmış` : String(rows.length)} />
@@ -247,9 +250,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
 
 function StatLine({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-2 text-[11px]">
+    <div className="flex items-baseline justify-between gap-2 text-[13px]">
       <span className="shrink-0" style={{ color: 'var(--muted)' }}>{label}</span>
-      <span className="tnum truncate text-right" style={{ color: color ?? 'var(--text)' }}>{value}</span>
+      <span className="tnum truncate text-right font-medium" style={{ color: color ?? 'var(--text)' }}>{value}</span>
     </div>
   );
 }

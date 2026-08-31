@@ -123,7 +123,18 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
               </label>
             )}
 
-            <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+              Fiyat Para Birimi
+              <select name="currency" key={eff?.currency ?? 'x'} defaultValue={eff?.currency ?? 'TRY'} className="field mt-1 tnum">
+                <option value="TRY">TRY</option>
+                <option value="USD">USD</option>
+              </select>
+              <span className="block mt-1" style={{ color: 'var(--faint)' }}>
+                Kaynağın verdiği fiyatın cinsi. Gruba göre seçili gelir, gerekirse değiştir.
+              </span>
+            </label>
+
+            <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
               Kâr Vergisi (%) <span style={{ color: 'var(--faint)' }}>— isteğe bağlı</span>
               {/* type=number DEĞİL: tarayıcı yerel ayarı İngilizce olduğunda
                   "12,5" geçersiz sayılıp alan sessizce boşalıyor. Metin olarak

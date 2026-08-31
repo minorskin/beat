@@ -17,6 +17,8 @@ export interface Position {
   own_value_try: number | null; own_value_usd: number | null; own_weight_pct: number | null; own_pnl_try: number | null;
   // Güncel (açık) lot'un açılış/kapanış tarihi + kullanılan konumlar — transactions'tan hesaplanır.
   opened_at: string | null; closed_at: string | null; locations: string[];
+  // Kâr üzerinden kesilecek vergi oranı (%) — girilmemişse null.
+  tax_rate: number | null;
   // Tutuluyor ama motor henüz fiyat çekmedi — bir sonraki turda gelir, o ana kadar değer/K-Z/ağırlık "—".
   pending: boolean;
 }
@@ -89,6 +91,7 @@ export async function getPositions(): Promise<Position[]> {
     -- v_holdings tahrik eder: elde tutulan HER şey listelenir, motor fiyatı henüz
     -- çekmemiş olsa bile (snapshot yoksa fiyat/değer/ağırlık null → arayüzde "—"/"bekliyor").
     select i.id as instrument_id, i.symbol, i.display_name, i.class_code, ac.name as class_name, ac.ui_group,
+           i.tax_rate,
            h.quantity, ps.price, i.currency, ps.price_ts, coalesce(ps.is_stale, false) as is_stale,
            ps.value_try, ps.value_usd, ps.weight_pct,
            h.own_quantity, ps.own_value_try, ps.own_value_usd, ps.own_weight_pct,

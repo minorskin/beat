@@ -13,10 +13,10 @@ import type { AssetClass } from '@/lib/data';
  * boş açılır ve yalnız kullanıcı gerçekten değiştirirse güncelleme yapılır.
  */
 export default function EditInstrument({
-  id, symbol, displayName, classCode, currency, price, txCount, positionLocations, classes, locations,
+  id, symbol, displayName, classCode, currency, price, taxRate, txCount, positionLocations, classes, locations,
 }: {
   id: string; symbol: string; displayName: string; classCode: string; currency: string;
-  price: number | null; txCount: number; positionLocations: string[];
+  price: number | null; taxRate: number | null; txCount: number; positionLocations: string[];
   classes: AssetClass[]; locations: string[];
 }) {
   const [open, setOpen] = useState(false);
@@ -92,10 +92,24 @@ export default function EditInstrument({
               </select>
             </label>
 
-            <div className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
               Fiyat Para Birimi
-              <div className="field mt-1 tnum" style={{ color: 'var(--faint)' }}>{currency}</div>
-            </div>
+              <select name="currency" defaultValue={currency} className="field mt-1 tnum">
+                <option value="TRY">TRY</option>
+                <option value="USD">USD</option>
+              </select>
+            </label>
+
+            <label className="col-span-2 sm:col-span-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+              Kâr Vergisi (%) <span style={{ color: 'var(--faint)' }}>— boş: girilmedi</span>
+              <input
+                name="tax_rate" type="text" inputMode="decimal"
+                pattern="[0-9]{1,3}([.,][0-9]{1,3})?"
+                defaultValue={taxRate != null ? String(taxRate) : ''}
+                placeholder="ör. 10" title="0 ile 100 arası bir oran (ör. 10 veya 12,5)"
+                className="field mt-1 tnum"
+              />
+            </label>
 
             <label className="col-span-2 text-[11px]" style={{ color: 'var(--muted)' }}>
               Konum
@@ -116,9 +130,10 @@ export default function EditInstrument({
             </label>
 
             <p className="col-span-2 text-[11px]" style={{ color: 'var(--faint)' }}>
-              {isRealty
-                ? 'Gayrimenkulde fiyat kaynağı senin girdiğin değerlemedir. Para birimi gruptan gelir, elle değiştirilmez.'
-                : 'Para birimi fiyatın hangi cinsten geldiğini söyler ve gruptan türetilir — elle değiştirilemez, yanlış değer büyüklüğü kurla ikinci kez çarpar.'}
+              Para birimi, gelen FİYATIN hangi cinsten olduğudur — kaç liraya
+              aldığın değil. Kaynağın verdiği fiyat TL ise TRY seç: USD seçilirse
+              değer bir kez daha kurla çarpılır. Değiştirdiğinde bu varlığın tüm
+              işlemleri de aynı birime geçer.
             </p>
 
             <div className="col-span-2 flex items-center gap-3 mt-1">
