@@ -28,7 +28,10 @@ async function queryFund(code: string, start: Date, end: Date): Promise<TefasRow
     basSira: 1, bitSira: 100000, dil: 'TR',
     sFonTurKod: '', fonKod: '', fonGrup: '', fonUnvanTip: '',
   };
-  const res = await fetch(URL_INFO, { method: 'POST', headers: HEADERS, body: JSON.stringify(body) });
+  const res = await fetch(URL_INFO, {
+    method: 'POST', headers: HEADERS, body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000),
+  });
   if (!res.ok) throw new Error(`TEFAS HTTP ${res.status}`);
   const data = (await res.json()) as { resultList?: TefasRow[]; errorMessage?: string };
   // Hafta sonu/tatilde TEFAS "Index 0 out of bounds" döner — bu hata değil, boş veri.
@@ -37,6 +40,27 @@ async function queryFund(code: string, start: Date, end: Date): Promise<TefasRow
     throw new Error(`TEFAS: ${data.errorMessage}`);
   }
   return data.resultList ?? [];
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * TEFAS tek tük istekte bağlantıyı düşürüyor ("TypeError: fetch failed") ve
+ * tek denemede pes edilince fon o turda tamamen fiyatsız kalıyordu (DFI günler
+ * boyu böyle düştü). Ağ hatası veriyle ilgili değil — kısa aralıkla tekrar
+ * deniyoruz. Veri yokluğu (boş sonuç) yeniden denenmez, o gerçek bir cevaptır.
+ */
+async function queryFundRetry(code: string, start: Date, end: Date, tries = 3): Promise<TefasRow[]> {
+  let last: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await queryFund(code, start, end);
+    } catch (e) {
+      last = e;
+      if (i < tries - 1) await sleep(2000 * (i + 1));
+    }
+  }
+  throw last;
 }
 
 export const tefasProvider: PriceProvider = {
@@ -57,7 +81,7 @@ export const tefasProvider: PriceProvider = {
 
     for (const s of syms) {
       try {
-        const rows = await queryFund(s.providerSymbol, start, end);
+        const rows = await queryFundRetry(s.providerSymbol, start, end);
         if (!rows.length) { errors.push({ symbol: s.symbol, message: 'veri yok' }); continue; }
         const valid = rows.filter((r) => r.fiyat > 0).sort((a, b) => a.tarih.localeCompare(b.tarih));
         if (!valid.length) { errors.push({ symbol: s.symbol, message: 'son 14 günde NAV yayınlanmamış' }); continue; }
@@ -73,7 +97,7 @@ export const tefasProvider: PriceProvider = {
       } catch (e) {
         errors.push({ symbol: s.symbol, message: String(e) });
       }
-      await new Promise((r) => setTimeout(r, 10_500)); // 6 istek/dk sınırına saygı
+      await sleep(10_500); // 6 istek/dk sınırına saygı
     }
     return { quotes, errors };
   },
@@ -82,7 +106,7 @@ export const tefasProvider: PriceProvider = {
     const t0 = Date.now();
     try {
       const end = new Date(); const start = new Date(end.getTime() - 7 * 864e5);
-      const rows = await queryFund('THF', start, end);
+      const rows = await queryFundRetry('THF', start, end, 2);
       return rows.length
         ? { status: 'ok' as const, latencyMs: Date.now() - t0 }
         : { status: 'degraded' as const, latencyMs: Date.now() - t0, error: 'boş sonuç' };
