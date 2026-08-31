@@ -96,13 +96,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
       </div>
 
       <main className="w-full px-3 sm:px-5 lg:px-8 pb-8 sm:pb-12">
-      {!snap ? (
-        <div className="panel p-8 mt-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
-          Henüz snapshot yok. İşlem ekleyip motorun çalışmasını bekleyin.
-        </div>
-      ) : (
-        <>
+      {/* Sekmeler HER ZAMAN çizilir. Boş durumda bütün sayfayı tek mesajla
+          değiştirmek, "işlem ekle" diyen mesajın ekleme butonlarını da
+          gizlemesi demekti — kullanıcı hiçbir şey giremiyordu. */}
           <TabPanel id="ozet">
+          {!snap ? (
+            <div className="panel p-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
+              Henüz snapshot yok.<br />
+              <span className="text-[12px]" style={{ color: 'var(--faint)' }}>
+                Varlık sekmesinden enstrümanını ve ilk işlemini ekle; motor bir sonraki turda (≤30 dk) fiyatı çeker.
+              </span>
+            </div>
+          ) : (
+          <>
           <div className="mb-3 sm:mb-4">
             <h2 className="text-base sm:text-lg font-semibold tracking-tight">Özet</h2>
             {/* timeAgo Date.now()'a bakar: sunucudaki render ile tarayıcıdaki
@@ -174,6 +180,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           <div>
             <Projection current={value} cur={cur} />
           </div>
+          </>
+          )}
           </TabPanel>
 
           <TabPanel id="varlik">
@@ -181,7 +189,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-semibold tracking-tight">Varlık</h2>
               <p className="text-[11px] sm:text-xs" style={{ color: 'var(--muted)' }}>
-                {rows.length} pozisyon · {money(value, cur)}{own && ' · yalnız bana ait'}
+                {rows.length === 0
+                  ? `Henüz pozisyon yok · katalogda ${instruments.length} enstrüman`
+                  : `${rows.length} pozisyon · ${money(value, cur)}${own ? ' · yalnız bana ait' : ''}`}
               </p>
             </div>
             <div className="shrink-0 flex items-center gap-2">
@@ -190,10 +200,29 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             </div>
           </div>
 
-          <PositionsTable rows={rows} own={own} cur={cur} transactions={transactions} locations={locations} classes={classes} />
+          {rows.length === 0 ? (
+            <div className="panel p-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
+              {instruments.length === 0 ? (
+                <>
+                  Katalog boş.<br />
+                  <span className="text-[12px]" style={{ color: 'var(--faint)' }}>
+                    Önce <b style={{ color: 'var(--muted)' }}>+ Enstrüman</b> ile varlığı tanımla (ad ve fiyat kaynağı
+                    otomatik çözülür), sonra <b style={{ color: 'var(--muted)' }}>+ İşlem</b> ile alımını gir.
+                  </span>
+                </>
+              ) : (
+                <>
+                  Henüz işlem yok.<br />
+                  <span className="text-[12px]" style={{ color: 'var(--faint)' }}>
+                    <b style={{ color: 'var(--muted)' }}>+ İşlem</b> ile ilk alımını gir; pozisyon burada listelenir.
+                  </span>
+                </>
+              )}
+            </div>
+          ) : (
+            <PositionsTable rows={rows} own={own} cur={cur} transactions={transactions} locations={locations} classes={classes} />
+          )}
           </TabPanel>
-        </>
-      )}
       </main>
     </TabsProvider>
   );
