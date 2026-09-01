@@ -4,7 +4,7 @@ import {
   CartesianGrid, ReferenceLine, type TooltipContentProps,
 } from 'recharts';
 import { useMemo, useState } from 'react';
-import type { SeriesPoint } from '@/lib/data';
+import type { SeriesPoint, SymPoint } from '@/lib/data';
 import type { Cur } from '@/lib/format';
 
 /**
@@ -49,14 +49,31 @@ export default function PortfolioChart({
     [symbols]);
 
   const rows: Row[] = useMemo(() => {
-    const pickSym = (v: [number, number, number, number]) =>
+    const pickSym = (v: SymPoint) =>
       own ? (cur === 'TRY' ? v[2] : v[3]) : (cur === 'TRY' ? v[0] : v[1]);
     const pickTotal = (d: SeriesPoint) =>
       own ? (cur === 'TRY' ? d.own_try : d.own_usd) : (cur === 'TRY' ? d.try : d.usd);
+    // BİRİM DEĞER = değer / adet, yani varlığın TL (ya da USD) cinsinden fiyatı.
+    // "% değişim" görünümünün ölçüsü budur, değerin kendisi değil: 116.000 TL
+    // nakde para eklemek değeri %46 artırır ama bu getiri değil, katkıdır.
+    // Sahiplikten bağımsız — emanet payı fiyatı değiştirmez, o yüzden hep
+    // toplam üzerinden okunur.
+    const unitOf = (v: SymPoint | undefined) => {
+      if (!v || !(v[4] > 0)) return null;
+      const val = cur === 'TRY' ? v[0] : v[1];
+      return val > 0 ? val / v[4] : null;
+    };
 
     // Baz = serinin aralıktaki İLK gözlemi. Sonradan alınan bir varlık kendi
     // giriş anından itibaren %0'dan başlar; başlangıcı sıfırsa oran anlamsız.
     const base: Record<string, number> = {};
+    // Varlık kırılımı olmayan seride (TÜM = yıl kapanışları) birim değer
+    // hesaplanamaz; orada toplamın kendi oranına düşülür.
+    const hasBreakdown = data.some((d) => Object.keys(d.s).length > 0);
+    // TOPLAM'ın oranı: zincirlenmiş getiri (TWR). Her adımda yalnız FİYAT
+    // hareketi ölçülür — adetler bir önceki gözlemde sabitlenir — ve adımlar
+    // çarpılarak birikir. Para giriş/çıkışı böylece eğriden tamamen düşer.
+    let chain = 1;
     // Etiket biçimi seçilen aralığa değil, verinin GERÇEK süresine bakar:
     // portföy 18 saatlikken "1Y" seçilince eksende "30 Ağu" on bir kez
     // tekrarlanıyordu — bu aralıkta ayırt edici olan saat, tarih değil.
@@ -71,21 +88,42 @@ export default function PortfolioChart({
       : spanH > 24 * 400 ? { timeZone: tz, year: 'numeric', month: 'short' }
       : { timeZone: tz, day: '2-digit', month: 'short' });
 
-    return data.map((d) => {
+    return data.map((d, i) => {
       const r: Row = { label: fmt.format(new Date(d.ts)) };
       const t = pickTotal(d);
       if (base[TOTAL_KEY] === undefined && t > 0) base[TOTAL_KEY] = t;
-      r[TOTAL_KEY] = mode === 'pct'
-        ? (base[TOTAL_KEY] ? (t / base[TOTAL_KEY] - 1) * 100 : 0)
-        : t;
+
+      if (mode === 'abs') {
+        r[TOTAL_KEY] = t;
+      } else if (!hasBreakdown) {
+        r[TOTAL_KEY] = base[TOTAL_KEY] ? (t / base[TOTAL_KEY] - 1) * 100 : 0;
+      } else {
+        const prev = data[i - 1];
+        if (prev) {
+          // Ağırlık = ÖNCEKİ gözlemdeki değer. Bu adımda alınan/eklenen
+          // miktar ağırlığa girmez; getiriyi yalnız o an elde olan taşır.
+          let num = 0, den = 0;
+          for (const sym of symbols) {
+            const u0 = unitOf(prev.s[sym]), u1 = unitOf(d.s[sym]);
+            if (u0 == null || u1 == null) continue;
+            const w = pickSym(prev.s[sym]);
+            if (!(w > 0)) continue;
+            num += w * (u1 / u0);
+            den += w;
+          }
+          if (den > 0) chain *= num / den;
+        }
+        r[TOTAL_KEY] = (chain - 1) * 100;
+      }
 
       for (const sym of symbols) {
         const v = d.s[sym];
         if (!v) { r[sym] = null; continue; }
-        const x = pickSym(v);
-        if (mode === 'abs') { r[sym] = x; continue; }
-        if (base[sym] === undefined && x > 0) base[sym] = x;
-        r[sym] = base[sym] ? (x / base[sym] - 1) * 100 : null;
+        if (mode === 'abs') { r[sym] = pickSym(v); continue; }
+        const u = unitOf(v);
+        if (u == null) { r[sym] = null; continue; }
+        if (base[sym] === undefined) base[sym] = u;
+        r[sym] = base[sym] ? (u / base[sym] - 1) * 100 : null;
       }
       return r;
     });
@@ -159,6 +197,14 @@ export default function PortfolioChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {mode === 'pct' && !yearly && (
+        <p className="text-[12.5px] mt-2" style={{ color: 'var(--faint)' }}>
+          Oranlar birim değer (fiyat) üzerinden — alım, satım ve para eklemesi
+          eğriyi bozmaz. TOPLAM, her adımın ağırlıklı getirisinin zinciri.
+          Yatırılan tutarı görmek için “Değer”e geç.
+        </p>
+      )}
 
       {yearly && (
         <p className="text-[12.5px] mt-2" style={{ color: 'var(--faint)' }}>

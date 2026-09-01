@@ -73,7 +73,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // Alış fiyatı girilmemiş pozisyonlar: maliyetleri meçhul olduğu için maliyet
   // ve değişim hesabının dışında kalıyorlar. Kart bunu söylemeli, yoksa
   // "maliyet neden portföyden küçük" sorusu havada kalır.
-  const noCostCount = rows.filter((p) => (own ? p.own_cost_try : p.cost_try) == null && valOf(p) > 0).length;
+  const costOf = (p: (typeof positions)[number]) => (own ? p.own_cost_try : p.cost_try);
+  const noCostRows = rows.filter((p) => costOf(p) == null && valOf(p) > 0);
+  const costedRows = rows.filter((p) => costOf(p) != null && valOf(p) > 0);
+  const noCostCount = noCostRows.length;
+  // Değişimin ne kadarlık bir kısmı ÖLÇÜLEBİLİYOR: yalnız sayıyı yazmak
+  // "oran neden hiç kıpırdamıyor" sorusunu cevaplamıyordu — kapsanan tutar
+  // yazılınca ölçünün portföyün küçük bir dilimine baktığı görülüyor.
+  const sumVal = (xs: typeof rows) => xs.reduce((a, p) => a + valOf(p), 0);
 
   // Dağılım kutucukları: alan = büyüklük, kutu grubunun rengiyle boyanır.
   const alloc = rows
@@ -163,18 +170,22 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                     sıkışınca ikisi de küçük punto kalıyordu. */}
                 <StatLine
                   label="Değişim Tutar"
+                  title="Alış fiyatına göre gerçekleşmemiş kâr/zarar — dönemsel değil, pozisyon açıldığından beri."
                   value={`${up ? '+' : ''}${money(pnl, cur)}`}
                   color={up ? 'var(--up)' : 'var(--down)'}
                 />
                 <StatLine
                   label="Değişim Oran"
+                  title="Kâr/zarar ÷ maliyet. Yalnız alış fiyatı girilmiş pozisyonlar sayılır."
                   value={pct(pnlPct)}
                   color={up ? 'var(--up)' : 'var(--down)'}
                 />
                 <StatLine label="Pozisyon" value={staleCount ? `${rows.length} · ${staleCount} taşınmış` : String(rows.length)} />
                 {noCostCount > 0 && (
                   <p className="text-[12.5px] pt-1" style={{ color: 'var(--faint)' }}>
-                    {noCostCount} pozisyonda alış fiyatı yok — değişim onlar hariç.
+                    Değişim yalnız alış fiyatı girilmiş {costedRows.length} pozisyondan
+                    ({money(sumVal(costedRows), cur)}) hesaplanıyor; {noCostCount} pozisyon
+                    ({money(sumVal(noCostRows), cur)}) hariç — işlemi düzenleyip birim fiyat gir.
                   </p>
                 )}
               </div>
@@ -261,9 +272,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   );
 }
 
-function StatLine({ label, value, color }: { label: string; value: string; color?: string }) {
+function StatLine({ label, value, color, title }: { label: string; value: string; color?: string; title?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-2 text-[14.5px]">
+    <div className="flex items-baseline justify-between gap-2 text-[14.5px]" title={title}>
       <span className="shrink-0" style={{ color: 'var(--muted)' }}>{label}</span>
       <span className="tnum truncate text-right font-medium" style={{ color: color ?? 'var(--text)' }}>{value}</span>
     </div>

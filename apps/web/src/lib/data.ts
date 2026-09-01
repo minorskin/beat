@@ -34,10 +34,18 @@ export interface TxRow {
   quantity: number; unit_price: number | null; currency: string;
   executed_at: string; location: string | null; external_quantity: number;
 }
+/**
+ * Bir gözlemde bir sembolün durumu:
+ * [value_try, value_usd, own_value_try, own_value_usd, quantity, own_quantity]
+ *
+ * ADET de taşınıyor çünkü "% değişim" görünümü değeri değil BİRİM DEĞERİ
+ * (value/adet) izlemek zorunda: para yatırınca adet artar, değer artar ama bu
+ * getiri değildir. Adet olmadan grafik bir mevduatı %46 kazanç gibi çiziyordu.
+ */
+export type SymPoint = [number, number, number, number, number, number];
 export interface SeriesPoint {
   ts: string; try: number; usd: number; own_try: number; own_usd: number;
-  /** sembol → [value_try, value_usd, own_value_try, own_value_usd] */
-  s: Record<string, [number, number, number, number]>;
+  s: Record<string, SymPoint>;
 }
 export interface HistoryBundle { points: SeriesPoint[]; symbols: string[] }
 export interface Instrument {
@@ -190,6 +198,7 @@ export async function getHistory(range: string): Promise<HistoryBundle> {
     ts: string; t_try: number; t_usd: number; o_try: number; o_usd: number;
     symbol: string | null; p_try: number | null; p_usd: number | null;
     p_own_try: number | null; p_own_usd: number | null;
+    p_qty: number | null; p_own_qty: number | null;
   }>(`
     with win as (
       select id, ts, total_value_try, total_value_usd, own_value_try, own_value_usd
@@ -213,7 +222,8 @@ export async function getHistory(range: string): Promise<HistoryBundle> {
            s.total_value_try t_try, s.total_value_usd t_usd,
            s.own_value_try o_try,   s.own_value_usd o_usd,
            i.symbol, pos.value_try p_try, pos.value_usd p_usd,
-           pos.own_value_try p_own_try, pos.own_value_usd p_own_usd
+           pos.own_value_try p_own_try, pos.own_value_usd p_own_usd,
+           pos.quantity p_qty, pos.own_quantity p_own_qty
     from snaps s
     left join position_snapshots pos on pos.snapshot_id = s.id
     left join instruments i on i.id = pos.instrument_id
@@ -230,7 +240,8 @@ export async function getHistory(range: string): Promise<HistoryBundle> {
     }
     if (r.symbol) {
       symbols.add(r.symbol);
-      pt.s[r.symbol] = [r.p_try ?? 0, r.p_usd ?? 0, r.p_own_try ?? 0, r.p_own_usd ?? 0];
+      pt.s[r.symbol] = [r.p_try ?? 0, r.p_usd ?? 0, r.p_own_try ?? 0, r.p_own_usd ?? 0,
+                        r.p_qty ?? 0, r.p_own_qty ?? 0];
     }
   }
   // Renk ataması sembol sırasına bağlı: alfabetik sıra render'dan render'a
@@ -291,55 +302,64 @@ export type PeriodKey = 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
 export type PeriodChanges = Record<PeriodKey, { total: Change | null; own: Change | null }>;
 
 export async function getPeriodChanges(): Promise<PeriodChanges> {
+  // Dönemsel değişim = O DÖNEMİN BAŞINDA elde olan sepetin bugünkü fiyatlarla
+  // değeri − o günkü değeri. İki snapshot'ın toplamını çıkarmak yanlıştı:
+  // aradaki para yatırma/çekme de "kazanç" görünüyordu (116.000 TL nakde
+  // 36.630 TL eklemek günlük kârı 36.630 TL artırıyordu). Adetler DÖNEM
+  // BAŞINDA sabitlenince geriye yalnız fiyat hareketi kalır.
+  //
+  // Dönem içinde alınan varlık bu ölçüye girmez (o gün elde değildi);
+  // tamamen satılan da girmez (bugünkü birim değeri bilinmiyor, satış zaten
+  // bir nakit akışı). Kapsam ikisinde de aynı sepet olduğu için oran tutarlı.
   const rows = await q<{
-    t_now: number; o_now: number;
-    t_h: number | null; o_h: number | null;
-    t_d: number | null; o_d: number | null;
-    t_w: number | null; o_w: number | null;
-    t_m: number | null; o_m: number | null;
-    t_q: number | null; o_q: number | null;
-    t_y: number | null; o_y: number | null;
+    period: PeriodKey;
+    base_try: number | null; now_try: number | null;
+    base_own: number | null; now_own: number | null;
   }>(`
     with cur as (
-      select ts, total_value_try, own_value_try
-      from portfolio_snapshots where granularity='hourly' order by ts desc limit 1
+      select id, ts from portfolio_snapshots where granularity='hourly' order by ts desc limit 1
+    ),
+    periods(k, iv) as (
+      values ('hour', interval '1 hour'), ('day', interval '1 day'), ('week', interval '7 days'),
+             ('month', interval '30 days'), ('quarter', interval '90 days'), ('year', interval '365 days')
+    ),
+    bases as (
+      select p.k, b.id as base_id
+      from periods p
+      cross join cur c
+      left join lateral (
+        select ps.id from portfolio_snapshots ps
+        where ps.granularity='hourly' and ps.ts <= c.ts - p.iv
+        order by ps.ts desc limit 1
+      ) b on true
+    ),
+    -- Bugünkü BİRİM değer (TL cinsinden fiyat). Adet değil fiyat taşınır.
+    now_unit as (
+      select pos.instrument_id, pos.value_try / nullif(pos.quantity, 0) as unit_try
+      from position_snapshots pos join cur c on c.id = pos.snapshot_id
+      where pos.quantity <> 0
     )
-    select cur.total_value_try t_now, cur.own_value_try o_now,
-      bh.total_value_try t_h,  bh.own_value_try o_h,
-      b1.total_value_try t_d,  b1.own_value_try o_d,
-      b7.total_value_try t_w,  b7.own_value_try o_w,
-      b30.total_value_try t_m, b30.own_value_try o_m,
-      b90.total_value_try t_q, b90.own_value_try o_q,
-      b365.total_value_try t_y, b365.own_value_try o_y
-    from cur
-    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
-      where granularity='hourly' and ts <= cur.ts - interval '1 hour'   order by ts desc limit 1) bh on true
-    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
-      where granularity='hourly' and ts <= cur.ts - interval '1 day'    order by ts desc limit 1) b1 on true
-    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
-      where granularity='hourly' and ts <= cur.ts - interval '7 days'   order by ts desc limit 1) b7 on true
-    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
-      where granularity='hourly' and ts <= cur.ts - interval '30 days'  order by ts desc limit 1) b30 on true
-    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
-      where granularity='hourly' and ts <= cur.ts - interval '90 days'  order by ts desc limit 1) b90 on true
-    left join lateral (select total_value_try, own_value_try from portfolio_snapshots
-      where granularity='hourly' and ts <= cur.ts - interval '365 days' order by ts desc limit 1) b365 on true`);
+    select b.k as period,
+           sum(bp.value_try)                as base_try,
+           sum(bp.quantity * n.unit_try)    as now_try,
+           sum(bp.own_value_try)            as base_own,
+           sum(bp.own_quantity * n.unit_try) as now_own
+    from bases b
+    join position_snapshots bp on bp.snapshot_id = b.base_id
+    join now_unit n on n.instrument_id = bp.instrument_id
+    where n.unit_try is not null
+    group by b.k`);
 
-  const r = rows[0];
-  const mk = (now: number, base: number | null): Change | null =>
-    base == null ? null : { abs: now - base, pct: base ? ((now - base) / base) * 100 : null };
+  const mk = (now: number | null, base: number | null): Change | null =>
+    now == null || base == null ? null : { abs: now - base, pct: base ? ((now - base) / base) * 100 : null };
   const empty = { total: null, own: null };
-  if (!r) {
-    return { hour: empty, day: empty, week: empty, month: empty, quarter: empty, year: empty };
-  }
-  return {
-    hour:    { total: mk(r.t_now, r.t_h), own: mk(r.o_now, r.o_h) },
-    day:     { total: mk(r.t_now, r.t_d), own: mk(r.o_now, r.o_d) },
-    week:    { total: mk(r.t_now, r.t_w), own: mk(r.o_now, r.o_w) },
-    month:   { total: mk(r.t_now, r.t_m), own: mk(r.o_now, r.o_m) },
-    quarter: { total: mk(r.t_now, r.t_q), own: mk(r.o_now, r.o_q) },
-    year:    { total: mk(r.t_now, r.t_y), own: mk(r.o_now, r.o_y) },
+  const out: PeriodChanges = {
+    hour: empty, day: empty, week: empty, month: empty, quarter: empty, year: empty,
   };
+  for (const r of rows) {
+    out[r.period] = { total: mk(r.now_try, r.base_try), own: mk(r.now_own, r.base_own) };
+  }
+  return out;
 }
 
 // ── Dönem bazında varlık kâr/zararı (öne çıkanlar kartları) ────────────────
