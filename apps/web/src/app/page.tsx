@@ -2,7 +2,7 @@ import {
   getLatestSnapshot, getPositions, getHistory, getInstruments,
   getLastFetch, getAssetClasses, getPeriodChanges, getPeriodMovers,
   getTransactionsByInstrument, getLocations, getUsdTry, getAnnualClosings,
-  type Change, type SeriesPoint,
+  type Change, type Position, type SeriesPoint,
 } from '@/lib/data';
 import { money, conv, num, pct, timeAgo, type Cur } from '@/lib/format';
 import PortfolioChart from '@/components/PortfolioChart';
@@ -36,24 +36,32 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
       getTransactionsByInstrument(), getLocations(), getUsdTry(), getAnnualClosings(),
     ]);
 
-  // Portföy değeri snapshot'ta iki para biriminde de duruyor — çevirmiyoruz,
-  // ilgili kolonu okuyoruz. Maliyet/değişim yalnız TL tutulduğu için güncel kurla.
-  const valueTry = own ? (snap?.own_value_try ?? 0) : (snap?.total_value_try ?? 0);
-  const valueUsd = own ? (snap?.own_value_usd ?? 0) : (snap?.total_value_usd ?? 0);
+  // Özet büyüklükler CANLI pozisyonlardan toplanır, snapshot'tan OKUNMAZ.
+  // Snapshot saat başı yazılır; arada bir işlem girildiğinde kart ile tablonun
+  // toplamı birbirini tutmuyordu. Tek kaynak getPositions — o da adedi
+  // v_holdings'ten, fiyatı v_latest_price'tan canlı okur.
+  const sum = (f: (p: Position) => number | null) => positions.reduce((a, p) => a + (f(p) ?? 0), 0);
+  const totalTry = sum((p) => p.value_try);
+  const totalUsd = sum((p) => p.value_usd);
+  const ownValueTry = sum((p) => p.own_value_try);
+  const ownValueUsd = sum((p) => p.own_value_usd);
+  const valueTry = own ? ownValueTry : totalTry;
+  const valueUsd = own ? ownValueUsd : totalUsd;
   const value = cur === 'USD' ? valueUsd : valueTry;
   const altValue = cur === 'USD' ? valueTry : valueUsd;
   const altCur: Cur = cur === 'USD' ? 'TRY' : 'USD';
-  const costTry = own ? (snap?.own_cost_try ?? 0) : (snap?.total_cost_try ?? 0);
-  const pnlTry = own ? (snap?.own_unrealized_pnl_try ?? 0) : (snap?.unrealized_pnl_try ?? 0);
+  // Maliyet ve K/Z yalnız alış fiyatı BİLİNEN pozisyonlardan toplanır: maliyeti
+  // girilmemiş varlığın maliyeti 0 değil meçhuldür (cost_try null), yoksa
+  // portföyün tamamı kâr görünür.
+  const costTry = sum((p) => (own ? p.own_cost_try : p.cost_try));
+  const pnlTry = sum((p) => (own ? p.own_pnl_try : p.pnl_try));
   const pnl = conv(pnlTry, cur, rate);
   const pnlPct = costTry > 0 ? (pnlTry / costTry) * 100 : 0;
   const up = pnl >= 0;
 
   // Emanet: toplam ile bana-ait arasındaki fark. Anahtarın ne kadar şey
   // gizlediğini/gösterdiğini kullanıcıya sayıyla söylemek gerekiyor.
-  const emanet = cur === 'USD'
-    ? (snap?.total_value_usd ?? 0) - (snap?.own_value_usd ?? 0)
-    : (snap?.total_value_try ?? 0) - (snap?.own_value_try ?? 0);
+  const emanet = cur === 'USD' ? totalUsd - ownValueUsd : totalTry - ownValueTry;
   const emanetCount = positions.filter((p) => p.external_quantity > 0).length;
 
   // "Bana ait" görünümünde payı sıfırlanmış pozisyonlar listede yer tutmasın.
@@ -65,7 +73,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // Alış fiyatı girilmemiş pozisyonlar: maliyetleri meçhul olduğu için maliyet
   // ve değişim hesabının dışında kalıyorlar. Kart bunu söylemeli, yoksa
   // "maliyet neden portföyden küçük" sorusu havada kalır.
-  const noCostCount = rows.filter((p) => (p.avg_cost ?? 0) <= 0 && (valOf(p) ?? 0) > 0).length;
+  const noCostCount = rows.filter((p) => (own ? p.own_cost_try : p.cost_try) == null && valOf(p) > 0).length;
 
   // Dağılım kutucukları: alan = büyüklük, kutu grubunun rengiyle boyanır.
   const alloc = rows
@@ -81,10 +89,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     const u = c.total_value_usd ?? (rate > 0 ? t / rate : 0);
     return { ts: `${c.year}-12-31T20:59:59.000Z`, try: t, usd: u, own_try: t, own_usd: u, s: {} };
   });
-  if (snap && yearly.length) {
+  // Serinin son noktası da canlı toplam olmalı — yıl kapanışlarının yanına
+  // bayat bir snapshot koyarsak grafik ile kart farklı sayı gösterir.
+  if (yearly.length && positions.length) {
     yearly.push({
-      ts: snap.ts, try: snap.total_value_try, usd: snap.total_value_usd,
-      own_try: snap.own_value_try, own_usd: snap.own_value_usd, s: {},
+      ts: new Date().toISOString(), try: totalTry, usd: totalUsd,
+      own_try: ownValueTry, own_usd: ownValueUsd, s: {},
     });
   }
   const isAll = range === 'TÜM';
@@ -109,7 +119,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           değiştirmek, "işlem ekle" diyen mesajın ekleme butonlarını da
           gizlemesi demekti — kullanıcı hiçbir şey giremiyordu. */}
           <TabPanel id="ozet">
-          {!snap ? (
+          {!snap && positions.length === 0 ? (
             <div className="panel p-8 text-center text-[15px]" style={{ color: 'var(--muted)' }}>
               Henüz snapshot yok.<br />
               <span className="text-[13.5px]" style={{ color: 'var(--faint)' }}>

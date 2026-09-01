@@ -13,6 +13,9 @@ export interface Position {
   quantity: number; price: number | null; currency: string; price_ts: string | null;
   is_stale: boolean; value_try: number | null; value_usd: number | null; weight_pct: number | null;
   avg_cost: number | null; pnl_try: number | null; pnl_pct: number | null;
+  // Maliyeti bilinen pozisyonlar için TL maliyet; alış fiyatı girilmemişse null
+  // (0 değil — meçhul). Toplam K/Z oranının paydası buradan toplanır.
+  cost_try: number | null; own_cost_try: number | null;
   external_quantity: number; own_quantity: number;
   own_value_try: number | null; own_value_usd: number | null; own_weight_pct: number | null; own_pnl_try: number | null;
   // Güncel (açık) lot'un açılış/kapanış tarihi + kullanılan konumlar — transactions'tan hesaplanır.
@@ -22,7 +25,8 @@ export interface Position {
   // Fiyatın kote edildiği birim (prices.currency). currency alanı artık kur
   // riski etiketi olduğu için para birimi bilgisi buradan okunur.
   price_currency: string | null;
-  // Tutuluyor ama motor henüz fiyat çekmedi — bir sonraki turda gelir, o ana kadar değer/K-Z/ağırlık "—".
+  // Tutuluyor ama kullanılabilir fiyat yok (motor henüz çekmedi ya da kotasyon
+  // TRY/USD dışı) — değer/K-Z/ağırlık "—" kalır.
   pending: boolean;
 }
 export interface TxRow {
@@ -57,11 +61,7 @@ export async function getLatestSnapshot(): Promise<Snapshot | null> {
 
 export async function getPositions(): Promise<Position[]> {
   return q<Position>(`
-    with latest as (select id from portfolio_snapshots order by ts desc limit 1),
-         -- Fiyatın kote edildiği birim: değer ve maliyet çevrimi buna bakar.
-         pcur as (select distinct on (instrument_id) instrument_id, currency from prices order by instrument_id, ts desc),
-         latest_ps as (select ps.* from position_snapshots ps join latest l on l.id = ps.snapshot_id),
-         fx as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1),
+    with fx as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1),
          -- Güncel lot'un açılış/kapanış tarihi + konumları: buy/sell'i imzalı adet
          -- olarak biriktirip, adet sıfıra her indiğinde yeni bir "segment" başlat.
          -- Bir enstrümanın en güncel segmenti = o an açık (ya da en son kapanan) pozisyon.
@@ -75,9 +75,13 @@ export async function getPositions(): Promise<Position[]> {
            from ledger
          ),
          segmented as (
+           -- coalesce ŞART: ilk satırda pencere çerçevesi boş, sum() null döner.
+           -- Null segment kendi başına bir grup oluyor ve "order by segment_id desc"
+           -- (Postgres'te NULLS FIRST) onu güncel lot sanıp EN ESKİ işlemin
+           -- tarihini/konumunu gösteriyordu.
            select *,
-             sum(case when running_qty = 0 then 1 else 0 end)
-               over (partition by instrument_id order by executed_at, id rows between unbounded preceding and 1 preceding) as segment_id
+             coalesce(sum(case when running_qty = 0 then 1 else 0 end)
+               over (partition by instrument_id order by executed_at, id rows between unbounded preceding and 1 preceding), 0) as segment_id
            from running
          ),
          segments as (
@@ -92,38 +96,65 @@ export async function getPositions(): Promise<Position[]> {
            select distinct on (instrument_id) instrument_id, opened_at, closed_at, locations
            from segments
            order by instrument_id, segment_id desc
-         )
+         ),
+         -- Değer CANLI hesaplanır: adet v_holdings'ten, fiyat v_latest_price'tan.
+         -- Snapshot'tan OKUNMAZ. Snapshot saat başı yazılır; bu arada girilen bir
+         -- işlem adedi değiştirdiğinde tablo "116.000 adet × 1 ₺ = 79.370 ₺" gibi
+         -- kendi içinde çelişen bir satır gösteriyordu (adet canlı, değer bayat).
+         base as (
+           select h.instrument_id, h.quantity, h.own_quantity, coalesce(h.external_qty, 0) as external_quantity,
+                  h.avg_cost, i.cadence,
+                  lp.price, lp.price_ts, lp.currency as price_currency,
+                  -- Motorla (src/snapshot.ts) AYNI kural: çevrimde FİYATIN kendi
+                  -- para birimi esastır, instruments.currency değil (o artık kur
+                  -- riski etiketi). TRY/USD dışı bir kotasyonu çevirmek yerine
+                  -- fiyatsız sayarız — yanlış çarpan üretmektense "—" gösteririz.
+                  case when lp.currency = 'USD' then (select rate from fx) else 1 end as fx_mult,
+                  (lp.price is not null and lp.currency in ('TRY','USD')) as priced
+           from v_holdings h
+           join instruments i on i.id = h.instrument_id
+           left join v_latest_price lp on lp.instrument_id = h.instrument_id
+           where h.quantity <> 0
+         ),
+         valued as (
+           select b.*,
+             case when b.priced then b.quantity     * b.price * b.fx_mult end as value_try,
+             case when b.priced then b.own_quantity * b.price * b.fx_mult end as own_value_try,
+             -- Alış fiyatı girilmemişse maliyet 0 DEĞİL meçhuldür: null kalır,
+             -- yoksa varlığın tamamı kâr gibi görünür.
+             case when b.avg_cost > 0 then b.avg_cost * b.quantity     * b.fx_mult end as cost_try,
+             case when b.avg_cost > 0 then b.avg_cost * b.own_quantity * b.fx_mult end as own_cost_try
+           from base b
+         ),
+         tot as (select sum(value_try) as t_try, sum(own_value_try) as t_own from valued)
     -- v_holdings tahrik eder: elde tutulan HER şey listelenir, motor fiyatı henüz
-    -- çekmemiş olsa bile (snapshot yoksa fiyat/değer/ağırlık null → arayüzde "—"/"bekliyor").
+    -- çekmemiş olsa bile (fiyat/değer/ağırlık null → arayüzde "—"/"bekliyor").
     select i.id as instrument_id, i.symbol, i.display_name, i.class_code, ac.name as class_name, ac.ui_group,
-           i.tax_rate, pc.currency as price_currency,
-           h.quantity, ps.price, i.currency, ps.price_ts, coalesce(ps.is_stale, false) as is_stale,
-           ps.value_try, ps.value_usd, ps.weight_pct,
-           h.own_quantity, ps.own_value_try, ps.own_value_usd, ps.own_weight_pct,
-           coalesce(h.external_qty, 0) as external_quantity,
-           h.avg_cost,
-           -- Alış fiyatı girilmemişse maliyet 0 DEĞİL meçhuldür: K/Z null kalır,
-           -- yoksa varlığın tamamı kâr gibi görünür.
-           case when h.avg_cost > 0 then
-             ps.value_try - h.avg_cost * h.quantity *
-               case when pc.currency='USD' then (select rate from fx) else 1 end
-           end as pnl_try,
-           case when h.avg_cost > 0 then
-             ps.own_value_try - h.avg_cost * h.own_quantity *
-               case when pc.currency='USD' then (select rate from fx) else 1 end
-           end as own_pnl_try,
-           case when h.avg_cost > 0 and ps.price is not null then
-             ((ps.price - h.avg_cost) / h.avg_cost) * 100 end as pnl_pct,
+           i.tax_rate, v.price_currency,
+           v.quantity, v.price, i.currency, v.price_ts,
+           -- Bayatlık da CANLI: motor durursa fiyat yaşlanır ama snapshot'taki
+           -- is_stale donuk kalırdı. Eşikler src/snapshot.ts'teki STALE_WINDOW ile aynı.
+           (v.price_ts is not null and extract(epoch from (now() - v.price_ts)) >
+             case v.cadence when 'hourly' then 10800 when 'market_hours' then 21600
+                            when 'daily_close' then 108000 else 21600 end) as is_stale,
+           v.value_try,
+           v.value_try / nullif((select rate from fx), 0) as value_usd,
+           case when (select t_try from tot) > 0 then v.value_try / (select t_try from tot) * 100 end as weight_pct,
+           v.own_quantity, v.own_value_try,
+           v.own_value_try / nullif((select rate from fx), 0) as own_value_usd,
+           case when (select t_own from tot) > 0 then v.own_value_try / (select t_own from tot) * 100 end as own_weight_pct,
+           v.external_quantity, v.avg_cost, v.cost_try, v.own_cost_try,
+           v.value_try - v.cost_try         as pnl_try,
+           v.own_value_try - v.own_cost_try as own_pnl_try,
+           case when v.avg_cost > 0 and v.price is not null then
+             ((v.price - v.avg_cost) / v.avg_cost) * 100 end as pnl_pct,
            cs.opened_at, cs.closed_at, coalesce(cs.locations, '{}') as locations,
-           (ps.instrument_id is null) as pending
-    from v_holdings h
-    join instruments i on i.id = h.instrument_id
+           (not v.priced) as pending
+    from valued v
+    join instruments i on i.id = v.instrument_id
     join asset_classes ac on ac.code = i.class_code
-    left join latest_ps ps on ps.instrument_id = h.instrument_id
-    left join current_segment cs on cs.instrument_id = h.instrument_id
-    left join pcur pc on pc.instrument_id = h.instrument_id
-    where h.quantity <> 0
-    order by ps.value_try desc nulls last`);
+    left join current_segment cs on cs.instrument_id = v.instrument_id
+    order by v.value_try desc nulls last`);
 }
 
 /** Bir enstrümana ait tüm işlemler, en yeniden eskiye — akordiyon paneli için. */
@@ -346,11 +377,18 @@ export async function getPeriodMovers(): Promise<PeriodMovers> {
       ) b on true
     ),
     now_pos as (
-      select pos.instrument_id, i.symbol, pos.quantity, pos.own_quantity,
+      -- Birim değer snapshot'tan (dönem başıyla aynı ölçü), ADET ise
+      -- v_holdings'ten canlı: tutar "bugün elimde olan adetle bu dönemde ne
+      -- kazandım" demek. Snapshot adedi saat başı yazıldığı için az önce
+      -- girilen bir işlemi görmüyordu.
+      select pos.instrument_id, i.symbol,
+             coalesce(h.quantity, pos.quantity)         as quantity,
+             coalesce(h.own_quantity, pos.own_quantity) as own_quantity,
              pos.value_try / nullif(pos.quantity, 0) as unit_try
       from position_snapshots pos
       join cur c on c.id = pos.snapshot_id
       join instruments i on i.id = pos.instrument_id
+      left join v_holdings h on h.instrument_id = pos.instrument_id
     )
     select b.k as period, n.symbol, n.quantity, n.own_quantity,
            n.unit_try as now_unit,

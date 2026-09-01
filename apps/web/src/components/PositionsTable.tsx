@@ -28,6 +28,10 @@ const WEIGHT_BUCKETS = [
 // Sunucuda useLayoutEffect uyarı basar; ölçüm işi yalnız tarayıcıda anlamlı.
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
+// K/Z rengi: hesaplanamayan satır (alış fiyatı yok) yeşil görünmesin — "—"
+// yazarken yükseliş rengi kullanmak kâr varmış izlenimi veriyordu.
+const pnlColor = (v: number | null) => (v == null ? 'var(--faint)' : v >= 0 ? 'var(--up)' : 'var(--down)');
+
 /**
  * Kur riski göstergesi: TL fiyatlı varlık kur karşısında açık pozisyondur
  * (kırmızı), dolar fiyatlı olan korunaklıdır (yeşil). Renk tek başına anlam
@@ -121,8 +125,8 @@ export default function PositionsTable({
   };
 
   const qtyOf = (p: Position) => (own ? p.own_quantity : p.quantity);
-  // Değer snapshot'ta iki para biriminde de duruyor — çevirmiyoruz, üst bardaki
-  // seçime karşılık gelen kolonu okuyoruz.
+  // Değer sorguda iki para biriminde birden hesaplanıyor — burada çevirmiyoruz,
+  // üst bardaki seçime karşılık gelen kolonu okuyoruz.
   const valOf = (p: Position) =>
     cur === 'USD' ? (own ? p.own_value_usd : p.value_usd) : (own ? p.own_value_try : p.value_try);
   const wOf = (p: Position) => (own ? p.own_weight_pct : p.weight_pct);
@@ -208,14 +212,18 @@ export default function PositionsTable({
     for (const p of displayRows) {
       value += valOf(p) ?? 0;
       weight += wOf(p) ?? 0;
-      const rowPnl = (own ? p.own_pnl_try : p.pnl_try) ?? 0;
-      const rowValueTry = (own ? p.own_value_try : p.value_try) ?? 0;
-      pnl += rowPnl;
-      cost += rowValueTry - rowPnl;
-      // Alış fiyatı girilmemiş işlem maliyeti 0 gösterir; böyle bir satır
-      // toplam oranı devasa şişirir (%760 gibi). Sayı üretmek yerine neden
-      // hesaplanamadığını söylüyoruz.
-      if (rowValueTry - rowPnl <= 0) noCost++;
+      // Maliyet SATIRIN KENDİ maliyetinden okunur (cost_try), "değer − K/Z"
+      // farkından değil: alış fiyatı girilmemiş satırda K/Z null olduğu için o
+      // fark satırın TÜM değerini maliyet sanıyordu — payda şişiyor, oran
+      // olduğundan küçük çıkıyor ve uyarı hiç görünmüyordu.
+      const rowCost = own ? p.own_cost_try : p.cost_try;
+      // Maliyeti meçhul satır: sayı üretmek yerine neden hesaplanamadığını söyle.
+      if (rowCost == null || rowCost <= 0) {
+        if ((valOf(p) ?? 0) > 0) noCost++;
+        continue;
+      }
+      cost += rowCost;
+      pnl += (own ? p.own_pnl_try : p.pnl_try) ?? 0;
     }
     return {
       value, weight, pnl, noCost,
@@ -389,7 +397,7 @@ export default function PositionsTable({
                       </div>
                       <div className="text-[12.5px] truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
                       <div className="text-[12.5px] mt-0.5 md:hidden truncate max-w-[84px]" style={{ color: 'var(--faint)' }}>{p.class_name} · {p.currency}</div>
-                      <div className="text-[12.5px] tnum mt-0.5 sm:hidden" style={{ color: (p.pnl_pct ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
+                      <div className="text-[12.5px] tnum mt-0.5 sm:hidden" style={{ color: pnlColor(p.pnl_pct) }}>
                         {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
                       </div>
                     </td>
@@ -416,7 +424,7 @@ export default function PositionsTable({
                         : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
                     </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap">{valOf(p) != null ? money(valOf(p)!, cur) : '—'}</td>
-                    <td className="text-right px-3 py-3 tnum hidden sm:table-cell whitespace-nowrap" style={{ color: (p.pnl_pct ?? 0) >= 0 ? 'var(--up)' : 'var(--down)' }}>
+                    <td className="text-right px-3 py-3 tnum hidden sm:table-cell whitespace-nowrap" style={{ color: pnlColor(p.pnl_pct) }}>
                       {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
                     </td>
                     <td className="text-right px-3 py-3 tnum hidden sm:table-cell whitespace-nowrap" style={{ color: 'var(--muted)' }}>
