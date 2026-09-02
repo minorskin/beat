@@ -1,5 +1,6 @@
 'use client';
 import { useParamNav } from './useParamNav';
+import { RANGES } from '@/lib/ranges';
 
 /**
  * Dönem anahtarı — sayfanın TEK zaman ekseni. Hem varlık değişimi grafiğini
@@ -8,16 +9,6 @@ import { useParamNav } from './useParamNav';
  *
  * Üst barın sağ ucunda iki satır: üstte kısa dönemler, altta uzunlar.
  */
-export const RANGES = [
-  { id: 'S', long: 'son 1 saat' },
-  { id: 'G', long: 'son 1 gün' },
-  { id: 'H', long: 'son 1 hafta' },
-  { id: 'A', long: 'son 1 ay' },
-  { id: '3A', long: 'son 3 ay' },
-  { id: '1Y', long: 'son 1 yıl' },
-  { id: 'TÜM', long: 'tüm geçmiş — elle girilen yıl kapanışları + bugün' },
-] as const;
-
 export default function RangeSwitcher({ range }: { range: string }) {
   const setParam = useParamNav();
   return (

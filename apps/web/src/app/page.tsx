@@ -3,7 +3,7 @@ import {
   getLastFetch, getAssetClasses, getPeriodChanges, getPeriodMovers,
   getTransactionsByInstrument, getLocations, getUsdTry, getAnnualClosings,
   getProjectionScenarios,
-  type Change, type Position, type SeriesPoint,
+  type Change, type Position, type SeriesPoint, type PeriodKey,
 } from '@/lib/data';
 import { money, conv, num, pct, timeAgo, type Cur } from '@/lib/format';
 import PortfolioChart from '@/components/PortfolioChart';
@@ -16,6 +16,7 @@ import SectionNav from '@/components/SectionNav';
 import TabsProvider, { TabPanel } from '@/components/Tabs';
 import SettingsMenu from '@/components/SettingsMenu';
 import RangeSwitcher from '@/components/RangeSwitcher';
+import { rangeLongOf } from '@/lib/ranges';
 import Movers from '@/components/Movers';
 import { logout } from './actions';
 
@@ -59,7 +60,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const pnlTry = sum((p) => (own ? p.own_pnl_try : p.pnl_try));
   const pnl = conv(pnlTry, cur, rate);
   const pnlPct = costTry > 0 ? (pnlTry / costTry) * 100 : 0;
-  const up = pnl >= 0;
 
   // Emanet: toplam ile bana-ait arasındaki fark. Anahtarın ne kadar şey
   // gizlediğini/gösterdiğini kullanıcıya sayıyla söylemek gerekiyor.
@@ -72,17 +72,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     (cur === 'USD' ? (own ? p.own_value_usd : p.value_usd) : (own ? p.own_value_try : p.value_try)) ?? 0;
 
   const staleCount = rows.filter((p) => p.is_stale).length;
-  // Alış fiyatı girilmemiş pozisyonlar: maliyetleri meçhul olduğu için maliyet
-  // ve değişim hesabının dışında kalıyorlar. Kart bunu söylemeli, yoksa
-  // "maliyet neden portföyden küçük" sorusu havada kalır.
-  const costOf = (p: (typeof positions)[number]) => (own ? p.own_cost_try : p.cost_try);
-  const noCostRows = rows.filter((p) => costOf(p) == null && valOf(p) > 0);
-  const costedRows = rows.filter((p) => costOf(p) != null && valOf(p) > 0);
-  const noCostCount = noCostRows.length;
-  // Değişimin ne kadarlık bir kısmı ÖLÇÜLEBİLİYOR: yalnız sayıyı yazmak
-  // "oran neden hiç kıpırdamıyor" sorusunu cevaplamıyordu — kapsanan tutar
-  // yazılınca ölçünün portföyün küçük bir dilimine baktığı görülüyor.
-  const sumVal = (xs: typeof rows) => xs.reduce((a, p) => a + valOf(p), 0);
 
   // Dağılım kutucukları: alan = büyüklük, kutu grubunun rengiyle boyanır.
   const alloc = rows
@@ -107,6 +96,31 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     });
   }
   const isAll = range === 'TÜM';
+
+  // Birinci karttaki değişim satırları da üst bardaki DÖNEM anahtarına bağlı —
+  // sayfanın tek zaman ekseni o. Daha önce bu iki satır "pozisyon açıldığından
+  // beri"yi gösteriyordu; yanı başındaki dönemsel kutular başka bir dönemi
+  // gösterirken kartın kendisi sabit durunca hangi sayının neyi ölçtüğü
+  // anlaşılmıyordu.
+  //
+  // TÜM = maliyet bazlı toplam K/Z (zaten "en baştan beri" demek). Diğer
+  // dönemler getPeriodChanges'ten: dönem başındaki sepetin fiyat hareketi,
+  // yani araya giren para giriş/çıkışı ölçüye karışmaz.
+  const PERIOD_OF: Record<string, PeriodKey> = {
+    S: 'hour', G: 'day', H: 'week', A: 'month', '3A': 'quarter', '1Y': 'year',
+  };
+  const periodKey = PERIOD_OF[range];
+  const periodChange = periodKey ? (own ? changes[periodKey].own : changes[periodKey].total) : null;
+  // O döneme yetecek geçmiş yoksa uydurmak yerine "—" yazılır. Movers gibi
+  // sessizce daha kısa bir döneme düşmek burada yanıltıcı olurdu: kart hangi
+  // dönemi gösterdiğini etiketinde söylüyor.
+  const chgAbs = isAll ? pnl : (periodChange ? conv(periodChange.abs, cur, rate) : null);
+  const chgPct = isAll ? pnlPct : (periodChange?.pct ?? null);
+  const chgUp = (chgAbs ?? chgPct ?? 0) >= 0;
+  const chgColor = chgAbs == null && chgPct == null
+    ? undefined
+    : chgUp ? 'var(--up)' : 'var(--down)';
+  const rangeLong = rangeLongOf(range);
 
   return (
     <TabsProvider>
@@ -172,24 +186,23 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                     sıkışınca ikisi de küçük punto kalıyordu. */}
                 <StatLine
                   label="Değişim Tutar"
-                  title="Alış fiyatına göre gerçekleşmemiş kâr/zarar — dönemsel değil, pozisyon açıldığından beri."
-                  value={`${up ? '+' : ''}${money(pnl, cur)}`}
-                  color={up ? 'var(--up)' : 'var(--down)'}
+                  note={range}
+                  title={isAll
+                    ? 'Alış fiyatına göre gerçekleşmemiş kâr/zarar — pozisyon açıldığından beri.'
+                    : `Değişim tutarı · ${rangeLong}. Dönem başındaki sepetin fiyat hareketi; araya giren para giriş/çıkışı sayılmaz.`}
+                  value={chgAbs == null ? '—' : `${chgUp ? '+' : ''}${money(chgAbs, cur)}`}
+                  color={chgColor}
                 />
                 <StatLine
                   label="Değişim Oran"
-                  title="Kâr/zarar ÷ maliyet. Yalnız alış fiyatı girilmiş pozisyonlar sayılır."
-                  value={pct(pnlPct)}
-                  color={up ? 'var(--up)' : 'var(--down)'}
+                  note={range}
+                  title={isAll
+                    ? 'Kâr/zarar ÷ maliyet. Yalnız alış fiyatı girilmiş pozisyonlar sayılır.'
+                    : `Değişim oranı · ${rangeLong}. Dönem başındaki sepetin fiyat hareketi.`}
+                  value={chgPct == null ? '—' : pct(chgPct)}
+                  color={chgColor}
                 />
                 <StatLine label="Pozisyon" value={staleCount ? `${rows.length} · ${staleCount} taşınmış` : String(rows.length)} />
-                {noCostCount > 0 && (
-                  <p className="t-label pt-1" style={{ color: 'var(--faint)' }}>
-                    Değişim yalnız alış fiyatı girilmiş {costedRows.length} pozisyondan
-                    ({money(sumVal(costedRows), cur)}) hesaplanıyor; {noCostCount} pozisyon
-                    ({money(sumVal(noCostRows), cur)}) hariç — işlemi düzenleyip birim fiyat gir.
-                  </p>
-                )}
               </div>
             </div>
 
@@ -274,10 +287,18 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   );
 }
 
-function StatLine({ label, value, color, title }: { label: string; value: string; color?: string; title?: string }) {
+function StatLine({ label, note, value, color, title }: {
+  label: string; note?: string; value: string; color?: string; title?: string;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-2 t-strong" title={title}>
-      <span className="shrink-0" style={{ color: 'var(--muted)' }}>{label}</span>
+      {/* Dönem rozeti üst bardaki anahtarla AYNI kısaltmayı kullanır (S/G/H/…);
+          uzun hâli title'da. Hangi sayının hangi dönemi ölçtüğü kartın kendi
+          üstünde yazsın diye — bakış üst bara gitmek zorunda kalmasın. */}
+      <span className="shrink-0" style={{ color: 'var(--muted)' }}>
+        {label}
+        {note && <span className="t-label tnum" style={{ color: 'var(--faint)' }}> · {note}</span>}
+      </span>
       <span className="tnum truncate text-right font-medium" style={{ color: color ?? 'var(--text)' }}>{value}</span>
     </div>
   );

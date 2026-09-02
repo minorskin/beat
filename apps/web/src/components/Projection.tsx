@@ -309,6 +309,16 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
         })}
       </div>
 
+      {/* Masaüstünde iki sütun: SOLDA varsayımlar, SAĞDA grafik. Kaydırıcıyı
+          oynatırken eğrinin aynı ekranda kalması gerekiyor — alt alta dizilince
+          slider'a dokunmak için grafiği ekrandan kaydırmak zorundaydın.
+
+          DOM sırası grafik → kontroller; mobilde okuma sırası bu (önce sonuç,
+          sonra ayar). Masaüstünde kontrol bloğu `lg:order-first` ile sola
+          geçiyor, yani tek bir DOM ağacı iki düzeni de veriyor. */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
+
+      <div className="lg:col-span-3 min-w-0">
       <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
         {stat.depletedAt != null
           ? <Stat label="Para bitiyor" value={durText(stat.depletedAt)} tone="down" />
@@ -320,7 +330,9 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
         <Stat label="Getiri" value={`${fmtC(growth)} ${unit}`} tone={growth >= 0 ? 'up' : 'down'} />
       </div>
 
-      <div className="w-full h-[200px] sm:h-[240px]">
+      {/* İki sütuna geçince grafik dar kaldı; masaüstünde biraz yükseltiliyor
+          ki sol sütundaki beş kaydırıcıyla boy dengesi tutsun. */}
+      <div className="w-full h-[200px] sm:h-[240px] lg:h-[286px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ left: 0, right: 6, top: 4, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="#232323" />
@@ -408,16 +420,18 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
           );
         })}
       </div>
+      </div>
 
-      {/* Seçili senaryonun varsayımları */}
-      <div className="space-y-3 sm:space-y-4 mt-4">
-        <div>
-          <div className="t-label mb-1.5" style={{ color: 'var(--muted)' }}>Senaryo adı</div>
+      {/* Seçili senaryonun varsayımları — masaüstünde sol sütun */}
+      <div className="lg:col-span-2 lg:order-first min-w-0">
+      <div className="space-y-3 sm:space-y-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="t-label shrink-0 w-[108px] sm:w-[104px]" style={{ color: 'var(--muted)' }}>Senaryo adı</span>
           <input
             value={cursel.name}
             maxLength={24}
             onChange={(e) => patch({ name: e.target.value })}
-            className="field"
+            className="field flex-1 min-w-0"
             aria-label="Senaryo adı" />
         </div>
         <Slider label="Aylık getiri" value={`%${pct(cursel.rate)}`} min={0} max={20} step={0.1}
@@ -466,10 +480,13 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
 
       {cur === 'USD' && (
         <p className="t-micro mt-3" style={{ color: 'var(--faint)' }}>
-          Aylık ekleme TL olarak saklanır; burada güncel kurla çevrilip gösteriliyor.
-          Dolar cinsinden girdiğin tutar da o kurla TL’ye çevrilerek kaydedilir.
+          Aylık ekleme ve gider TL olarak saklanır; burada güncel kurla çevrilip
+          gösteriliyor. Dolar cinsinden girdiğin tutar da o kurla TL’ye çevrilerek kaydedilir.
         </p>
       )}
+      </div>
+
+      </div>
     </div>
   );
 }
@@ -486,18 +503,36 @@ function Stat({ label, value, tone }: { label: string; value: string; tone: 'tex
   );
 }
 
+/**
+ * Tek satır: başlık solda · kaydırıcı ortada · değer sağda.
+ *
+ * Değer kaydırıcının SAĞINDA sabit genişlikli bir sütunda durur. Başlığın
+ * yanına koyunca sayı her oynatışta yer değiştirip zıplıyordu; sabit sütun +
+ * tabular rakam ile rakamlar yerinde kalıyor. Genişlik dar ekranda daha az
+ * yer kaplasın diye iki kademeli.
+ */
 function Slider({ label, value, min, max, step, v, set }: {
   label: string; value: string; min: number; max: number; step: number; v: number; set: (n: number) => void;
 }) {
   return (
-    <div>
-      <div className="flex justify-between t-label mb-1.5">
-        <span style={{ color: 'var(--muted)' }}>{label}</span>
-        <span className="tnum" style={{ color: 'var(--text)' }}>{value}</span>
-      </div>
+    <div className="flex items-center gap-2 sm:gap-3">
+      <span
+        className="t-label shrink-0 truncate w-[108px] sm:w-[104px]"
+        style={{ color: 'var(--muted)' }}
+        title={label}
+      >
+        {label}
+      </span>
       <input type="range" min={min} max={max} step={step} value={v}
         onChange={(e) => set(Number(e.target.value))}
-        className="w-full" />
+        aria-label={label}
+        className="flex-1 min-w-0" />
+      <span
+        className="t-label tnum shrink-0 text-right w-[84px] sm:w-[88px] truncate"
+        style={{ color: 'var(--text)' }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
