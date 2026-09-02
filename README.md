@@ -53,7 +53,15 @@ ilk alım girildiğinde satır kendiliğinden portföye geçer.
 | Döviz / Altın | 7/24 | saatlik |
 | BIST | 10:00–18:10 TR | piyasa saatleri |
 | ABD hisse/ETF | 09:30–16:00 NY | piyasa saatleri |
-| TEFAS fonları | akşam NAV | günde 1 |
+| TEFAS fonları | sabah NAV (~07:00 TR) | günde 1 — NAV alınınca o gün susar |
+
+> **Fonlar tek istisna: motor onları her turda çekmez.** TEFAS günde bir NAV
+> yayınlıyor; saatlik snapshot'lardaki `price_ts` iki gün üst üste 06:00–07:00
+> arasında atladı, sonra ertesi sabaha kadar hiç kıpırdamadı. Bu yüzden fonlar
+> yalnız **hafta içi, 06:00 TR'den sonra ve o günün NAV'ı henüz elde değilse**
+> sorgulanır (`loadCandidates`, `FUND_POLL_FROM_HOUR`). NAV geldiği an fon o gün
+> bir daha sorgulanmaz: günde ~144 istek yerine ~6. Hiç fiyatı olmayan enstrüman
+> bu kapıya takılmaz (fail-open) — yeni eklenen fon hafta sonu bile çekilir.
 
 **EOD kesimi 02:00 TR'de** çalışır ve bir önceki işlem günü etiketlenir.
 Sebep: NYSE kapanışı yazın 23:00 TR, **kışın 00:00 TR (ertesi takvim günü)**. 02:00 her iki

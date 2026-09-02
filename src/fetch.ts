@@ -12,9 +12,13 @@ import type { Quote } from './core/types.js';
 async function main() {
   const kind = process.argv[2] ?? 'manual';
   const runId = await startRun(kind);
-  const plan = await loadCandidates();
+  const { plan, skipped } = await loadCandidates();
   const fxSeed = await loadLatestFx();
   console.log(`\nBeat fetch · kind=${kind} · ${plan.size} enstrüman · seed FX: ${[...fxSeed].map(([b, r]) => `${b}=${r}`).join(' ') || 'yok'}`);
+  // Takvim kapısı: günde tek NAV yayınlayan fonlar, o günün NAV'ı alındıktan
+  // sonra tekrar sorgulanmaz (bkz. loadCandidates). Atlananları yazıyoruz ki
+  // "fon neden çekilmedi" sorusu log'dan cevaplanabilsin.
+  if (skipped.size) console.log(`atlandı (takvim): ${[...skipped.values()].join(', ')}`);
 
   const out = await runFetch(plan, fxSeed);
 

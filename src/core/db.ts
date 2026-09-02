@@ -13,6 +13,13 @@ export const pool = new Pool({
 // numeric sütunlar string döner; sayıya çevir.
 pg.types.setTypeParser(1700, (v) => (v === null ? null : Number(v)));
 
+export interface CandidatePlan {
+  /** Bu turda çekilecek enstrümanlar (instrumentId -> failover adayları) */
+  plan: Map<string, Candidate[]>;
+  /** Takvim kapısına takılıp atlananlar (instrumentId -> sembol) */
+  skipped: Map<string, string>;
+}
+
 export interface Candidate {
   instrumentId: string;
   symbol: string;
@@ -24,24 +31,80 @@ export interface Candidate {
   priority: number;
 }
 
-/** Aktif enstrümanları failover adaylarıyla (priority sırasında) döndürür. */
-export async function loadCandidates(): Promise<Map<string, Candidate[]>> {
-  const { rows } = await pool.query<Candidate>(`
+/**
+ * TEFAS NAV'ının yayınlandığı saat (Europe/Istanbul).
+ *
+ * Tahmin değil ölçüm: saatlik position_snapshots'ta fonların `price_ts` alanı
+ * iki gün üst üste 06:00 ile 07:00 arasında yeni NAV'a atladı, sonra ertesi
+ * sabaha kadar hiç kıpırdamadı. Pencereyi 06:00'da açıyoruz — bir saat erken
+ * başlamak veri kaybettirmez, yalnız ilk sorguyu boşa çıkarır; geç başlamak
+ * ise NAV'ı saatlerce geç yakalamak demek olurdu.
+ */
+const FUND_POLL_FROM_HOUR = 6;
+
+/**
+ * Aktif enstrümanları failover adaylarıyla (priority sırasında) döndürür.
+ *
+ * `daily_close` ritmindeki enstrümanlar (TEFAS fonları) HER TURDA ÇEKİLMEZ.
+ * Kaynak günde tek NAV yayınlıyor; 10 dakikada bir sormak günde 144 istekten
+ * 143'ünü boşa harcıyor ve TEFAS'ın 6 istek/dk sınırına gereksiz yükleniyordu.
+ * Kapı üç koşullu:
+ *
+ *   1. Hafta içi mi?           (TEFAS hafta sonu NAV yayınlamaz)
+ *   2. Yayın saati geçti mi?   (>= 06:00 TR)
+ *   3. Bugünün NAV'ı elimizde YOK mu?
+ *
+ * Üçü de sağlanıyorsa çekilir; NAV geldiği anda 3. koşul düşer ve fon o gün
+ * bir daha sorgulanmaz. Günde ~144 istek yerine ~6.
+ *
+ * FAIL-OPEN: hiç fiyatı olmayan enstrüman (yeni eklenmiş fon) pencereye ve
+ * güne bakılmaksızın her turda çekilir. Aksi halde cumartesi eklenen bir fon
+ * pazartesi sabahına kadar fiyatsız kalırdı — oysa cuma NAV'ı hazır duruyor.
+ *
+ * `now` yalnız test için: verilmezse veritabanının kendi saati kullanılır.
+ */
+export async function loadCandidates(now?: Date): Promise<CandidatePlan> {
+  const { rows } = await pool.query<Candidate & { due: boolean }>(`
+    with n as (select coalesce($1::timestamptz, now()) at time zone 'Europe/Istanbul' as tr)
     select i.id as "instrumentId", i.symbol, i.class_code as "classCode",
            i.currency, i.cadence,
            s.provider_id as "providerId", s.provider_symbol as "providerSymbol",
-           s.priority
+           s.priority,
+           (
+             i.cadence <> 'daily_close'
+             -- hiç gözlem yok → koşulsuz çek (yeni enstrüman)
+             or not exists (select 1 from prices p where p.instrument_id = i.id)
+             or (
+               extract(isodow from n.tr) <= 5
+               and extract(hour from n.tr) >= ${FUND_POLL_FROM_HOUR}
+               and not exists (
+                 select 1 from prices p
+                 where p.instrument_id = i.id
+                   and (p.ts at time zone 'Europe/Istanbul')::date = n.tr::date
+               )
+             )
+           ) as due
     from instruments i
     join instrument_sources s on s.instrument_id = i.id and s.is_active
+    cross join n
     where i.is_active
-    order by i.id, s.priority`);
-  const map = new Map<string, Candidate[]>();
+    order by i.id, s.priority`, [now ?? null]);
+
+  // Filtre SQL'de değil burada: atlanan enstrümanlar da geri dönüyor ki
+  // çalıştırma çıktısında "neden çekilmedi" görünsün. Sessizce eksilen bir
+  // enstrüman, motor bozulduğunda fark edilmesi en zor arıza olurdu.
+  const plan = new Map<string, Candidate[]>();
+  const skipped = new Map<string, string>();
   for (const r of rows) {
-    const list = map.get(r.instrumentId) ?? [];
-    list.push(r);
-    map.set(r.instrumentId, list);
+    if (r.due) {
+      const list = plan.get(r.instrumentId) ?? [];
+      list.push(r);
+      plan.set(r.instrumentId, list);
+    } else {
+      skipped.set(r.instrumentId, r.symbol);
+    }
   }
-  return map;
+  return { plan, skipped };
 }
 
 /** Snapshot ve goldapi türetmesi için son bilinen USD/EUR -> TRY kurları. */
