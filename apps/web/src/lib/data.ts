@@ -183,17 +183,34 @@ export async function getLocations(): Promise<string[]> {
   return rows.map((r) => r.location);
 }
 
-// Aralık → geriye bakış penceresi. Kova genişliği burada SABİT DEĞİL; aşağıda
-// elimizdeki verinin gerçek uzunluğundan türetiliyor (bkz. sorgudaki `b`).
-const RANGE_INTERVAL: Record<string, string> = {
-  'S': '1 hour', 'G': '1 day', 'H': '7 days', 'A': '30 days', '3A': '90 days', '1Y': '365 days',
+/**
+ * Aralık → (geriye bakış penceresi, kova genişliği).
+ *
+ * Grafiğin penceresi ile GRANÜLERLİĞİ ayrı iki karar:
+ *   S  → son 24 saat, saatlik nokta
+ *   G  → son 30 gün,  günlük nokta
+ *   H  → son 1 yıl,   haftalık nokta
+ *   A  → son 1 yıl,   haftalık nokta
+ * H ve A grafikte aynı seriyi verir; ikisi yine de ayrı seçim çünkü birinci
+ * karttaki değişim ve "öne çıkanlar" farklı dönemi ölçmeye devam ediyor
+ * (H = 7 günlük değişim, A = 30 günlük).
+ *
+ * bucket = null → kova veriden türetilir (~120 nokta), eski davranış.
+ */
+const RANGE_SPEC: Record<string, { window: string; bucket: number | null }> = {
+  'S':  { window: '24 hours', bucket: 3600 },    // saatlik
+  'G':  { window: '30 days',  bucket: 86400 },   // günlük
+  'H':  { window: '365 days', bucket: 604800 },  // haftalık
+  'A':  { window: '365 days', bucket: 604800 },  // haftalık
+  '3A': { window: '90 days',  bucket: null },
+  '1Y': { window: '365 days', bucket: null },
 };/**
  * Portföy geçmişi + her enstrümanın kendi değer serisi.
  * Kova başına SON snapshot alınır (ortalama değil) — böylece son nokta
  * her zaman gerçekten gözlenmiş bir andır, uydurma bir ara değer değil.
  */
 export async function getHistory(range: string): Promise<HistoryBundle> {
-  const interval = RANGE_INTERVAL[range] ?? RANGE_INTERVAL['A'];
+  const spec = RANGE_SPEC[range] ?? RANGE_SPEC['A'];
   const rows = await q<{
     ts: string; t_try: number; t_usd: number; o_try: number; o_usd: number;
     symbol: string | null; p_try: number | null; p_usd: number | null;
@@ -205,18 +222,33 @@ export async function getHistory(range: string): Promise<HistoryBundle> {
       from portfolio_snapshots
       where ts >= now() - ($1)::interval
     ),
+    span as (
+      select coalesce(extract(epoch from (max(ts) - min(ts))), 0) as sec from win
+    ),
     b as (
-      -- Kova, aralığın NOMİNAL uzunluğundan değil verinin GERÇEK uzunluğundan
-      -- türetiliyor (~120 nokta hedefi). Aksi halde portföy 1 günlükken "1Y"
-      -- seçilince her şey tek kovaya düşüyor, tek noktalı çizgi de çizilmiyor.
-      select greatest(60, coalesce(extract(epoch from (max(ts) - min(ts))), 0) / 120) as bucket
-      from win
+      -- İstenen granülerlik ($2) varsa o kullanılır — AMA elimizdeki geçmiş
+      -- ona yetmiyorsa kova küçültülür. Portföy 3 günlükken "haftalık" tek
+      -- kova demek, yani tek nokta: çizgi çizilmez ve grafik bozuk görünür.
+      -- Bu yüzden istenen kova ile "en az ~24 nokta çıkaran" kova arasından
+      -- KÜÇÜK olan seçilir; yeterli geçmiş birikince istenen granülerliğe
+      -- kendiliğinden oturur.
+      --
+      -- $2 null ise eski davranış: kovayı tamamen veriden türet (~120 nokta).
+      select case
+               when ($2)::float8 is null then greatest(60, span.sec / 120)
+               else least(($2)::float8, greatest(60, span.sec / 24))
+             end as bucket
+      from span
     ),
     snaps as (
-      select distinct on (floor(extract(epoch from w.ts) / b.bucket))
+      -- Kova sınırı Europe/Istanbul gün başına hizalanır (+10800 sn). Epoch
+      -- doğrudan bölünseydi "günlük" nokta TR saatiyle 03:00'te kapanırdı;
+      -- sayfanın geri kalanı da bu saat dilimine sabitli (bkz. lib/format).
+      -- Türkiye 2016'dan beri yaz saati uygulamıyor, sabit ofset doğru.
+      select distinct on (floor((extract(epoch from w.ts) + 10800) / b.bucket))
         w.id, w.ts, w.total_value_try, w.total_value_usd, w.own_value_try, w.own_value_usd
       from win w cross join b
-      order by floor(extract(epoch from w.ts) / b.bucket), w.ts desc
+      order by floor((extract(epoch from w.ts) + 10800) / b.bucket), w.ts desc
     )
     select s.ts,
            s.total_value_try t_try, s.total_value_usd t_usd,
@@ -227,7 +259,7 @@ export async function getHistory(range: string): Promise<HistoryBundle> {
     from snaps s
     left join position_snapshots pos on pos.snapshot_id = s.id
     left join instruments i on i.id = pos.instrument_id
-    order by s.ts`, [interval]);
+    order by s.ts`, [spec.window, spec.bucket]);
 
   const byTs = new Map<string, SeriesPoint>();
   const symbols = new Set<string>();
