@@ -352,13 +352,25 @@ export async function saveProjectionScenario(formData: FormData): Promise<Result
   if (monthlyTry == null || monthlyTry < 0) return { ok: false, error: 'Aylık ekleme geçersiz' };
 
   const months = Number(String(formData.get('months') || ''));
-  if (!Number.isInteger(months) || months < 1 || months > 360) return { ok: false, error: 'Süre 1-360 ay arası olmalı' };
+  if (!Number.isInteger(months) || months < 1 || months > 120) return { ok: false, error: 'Süre 1-120 ay arası olmalı' };
+
+  // Enflasyon ve gider birlikte negatif etki eder: geliri (1+i)^m ile böler,
+  // gideri (1+i)^m ile çarpar. Sınırlar şemadaki check'lerle aynı tutulmalı.
+  const inflation = Number(String(formData.get('monthly_inflation') || ''));
+  if (!Number.isFinite(inflation) || inflation < 0 || inflation > 10) {
+    return { ok: false, error: 'Aylık enflasyon 0-10 arası olmalı' };
+  }
+
+  const expenseTry = parseAmount(String(formData.get('monthly_expense_try') || ''));
+  if (expenseTry == null || expenseTry < 0) return { ok: false, error: 'Aylık gider geçersiz' };
+  if (expenseTry > 200000) return { ok: false, error: 'Aylık gider en fazla 200.000 ₺' };
 
   await q(
     `update projection_scenarios
-        set name=$2, monthly_rate=$3, monthly_try=$4, months=$5, updated_at=now()
+        set name=$2, monthly_rate=$3, monthly_try=$4, months=$5,
+            monthly_inflation=$6, monthly_expense_try=$7, updated_at=now()
       where slot=$1`,
-    [slot, name, rate, monthlyTry, months]);
+    [slot, name, rate, monthlyTry, months, inflation, expenseTry]);
   return { ok: true };
 }
 

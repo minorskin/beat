@@ -441,10 +441,14 @@ export async function getPeriodMovers(): Promise<PeriodMovers> {
  */
 export interface ProjectionScenario {
   slot: number; name: string; monthly_rate: number; monthly_try: number; months: number;
+  // Aylık enflasyon % — geliri böler, gideri çarpar (bkz. migration 0011).
+  monthly_inflation: number;
+  monthly_expense_try: number;
 }
 
 export async function getProjectionScenarios(): Promise<ProjectionScenario[]> {
   return q<ProjectionScenario>(
-    `select slot, name, monthly_rate, monthly_try, months
+    `select slot, name, monthly_rate, monthly_try, months,
+            monthly_inflation, monthly_expense_try
        from projection_scenarios order by slot`);
 }

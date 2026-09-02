@@ -24,7 +24,12 @@ const MONTHLY: Record<Cur, { max: number; step: number }> = {
   USD: { max: 2500, step: 50 },
 };
 
-const MAX_MONTHS = 360; // 30 yıl
+const MAX_MONTHS = 120; // 10 yıl
+
+// Aylık gider TL saklanır ve şemada 200.000 ₺ ile sınırlı. USD görünümünde
+// kaydırıcının tavanı güncel kurdan TÜRETİLİR — sabit bir $ tavanı yazsaydık
+// kur yükselince slider'ın sonu şemanın kabul etmediği bir tutara denk gelirdi.
+const EXPENSE_TRY_MAX = 200000;
 
 const yearFmt = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
@@ -46,33 +51,77 @@ function durText(m: number) {
   return `${y} yıl ${mm} ay`;
 }
 
-/** Bileşik büyüme: her ay önce getiri işler, sonra katkı eklenir. */
-function project(current: number, monthlyRate: number, monthly: number, months: number) {
+/**
+ * Aylık bileşik model:
+ *
+ *   v[m] = v[m-1] × (1+getiri)  +  gelir[m]  −  gider[m]
+ *   gelir[m] = aylık ekleme ÷ (1+enflasyon)^m    ← enflasyon geliri DÜŞÜRÜR
+ *   gider[m] = aylık gider   × (1+enflasyon)^m   ← enflasyon gideri ARTIRIR
+ *
+ * Tek kaydırıcı makasın iki ağzını birden açıyor: koyabildiğin küçülürken
+ * çıkardığın büyüyor. Getiri oranına dokunulmaz — nominal getiriyi kullanıcı
+ * kendi kaydırıcısından ayarlıyor, onu ayrıca reel'e çevirmek aynı etkiyi
+ * üçüncü kez saymak olurdu.
+ *
+ * Portföy sıfırın altına DÜŞMEZ: para bittiği ay seri orada kesilir ve o ay
+ * `depletedAt` olarak döner. Eksiye sarkan bir eğri hem ekseni mahvediyor hem
+ * de gerçekte olmayan bir şeyi çiziyor — "planın burada bitiyor" demek daha
+ * doğru bir cevap.
+ */
+function project(
+  current: number, monthlyRate: number, monthly: number, months: number,
+  inflationRate: number, expense: number,
+) {
   const r = monthlyRate / 100;
-  const v: number[] = new Array(months + 1);
-  const c: number[] = new Array(months + 1);
+  const i = inflationRate / 100;
+  const v: (number | null)[] = new Array(months + 1).fill(null);
+  const c: (number | null)[] = new Array(months + 1).fill(null);
   v[0] = current;
   c[0] = current;
+  let depletedAt: number | null = null;
+  let f = 1; // (1+i)^m — her ay bir kez çarpılır, pow çağrısına gerek yok
   for (let m = 1; m <= months; m++) {
-    v[m] = v[m - 1] * (1 + r) + monthly;
-    c[m] = c[m - 1] + monthly;
+    f *= 1 + i;
+    const income = monthly / f;
+    const cost = expense * f;
+    const next = (v[m - 1] as number) * (1 + r) + income - cost;
+    const net = (c[m - 1] as number) + income - cost;
+    if (next <= 0) {
+      v[m] = 0;
+      c[m] = net;
+      depletedAt = m;
+      break; // kalan aylar null kalır → çizgi orada biter
+    }
+    v[m] = next;
+    c[m] = net;
   }
-  return { value: v, contributed: c };
+  return { value: v, contributed: c, depletedAt };
 }
 
-type Scen = { slot: number; name: string; rate: number; monthlyTry: number; months: number };
+type Scen = {
+  slot: number; name: string; rate: number; monthlyTry: number; months: number;
+  inflation: number; expenseTry: number;
+};
 const toScen = (s: ProjectionScenario): Scen => ({
   slot: s.slot, name: s.name, rate: Number(s.monthly_rate),
   monthlyTry: Number(s.monthly_try), months: s.months,
+  inflation: Number(s.monthly_inflation), expenseTry: Number(s.monthly_expense_try),
 });
 const same = (a: Scen, b: Scen) =>
-  a.name === b.name && a.rate === b.rate && a.monthlyTry === b.monthlyTry && a.months === b.months;
+  a.name === b.name && a.rate === b.rate && a.monthlyTry === b.monthlyTry &&
+  a.months === b.months && a.inflation === b.inflation && a.expenseTry === b.expenseTry;
 
 export default function Projection({ current, cur, rate: fx, scenarios }: {
   current: number; cur: Cur; rate: number; scenarios: ProjectionScenario[];
 }) {
   const unit = curSymbol(cur);
   const cfg = MONTHLY[cur];
+  // Gider kaydırıcısının tavanı şemadaki 200.000 ₺ sınırını AŞAMAZ; USD
+  // görünümünde tavan kurdan türetilip adım katına yuvarlanır.
+  const expStep = cur === 'USD' ? 50 : 1000;
+  const expMax = cur === 'USD'
+    ? Math.max(expStep, Math.floor(EXPENSE_TRY_MAX / (fx > 0 ? fx : 1) / expStep) * expStep)
+    : EXPENSE_TRY_MAX;
 
   // İki kopya: `list` düzenlenen çalışma kopyası, `saved` en son kaydedilen
   // hâli. Farkları "kaydedilmemiş değişiklik var" rozetini besliyor — kullanıcı
@@ -105,7 +154,7 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
   const visible = list.filter((s) => !hidden.has(s.slot));
   const dirty = cursel && !same(cursel, saved.find((s) => s.slot === cursel.slot)!);
 
-  const { rows, stat } = useMemo(() => {
+  const { rows, stat, depleted } = useMemo(() => {
     // Ortak eksen = görünür senaryoların EN UZUNU. Kısa senaryolar kendi
     // sürelerinden sonra null bırakılır (connectNulls=false), yani eğri
     // uzatılmış gibi görünmez.
@@ -113,7 +162,10 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
     const stride = Math.max(1, Math.ceil(span / 36));
 
     const series = new Map<number, ReturnType<typeof project>>();
-    for (const s of list) series.set(s.slot, project(current, s.rate, toView(s.monthlyTry), s.months));
+    for (const s of list) {
+      series.set(s.slot, project(
+        current, s.rate, toView(s.monthlyTry), s.months, s.inflation, toView(s.expenseTry)));
+    }
 
     type Row = { m: number; label: string; anapara: number | null } & Record<string, number | string | null>;
     const pts: Row[] = [];
@@ -127,21 +179,39 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
       const row = { m, label, anapara: null } as Row;
       for (const s of visible) {
         const p = series.get(s.slot)!;
-        row[`s${s.slot}`] = m <= s.months ? Math.round(p.value[m]) : null;
+        const v = m <= s.months ? p.value[m] : null;
+        row[`s${s.slot}`] = v == null ? null : Math.round(v);
       }
-      // "Yatırılan" çizgisi yalnız SEÇİLİ senaryo için: beş anapara çizgisi
+      // "Net katkı" çizgisi yalnız SEÇİLİ senaryo için: beş katkı çizgisi
       // aynı eksende hiçbir soruyu cevaplamıyor, sadece gürültü.
       if (cursel && m <= cursel.months) {
-        row.anapara = Math.round(series.get(cursel.slot)!.contributed[m]);
+        const cv = series.get(cursel.slot)!.contributed[m];
+        row.anapara = cv == null ? null : Math.round(cv);
       }
       pts.push(row);
     }
 
+    // Özet, senaryonun GERÇEKTEN ulaştığı son aya bakar: para tükendiyse
+    // seri orada bitiyor, `months`'taki hücre boş.
     const p = cursel ? series.get(cursel.slot)! : null;
-    const st = p && cursel
-      ? { final: p.value[cursel.months], contributed: p.contributed[cursel.months] }
-      : { final: current, contributed: current };
-    return { rows: pts, stat: st };
+    const end = p ? (p.depletedAt ?? cursel!.months) : 0;
+    const st = p
+      ? {
+          final: (p.value[end] as number) ?? current,
+          contributed: (p.contributed[end] as number) ?? current,
+          depletedAt: p.depletedAt,
+        }
+      : { final: current, contributed: current, depletedAt: null as number | null };
+
+    // Grafikte çizilen senaryolardan hangileri tükeniyor — altta adlarıyla
+    // yazılacak. Yalnız görünür olanlar: gizli bir eğri için uyarı vermek
+    // kullanıcıyı olmayan bir çizgiyi aramaya gönderiyor.
+    const dep = visible
+      .map((sc) => ({ name: sc.name, at: series.get(sc.slot)!.depletedAt }))
+      .filter((d): d is { name: string; at: number } => d.at != null)
+      .sort((x, y) => x.at - y.at);
+
+    return { rows: pts, stat: st, depleted: dep };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list, hidden, current, cur, fx, sel]);
 
@@ -176,6 +246,8 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
       fd.set('monthly_rate', String(cursel.rate));
       fd.set('monthly_try', String(Math.round(cursel.monthlyTry * 100) / 100));
       fd.set('months', String(cursel.months));
+      fd.set('monthly_inflation', String(cursel.inflation));
+      fd.set('monthly_expense_try', String(Math.round(cursel.expenseTry * 100) / 100));
       const res = await saveProjectionScenario(fd);
       if (res.ok) {
         setSaved((prev) => prev.map((s) => (s.slot === cursel.slot ? { ...cursel } : s)));
@@ -238,9 +310,14 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
       </div>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
-        <Stat label={`${durShort(cursel.months)} sonra`} value={`${fmtC(stat.final)} ${unit}`} tone="text" />
-        <Stat label="Yatırılan" value={`${fmtC(stat.contributed)} ${unit}`} tone="muted" />
-        <Stat label="Getiri" value={`${fmtC(growth)} ${unit}`} tone="up" />
+        {stat.depletedAt != null
+          ? <Stat label="Para bitiyor" value={durText(stat.depletedAt)} tone="down" />
+          : <Stat label={`${durShort(cursel.months)} sonra`} value={`${fmtC(stat.final)} ${unit}`} tone="text" />}
+        {/* Gider çıktığı için bu artık "yatırılan" değil NET akış: konulan
+            eksi çıkarılan. Adı da onu söylemeli, yoksa gider girildiğinde
+            küçülen sayı hata gibi görünüyor. */}
+        <Stat label="Net katkı" value={`${fmtC(stat.contributed)} ${unit}`} tone="muted" />
+        <Stat label="Getiri" value={`${fmtC(growth)} ${unit}`} tone={growth >= 0 ? 'up' : 'down'} />
       </div>
 
       <div className="w-full h-[200px] sm:h-[240px]">
@@ -262,7 +339,7 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
 
             {/* Anapara en altta — referans çizgisi, veri değil. */}
             <Line
-              dataKey="anapara" name="Yatırılan" type="monotone"
+              dataKey="anapara" name="Net katkı" type="monotone"
               stroke={CONTRIB_COLOR} strokeWidth={1} strokeDasharray="3 3"
               dot={false} isAnimationActive={false} connectNulls={false} />
 
@@ -282,6 +359,14 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {depleted.length > 0 && (
+        <p className="t-micro mt-2" style={{ color: 'var(--down)' }}>
+          {depleted.map((d) => `${d.name}: ${durText(d.at)}`).join(' · ')} —
+          {depleted.length > 1 ? ' bu senaryolarda' : ' bu senaryoda'} portföy sıfırlanıyor,
+          eğri orada bitiyor.
+        </p>
+      )}
 
       {/* Lejant — hangi senaryoların üst üste çizildiğini açar/kapatır.
           Grafiğin üstündeki düğme sırası DÜZENLEME seçimi, burası GÖRÜNÜRLÜK;
@@ -337,12 +422,24 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
         </div>
         <Slider label="Aylık getiri" value={`%${pct(cursel.rate)}`} min={0} max={20} step={0.1}
           v={cursel.rate} set={(n) => patch({ rate: n })} />
+        <Slider label="Aylık enflasyon" value={`%${pct(cursel.inflation)}`} min={0} max={10} step={0.1}
+          v={cursel.inflation} set={(n) => patch({ inflation: n })} />
         <Slider label="Aylık ekleme" value={`${fmt(toView(cursel.monthlyTry))} ${unit}`}
           min={0} max={cfg.max} step={cfg.step}
           v={toView(cursel.monthlyTry)} set={(n) => patch({ monthlyTry: toTry(n) })} />
+        <Slider label="Aylık gider" value={`${fmt(toView(cursel.expenseTry))} ${unit}`}
+          min={0} max={expMax} step={expStep}
+          v={Math.min(toView(cursel.expenseTry), expMax)} set={(n) => patch({ expenseTry: toTry(n) })} />
         <Slider label="Süre" value={durText(cursel.months)} min={1} max={MAX_MONTHS} step={1}
           v={cursel.months} set={(n) => patch({ months: n })} />
       </div>
+
+      <p className="t-micro mt-3" style={{ color: 'var(--faint)' }}>
+        Enflasyon iki yönden birden çalışır: aylık eklemeyi her ay
+        (1+enflasyon) kadar <b style={{ color: 'var(--muted)' }}>küçültür</b>, aylık gideri aynı oranda
+        <b style={{ color: 'var(--muted)' }}> büyütür</b>. Getiri oranı nominaldir, ona dokunmaz.
+        Portföy sıfırlanırsa eğri o ayda biter.
+      </p>
 
       <div className="flex items-center gap-3 mt-4 flex-wrap">
         <button
@@ -377,8 +474,10 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone: 'text' | 'muted' | 'up' }) {
-  const c = tone === 'up' ? 'var(--up)' : tone === 'muted' ? 'var(--muted)' : 'var(--text)';
+function Stat({ label, value, tone }: { label: string; value: string; tone: 'text' | 'muted' | 'up' | 'down' }) {
+  const c = tone === 'up' ? 'var(--up)'
+    : tone === 'down' ? 'var(--down)'
+    : tone === 'muted' ? 'var(--muted)' : 'var(--text)';
   return (
     <div>
       <div className="t-label mb-0.5 truncate" style={{ color: 'var(--muted)' }}>{label}</div>
