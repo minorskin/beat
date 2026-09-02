@@ -89,13 +89,13 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
 
   return (
     <div className="panel p-3 sm:p-5 flex flex-col">
-      <h2 className="text-[15px] font-medium mb-2" style={{ color: 'var(--muted)' }}>Varlık Dağılımı</h2>
+      <h2 className="t-head font-medium mb-2" style={{ color: 'var(--muted)' }}>Varlık Dağılımı</h2>
 
       <div ref={boxRef} className="relative w-full h-[220px] sm:h-[260px] overflow-hidden rounded-[var(--r-sm)]">
         {rects.map((r) => {
           const share = (r.value / total) * 100;
           const t = Math.sqrt(r.value / max);
-          const big = r.w > 54 && r.h > 26;
+          const big = r.w > 62 && r.h > 30;
           return (
             <div
               key={r.symbol}
@@ -111,8 +111,8 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
             >
               {big && (
                 <>
-                  <div className="text-[12.5px] font-medium truncate">{r.symbol}</div>
-                  {r.h > 42 && <div className="text-[11.5px] tnum truncate opacity-90">%{num(share, 1)}</div>}
+                  <div className="t-label font-medium truncate">{r.symbol}</div>
+                  {r.h > 48 && <div className="t-micro tnum truncate opacity-90">%{num(share, 1)}</div>}
                 </>
               )}
             </div>
@@ -122,7 +122,7 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-3">
         {groups.map((g) => (
-          <div key={g.name} className="flex items-center gap-2 text-[12.5px] min-w-0">
+          <div key={g.name} className="flex items-center gap-2 t-label min-w-0">
             <span
               className="w-2 h-2 rounded-[2px] shrink-0"
               style={{ background: tone(Math.sqrt(g.value / (groups[0]?.value || 1))) }} />

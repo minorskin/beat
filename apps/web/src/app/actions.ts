@@ -326,6 +326,42 @@ export async function removeAnnualClosing(formData: FormData): Promise<Result> {
   return { ok: true };
 }
 
+/**
+ * Bir projeksiyon senaryosunu (slot 1-5) günceller. Ekleme/silme YOK: slotlar
+ * migration'da sabitlendi, "yeni senaryo" boş bir slotun üzerine yazmaktır.
+ * Böylece grafikteki renk↔senaryo eşlemesi hiç kaymaz.
+ *
+ * Bilerek `revalidatePath` çağırmıyoruz: bileşen zaten düzenlediği değeri
+ * elinde tutuyor, sayfayı yeniden çizmek onlarca sorguyu boşuna tekrar
+ * çalıştırırdı. Kayıt bir sonraki gerçek yüklemede sunucudan gelir.
+ */
+export async function saveProjectionScenario(formData: FormData): Promise<Result> {
+  const slot = Number(String(formData.get('slot') || ''));
+  if (!Number.isInteger(slot) || slot < 1 || slot > 5) return { ok: false, error: 'Senaryo yok' };
+
+  const name = String(formData.get('name') || '').trim();
+  if (!name) return { ok: false, error: 'Senaryo adı boş olamaz' };
+  if (name.length > 24) return { ok: false, error: 'Senaryo adı en fazla 24 karakter' };
+
+  const rate = Number(String(formData.get('monthly_rate') || ''));
+  if (!Number.isFinite(rate) || rate < 0 || rate > 20) return { ok: false, error: 'Aylık getiri 0-20 arası olmalı' };
+
+  // Aylık ekleme her zaman TL saklanır; USD görünümündeyken istemci çevirip
+  // gönderir. Kur 0 gelirse çevrim yapılamaz — sessizce sıfır yazmak yerine hata.
+  const monthlyTry = parseAmount(String(formData.get('monthly_try') || ''));
+  if (monthlyTry == null || monthlyTry < 0) return { ok: false, error: 'Aylık ekleme geçersiz' };
+
+  const months = Number(String(formData.get('months') || ''));
+  if (!Number.isInteger(months) || months < 1 || months > 360) return { ok: false, error: 'Süre 1-360 ay arası olmalı' };
+
+  await q(
+    `update projection_scenarios
+        set name=$2, monthly_rate=$3, monthly_try=$4, months=$5, updated_at=now()
+      where slot=$1`,
+    [slot, name, rate, monthlyTry, months]);
+  return { ok: true };
+}
+
 export async function logout() {
   'use server';
   const { cookies } = await import('next/headers');

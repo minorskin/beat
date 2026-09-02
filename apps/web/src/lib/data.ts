@@ -431,3 +431,20 @@ export async function getPeriodMovers(): Promise<PeriodMovers> {
   }
   return out;
 }
+
+/**
+ * Büyüme projeksiyonunun beş sabit senaryo slotu (bkz. migration 0010).
+ *
+ * `monthly_try` TL cinsindendir — sayfa USD görünümündeyken bileşen güncel
+ * kurla çevirir. Slot numarası aynı zamanda grafikteki rengi belirler, o
+ * yüzden sıra korunarak okunur.
+ */
+export interface ProjectionScenario {
+  slot: number; name: string; monthly_rate: number; monthly_try: number; months: number;
+}
+
+export async function getProjectionScenarios(): Promise<ProjectionScenario[]> {
+  return q<ProjectionScenario>(
+    `select slot, name, monthly_rate, monthly_try, months
+       from projection_scenarios order by slot`);
+}

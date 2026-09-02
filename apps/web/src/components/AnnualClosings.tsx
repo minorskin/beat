@@ -28,10 +28,10 @@ export default function AnnualClosingsDialog({ rows, onClose }: { rows: AnnualCl
             className="sheet w-full sm:max-w-md p-4 sm:p-5 max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-[15px] font-medium">Yıl Kapanışları</h2>
-              <button type="button" onClick={reset} className="seg text-[16px] leading-none" aria-label="Kapat">✕</button>
+              <h2 className="t-head font-medium">Yıl Kapanışları</h2>
+              <button type="button" onClick={reset} className="seg t-icon leading-none" aria-label="Kapat">✕</button>
             </div>
-            <p className="text-[12.5px] mb-3" style={{ color: 'var(--faint)' }}>
+            <p className="t-label mb-3" style={{ color: 'var(--faint)' }}>
               Motor devreye girmeden önceki yılların yıl sonu toplamı. Grafikte
               üst bardaki <span className="tnum">TÜM</span> aralığında görünür.
               Varlık kırılımı olmadığı için yalnız toplam çizilir.
@@ -40,18 +40,18 @@ export default function AnnualClosingsDialog({ rows, onClose }: { rows: AnnualCl
             {rows.length > 0 && (
               <div className="mb-3">
                 {rows.map((r) => (
-                  <div key={r.year} className="flex items-baseline gap-2 text-[13.5px] py-1.5">
+                  <div key={r.year} className="flex items-baseline gap-2 t-body py-1.5">
                     <span className="tnum font-medium w-10 shrink-0">{r.year}</span>
                     <span className="tnum truncate">{tl(r.total_value_try)}</span>
                     {r.total_value_usd != null && (
-                      <span className="tnum text-[12.5px] shrink-0" style={{ color: 'var(--muted)' }}>
+                      <span className="tnum t-label shrink-0" style={{ color: 'var(--muted)' }}>
                         {usd(r.total_value_usd)}
                       </span>
                     )}
                     <span className="ml-auto flex gap-2 shrink-0">
                       <button
                         type="button" onClick={() => { setEdit(r); setMsg(''); }}
-                        className="text-[12.5px] underline underline-offset-2" style={{ color: 'var(--muted)' }}
+                        className="t-label underline underline-offset-2" style={{ color: 'var(--muted)' }}
                       >
                         düzenle
                       </button>
@@ -63,7 +63,7 @@ export default function AnnualClosingsDialog({ rows, onClose }: { rows: AnnualCl
                           const res = await removeAnnualClosing(fd);
                           setMsg(res.ok ? `${r.year} silindi` : res.error || 'Silinemedi');
                         })}
-                        className="text-[12.5px] underline underline-offset-2" style={{ color: 'var(--down)' }}
+                        className="t-label underline underline-offset-2" style={{ color: 'var(--down)' }}
                       >
                         sil
                       </button>
@@ -82,7 +82,7 @@ export default function AnnualClosingsDialog({ rows, onClose }: { rows: AnnualCl
               })}
               className="grid grid-cols-2 gap-3"
             >
-              <label className="col-span-2 sm:col-span-1 text-[12.5px]" style={{ color: 'var(--muted)' }}>
+              <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
                 Yıl
                 <input
                   name="year" required inputMode="numeric" className="field mt-1 tnum"
@@ -90,7 +90,7 @@ export default function AnnualClosingsDialog({ rows, onClose }: { rows: AnnualCl
                 />
               </label>
 
-              <label className="col-span-2 sm:col-span-1 text-[12.5px]" style={{ color: 'var(--muted)' }}>
+              <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
                 Toplam (₺)
                 <input
                   name="total_value_try" required inputMode="decimal" className="field mt-1 tnum"
@@ -98,7 +98,7 @@ export default function AnnualClosingsDialog({ rows, onClose }: { rows: AnnualCl
                 />
               </label>
 
-              <label className="col-span-2 text-[12.5px]" style={{ color: 'var(--muted)' }}>
+              <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
                 Toplam ($) <span style={{ color: 'var(--faint)' }}>— isteğe bağlı</span>
                 <input
                   name="total_value_usd" inputMode="decimal" className="field mt-1 tnum"
@@ -109,7 +109,7 @@ export default function AnnualClosingsDialog({ rows, onClose }: { rows: AnnualCl
                 </span>
               </label>
 
-              <label className="col-span-2 text-[12.5px]" style={{ color: 'var(--muted)' }}>
+              <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
                 Not <span style={{ color: 'var(--faint)' }}>— isteğe bağlı</span>
                 <input name="note" className="field mt-1" defaultValue={edit?.note ?? ''} placeholder="ör. yıl sonu ekstre" />
               </label>
@@ -121,7 +121,7 @@ export default function AnnualClosingsDialog({ rows, onClose }: { rows: AnnualCl
                 {edit && (
                   <button type="button" onClick={() => setEdit(null)} className="btn btn-ghost">Vazgeç</button>
                 )}
-                {msg && <span className="text-[13.5px]" style={{ color: 'var(--muted)' }}>{msg}</span>}
+                {msg && <span className="t-body" style={{ color: 'var(--muted)' }}>{msg}</span>}
               </div>
             </form>
       </div>

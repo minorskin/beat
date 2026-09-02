@@ -29,6 +29,50 @@
   --r-sm: 4px;
 }
 
+/* ── Tipografi ölçeği ───────────────────────────────────────────────────────
+   Bütün punto kararları burada toplanır; bileşenlerde tek tek px yazılmaz.
+   Kademeler arası ORAN iki ekranda da aynı — mobilde bütün kademeler birlikte
+   büyür, yani hiyerarşi korunurken metin okunur hale gelir.
+
+   Dar ekranda puntoyu küçültmek yerine BÜYÜTÜYORUZ: telefonda okuma mesafesi
+   masaüstünden kısa değil, yalnız ekran küçük. Kazanılacak birkaç piksel,
+   okunmayan bir sayıdan daha değersiz. */
+:root {
+  --t-micro:  12.5px;  /* kutu içi alt satır, rozet — en küçük kademe */
+  --t-label:  14px;    /* ikincil etiket, yardımcı açıklama */
+  --t-body:   15px;    /* tablo verisi, gövde metni */
+  --t-strong: 16px;    /* vurgulu sayı satırı */
+  --t-head:   17px;    /* panel başlığı */
+  --t-icon:   18px;    /* kapat (✕) gibi tek karakterlik dokunma hedefleri */
+
+  /* Ekranla birlikte kademe atlayanlar (eski text-[a] sm:text-[b] çiftleri) */
+  --t-sub:    14px;    /* başlık altı açıklama */
+  --t-h2:     19px;    /* sekme başlığı */
+  --t-kpi:    24px;    /* toplam varlık — sayfanın en büyük sayısı */
+}
+@media (min-width: 640px) {
+  :root { --t-sub: 15px; --t-h2: 21px; --t-kpi: 29px; }
+}
+@media (max-width: 639.98px) {
+  :root {
+    --t-micro:  13px;
+    --t-label:  14.5px;
+    --t-body:   15.5px;
+    --t-strong: 16.5px;
+    --t-head:   17.5px;
+  }
+}
+
+.t-micro  { font-size: var(--t-micro); }
+.t-label  { font-size: var(--t-label); }
+.t-body   { font-size: var(--t-body); }
+.t-strong { font-size: var(--t-strong); }
+.t-head   { font-size: var(--t-head); }
+.t-icon   { font-size: var(--t-icon); }
+.t-sub    { font-size: var(--t-sub); }
+.t-h2     { font-size: var(--t-h2); }
+.t-kpi    { font-size: var(--t-kpi); }
+
 html, body {
   background: var(--bg);
   color: var(--text);
@@ -54,7 +98,7 @@ body {
   color: var(--text);
   border-radius: var(--r-sm);
   padding: 0.55rem 0.65rem;
-  font-size: 0.9375rem;
+  font-size: var(--t-body);
   appearance: none;
   transition: background 0.15s ease;
 }
@@ -74,9 +118,9 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 /* Butonlar */
 .btn {
   border-radius: var(--r-sm);
-  font-size: 0.9375rem;
+  font-size: var(--t-body);
   padding: 0.5rem 0.85rem;
-  line-height: 1.25rem;
+  line-height: 1.3;
   white-space: nowrap;
   transition: background 0.15s ease, opacity 0.15s ease;
   cursor: pointer;
@@ -93,8 +137,8 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 /* Segment / sekme */
 .seg {
   border-radius: var(--r-sm);
-  font-size: 0.8125rem;
-  padding: 0.3rem 0.6rem;
+  font-size: var(--t-label);
+  padding: 0.32rem 0.62rem;
   background: transparent;
   color: var(--muted);
   transition: background 0.15s ease, color 0.15s ease;
@@ -103,7 +147,7 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 .seg:hover { background: var(--panel-2); color: var(--text); }
 .seg-on { background: var(--panel-3); color: var(--text); }
 /* Üst bardaki iki satırlı dönem seçicisine sığan dar varyant. */
-.seg-xs { padding: 0.15rem 0.3rem; font-size: 0.6875rem; line-height: 1rem; }
+.seg-xs { padding: 0.2rem 0.36rem; font-size: var(--t-micro); line-height: 1.15; }
 .seg-on:hover { background: var(--panel-3); }
 
 /* Tablo — çizgi yok, tüm ana satırlar aynı koyu ton + hover */
@@ -140,8 +184,8 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 
 .navlink {
   border-radius: var(--r-sm);
-  padding: 0.35rem 0.6rem;
-  font-size: 0.875rem;
+  padding: 0.38rem 0.65rem;
+  font-size: var(--t-body);
   font-weight: 500;
   color: var(--muted);
   white-space: nowrap;
@@ -210,7 +254,6 @@ input[type="range"]::-moz-range-thumb {
 
 /* Mobil okunabilirlik: 16px altındaki girdiler iOS'ta odaklanınca sayfayı
    yakınlaştırıyor — dar ekranda form alanlarını 16px'e sabitliyoruz. */
-@media (max-width: 640px) {
-  .field { font-size: 1rem; padding: 0.6rem 0.7rem; }
-  .btn { font-size: 0.9375rem; }
+@media (max-width: 639.98px) {
+  .field { font-size: 16px; padding: 0.6rem 0.7rem; }
 }

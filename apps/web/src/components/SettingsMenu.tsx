@@ -80,7 +80,7 @@ export default function SettingsMenu({
           >
             Yıl Kapanışları
             {closings.length > 0 && (
-              <span className="ml-auto tnum text-[12.5px]" style={{ color: 'var(--faint)' }}>{closings.length}</span>
+              <span className="ml-auto tnum t-label" style={{ color: 'var(--faint)' }}>{closings.length}</span>
             )}
           </MenuItem>
 
@@ -119,7 +119,7 @@ export default function SettingsMenu({
 function MenuGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mb-2 last:mb-0">
-      <div className="text-[11px] mb-1 px-0.5" style={{ color: 'var(--faint)' }}>{label}</div>
+      <div className="t-micro mb-1 px-0.5" style={{ color: 'var(--faint)' }}>{label}</div>
       <div className="flex gap-1">{children}</div>
     </div>
   );
@@ -144,7 +144,7 @@ function MenuItem({ icon, onClick, children }: {
   return (
     <button
       type="button" role="menuitem" onClick={onClick}
-      className="menu-item w-full flex items-center gap-2 px-1.5 py-1.5 text-[13.5px] rounded"
+      className="menu-item w-full flex items-center gap-2 px-1.5 py-1.5 t-body rounded"
       style={{ color: 'var(--muted)' }}
     >
       {icon}

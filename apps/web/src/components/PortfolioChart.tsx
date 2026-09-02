@@ -149,10 +149,20 @@ export default function PortfolioChart({
     return next;
   });
 
+  // "HEPSİ" — tek tıkla bütün serileri kapatıp boş bir eksene bakmak (ya da
+  // hepsini geri açmak) için. Tek tek 12 çizgiyi kapatmak, bir varlığı yalnız
+  // görmek isteyen için katlanılmaz bir iş: kapat-hepsini + tek tık aç, iki
+  // hamlede aynı yere varıyor.
+  const allKeys = [TOTAL_KEY, ...symbols];
+  const allOn = allKeys.every((k) => !hidden.has(k));
+  // Kısmi seçimde düğme "kapalı" görünür; o hâlde tıklamanın hepsini AÇMASI
+  // beklenir. Bu yüzden karar görünen duruma bağlanıyor, gizlenen sayısına değil.
+  const toggleAll = () => setHidden(allOn ? new Set(allKeys) : new Set());
+
   return (
     <div className="panel p-3 sm:p-5">
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-        <h2 className="text-[15px] font-medium" style={{ color: 'var(--muted)' }}>
+        <h2 className="t-head font-medium" style={{ color: 'var(--muted)' }}>
           Varlık Değişimi
           {yearly
             ? <span style={{ color: 'var(--faint)' }}> · yıl kapanışları</span>
@@ -173,8 +183,8 @@ export default function PortfolioChart({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ left: 0, right: 6, top: 4, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="#232323" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#a8a8a8' }} minTickGap={40} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={fmtY} tick={{ fontSize: 11, fill: '#a8a8a8' }} width={52} axisLine={false} tickLine={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 12.5, fill: '#a8a8a8' }} minTickGap={40} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={fmtY} tick={{ fontSize: 12.5, fill: '#a8a8a8' }} width={52} axisLine={false} tickLine={false} />
             {mode === 'pct' && <ReferenceLine y={0} stroke="#3d3d3d" />}
             <Tooltip
               cursor={{ stroke: '#3d3d3d', strokeWidth: 1 }}
@@ -199,7 +209,7 @@ export default function PortfolioChart({
       </div>
 
       {mode === 'pct' && !yearly && (
-        <p className="text-[12.5px] mt-2" style={{ color: 'var(--faint)' }}>
+        <p className="t-label mt-2" style={{ color: 'var(--faint)' }}>
           Oranlar birim değer (fiyat) üzerinden — alım, satım ve para eklemesi
           eğriyi bozmaz. TOPLAM, her adımın ağırlıklı getirisinin zinciri.
           Yatırılan tutarı görmek için “Değer”e geç.
@@ -207,7 +217,7 @@ export default function PortfolioChart({
       )}
 
       {yearly && (
-        <p className="text-[12.5px] mt-2" style={{ color: 'var(--faint)' }}>
+        <p className="t-label mt-2" style={{ color: 'var(--faint)' }}>
           Elle girilen yıl sonu toplamları + bugünkü değer. Bu yıllarda varlık
           kırılımı yok; emanet ayrımı da uygulanmaz (toplam gösterilir).
         </p>
@@ -215,6 +225,24 @@ export default function PortfolioChart({
 
       {/* Yatay lejant — tıklayınca ilgili çizgi açılıp kapanır */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3">
+        <button
+          onClick={toggleAll}
+          aria-pressed={allOn}
+          title={allOn ? 'Hepsini gizle' : 'Hepsini göster'}
+          className="flex items-center gap-1.5 t-label leading-none py-0.5 cursor-pointer"
+          style={{ color: allOn ? 'var(--text)' : 'var(--muted)' }}
+        >
+          {/* Renk çubuğu yerine kutu: bu bir seri değil, seri anahtarı. */}
+          <span
+            className="inline-block shrink-0 rounded-[2px]"
+            style={{
+              width: 11, height: 11,
+              background: allOn ? 'var(--text)' : 'transparent',
+              boxShadow: `inset 0 0 0 1.5px ${allOn ? 'var(--text)' : 'var(--faint)'}`,
+            }} />
+          HEPSİ
+        </button>
+        <span className="shrink-0" style={{ width: 1, height: 12, background: 'var(--panel-3)' }} />
         <LegendChip label="TOPLAM" color={TOTAL_COLOR} on={!hidden.has(TOTAL_KEY)} onClick={() => toggle(TOTAL_KEY)} />
         {symbols.map((sym) => (
           <LegendChip
@@ -237,7 +265,7 @@ function LegendChip({ label, color, dashed, on, onClick }: {
       onClick={onClick}
       aria-pressed={on}
       title={on ? `${label} — gizle` : `${label} — göster`}
-      className="flex items-center gap-1.5 text-[12.5px] leading-none py-0.5 cursor-pointer transition-opacity"
+      className="flex items-center gap-1.5 t-label leading-none py-0.5 cursor-pointer transition-opacity"
       style={{ opacity: on ? 1 : 0.35, color: on ? color : 'var(--muted)' }}
     >
       <span
@@ -263,7 +291,7 @@ function ChartTooltip({ active, payload, label, fmt }:
   const shown = items.slice(0, 8);
   return (
     <div style={{
-      background: '#1c1c1c', borderRadius: 4, fontSize: 13, padding: '8px 10px',
+      background: '#1c1c1c', borderRadius: 4, fontSize: 14.5, padding: '8px 10px',
       boxShadow: '0 4px 16px rgba(0,0,0,0.5)', minWidth: 140,
     }}>
       <div style={{ color: '#a8a8a8', marginBottom: 4 }}>{label}</div>

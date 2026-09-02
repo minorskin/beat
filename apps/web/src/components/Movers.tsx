@@ -69,11 +69,11 @@ function Card({ title, note, up, down, empty }: {
   return (
     <div className="panel p-3 sm:p-4 flex flex-col">
       <div className="min-w-0 mb-2">
-        <div className="text-[12.5px] truncate" style={{ color: 'var(--muted)' }}>{title}</div>
-        <div className="text-[11px] truncate" style={{ color: 'var(--faint)' }}>{note}</div>
+        <div className="t-label truncate" style={{ color: 'var(--muted)' }}>{title}</div>
+        <div className="t-micro truncate" style={{ color: 'var(--faint)' }}>{note}</div>
       </div>
       {empty ? (
-        <div className="text-[12.5px] flex-1 flex items-center" style={{ color: 'var(--faint)' }}>
+        <div className="t-label flex-1 flex items-center" style={{ color: 'var(--faint)' }}>
           Bu dönem için yeterli geçmiş yok.
         </div>
       ) : (
@@ -89,13 +89,13 @@ function Card({ title, note, up, down, empty }: {
 function List({ label, items }: { label: string; items: Item[] }) {
   return (
     <>
-      <div className="text-[11px] mb-1 truncate" style={{ color: 'var(--faint)' }}>{label}</div>
+      <div className="t-micro mb-1 truncate" style={{ color: 'var(--faint)' }}>{label}</div>
       {items.length === 0 ? (
-        <div className="text-[12.5px]" style={{ color: 'var(--faint)' }}>—</div>
+        <div className="t-label" style={{ color: 'var(--faint)' }}>—</div>
       ) : (
         <ol className="space-y-1">
           {items.map((m) => (
-            <li key={m.symbol} className="flex items-baseline justify-between gap-2 text-[12.5px] min-w-0">
+            <li key={m.symbol} className="flex items-baseline justify-between gap-2 t-label min-w-0">
               <span className="truncate">{m.symbol}</span>
               <span className="tnum shrink-0" style={{ color: m.positive ? 'var(--up)' : 'var(--down)' }}>{m.text}</span>
             </li>
