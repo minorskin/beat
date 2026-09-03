@@ -32,15 +32,25 @@ export interface Candidate {
 }
 
 /**
- * TEFAS NAV'ının yayınlandığı saat (Europe/Istanbul).
+ * TEFAS tarama penceresi (Europe/Istanbul) — hafta içi [06:00, 10:00).
  *
- * Tahmin değil ölçüm: saatlik position_snapshots'ta fonların `price_ts` alanı
- * iki gün üst üste 06:00 ile 07:00 arasında yeni NAV'a atladı, sonra ertesi
- * sabaha kadar hiç kıpırdamadı. Pencereyi 06:00'da açıyoruz — bir saat erken
- * başlamak veri kaybettirmez, yalnız ilk sorguyu boşa çıkarır; geç başlamak
- * ise NAV'ı saatlerce geç yakalamak demek olurdu.
+ * Alt sınır tahmin değil ölçüm: saatlik position_snapshots'ta fonların
+ * `price_ts` alanı iki gün üst üste 06:00 ile 07:00 arasında yeni NAV'a atladı,
+ * sonra ertesi sabaha kadar hiç kıpırdamadı. 06:00 bir saat erken açar — veri
+ * kaybettirmez, yalnız ilk sorguyu boşa çıkarır.
+ *
+ * Üst sınır 10:00: NAV normalde ~07:00'de gelir, üç saat pay yeter. Tatilde
+ * (hafta içi ama NAV yok) tarama böylece gün boyu sürmez, dört saatte biter.
+ *
+ * BİLİNEN SINIR: TEFAS bir gün 10:00'dan SONRA yayınlarsa o günün NAV'ı hiç
+ * yazılmaz — ertesi sabah artık daha yeni bir satır olduğu için sağlayıcı onu
+ * alır ve seride o güne ait değer eksik kalır. Pencereyi kullanıcı bilerek bu
+ * aralığa çekti; bunu ortadan kaldırmanın yolu tek satır değil, sağlayıcının
+ * gördüğü 14 günlük pencerenin tamamını yazmasıdır (motor şu an enstrüman
+ * başına tek quote taşıyor, bu ayrı bir değişiklik).
  */
 const FUND_POLL_FROM_HOUR = 6;
+const FUND_POLL_TO_HOUR = 10;
 
 /**
  * Aktif enstrümanları failover adaylarıyla (priority sırasında) döndürür.
@@ -51,11 +61,12 @@ const FUND_POLL_FROM_HOUR = 6;
  * Kapı üç koşullu:
  *
  *   1. Hafta içi mi?           (TEFAS hafta sonu NAV yayınlamaz)
- *   2. Yayın saati geçti mi?   (>= 06:00 TR)
+ *   2. Tarama penceresinde mi? (06:00 <= saat < 10:00 TR)
  *   3. Bugünün NAV'ı elimizde YOK mu?
  *
  * Üçü de sağlanıyorsa çekilir; NAV geldiği anda 3. koşul düşer ve fon o gün
- * bir daha sorgulanmaz. Günde ~144 istek yerine ~6.
+ * bir daha sorgulanmaz. Günde ~144 istek yerine ~6 (NAV gecikirse pencere
+ * dolduğunda en fazla ~24).
  *
  * FAIL-OPEN: hiç fiyatı olmayan enstrüman (yeni eklenmiş fon) pencereye ve
  * güne bakılmaksızın her turda çekilir. Aksi halde cumartesi eklenen bir fon
@@ -77,6 +88,7 @@ export async function loadCandidates(now?: Date): Promise<CandidatePlan> {
              or (
                extract(isodow from n.tr) <= 5
                and extract(hour from n.tr) >= ${FUND_POLL_FROM_HOUR}
+               and extract(hour from n.tr) < ${FUND_POLL_TO_HOUR}
                and not exists (
                  select 1 from prices p
                  where p.instrument_id = i.id

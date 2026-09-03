@@ -53,15 +53,23 @@ ilk alım girildiğinde satır kendiliğinden portföye geçer.
 | Döviz / Altın | 7/24 | saatlik |
 | BIST | 10:00–18:10 TR | piyasa saatleri |
 | ABD hisse/ETF | 09:30–16:00 NY | piyasa saatleri |
-| TEFAS fonları | sabah NAV (~07:00 TR) | günde 1 — NAV alınınca o gün susar |
+| TEFAS fonları | sabah NAV (07:00–10:00 TR) | hafta içi 06:00–10:00 taranır, NAV gelince susar |
 
 > **Fonlar tek istisna: motor onları her turda çekmez.** TEFAS günde bir NAV
-> yayınlıyor; saatlik snapshot'lardaki `price_ts` iki gün üst üste 06:00–07:00
-> arasında atladı, sonra ertesi sabaha kadar hiç kıpırdamadı. Bu yüzden fonlar
-> yalnız **hafta içi, 06:00 TR'den sonra ve o günün NAV'ı henüz elde değilse**
-> sorgulanır (`loadCandidates`, `FUND_POLL_FROM_HOUR`). NAV geldiği an fon o gün
-> bir daha sorgulanmaz: günde ~144 istek yerine ~6. Hiç fiyatı olmayan enstrüman
-> bu kapıya takılmaz (fail-open) — yeni eklenen fon hafta sonu bile çekilir.
+> yayınlıyor, o yüzden fonlar yalnız **hafta içi, 06:00 ≤ saat < 10:00 TR ve o
+> günün NAV'ı henüz elde değilse** sorgulanır (`loadCandidates`,
+> `FUND_POLL_FROM_HOUR` / `FUND_POLL_TO_HOUR`). NAV geldiği an fon o gün bir daha
+> sorgulanmaz: günde ~144 istek yerine ~6. Hiç fiyatı olmayan enstrüman bu kapıya
+> takılmaz (fail-open) — yeni eklenen fon hafta sonu bile çekilir.
+>
+> Yayın saatleri ölçüldü (saatlik `position_snapshots`'ta `price_ts`'in atladığı an):
+> THF 07:00 · 07:00 · 07:00 — DFI 09:00 · 08:00 — TLY 10:00 · 08:00 · 07:00.
+>
+> **Bilinen sınır:** TLY örneğindeki gibi NAV 10:00'a dayanır ya da geçerse o
+> günün değeri hiç yazılmaz — ertesi sabah artık daha yeni bir satır olduğu için
+> sağlayıcı onu alır ve seride o güne ait değer eksik kalır. Kalıcı çözüm
+> pencereyi büyütmek değil, sağlayıcının gördüğü 14 günlük pencerenin tamamını
+> yazmasıdır; motor şu an enstrüman başına tek quote taşıyor (ayrı bir iş).
 
 **EOD kesimi 02:00 TR'de** çalışır ve bir önceki işlem günü etiketlenir.
 Sebep: NYSE kapanışı yazın 23:00 TR, **kışın 00:00 TR (ertesi takvim günü)**. 02:00 her iki
