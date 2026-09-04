@@ -74,22 +74,30 @@ export default function PortfolioChart({
     // hareketi ölçülür — adetler bir önceki gözlemde sabitlenir — ve adımlar
     // çarpılarak birikir. Para giriş/çıkışı böylece eğriden tamamen düşer.
     let chain = 1;
-    // Etiket biçimi seçilen aralığa değil, verinin GERÇEK süresine bakar:
-    // portföy 18 saatlikken "1Y" seçilince eksende "30 Ağu" on bir kez
-    // tekrarlanıyordu — bu aralıkta ayırt edici olan saat, tarih değil.
+    // Etiket biçimini belirleyen şey serinin SÜRESİ değil, iki nokta ARASINDAKİ
+    // adımdır. Süreye bakan eski kural 102 saatlik seride saati atıyordu; oysa
+    // kova 4,25 saatti, yani günde ~5 gözlem vardı ve beşi de aynı "04 Eyl"
+    // etiketini taşıyordu — hangi okumaya bakıldığı ayırt edilemiyordu.
     const tz = 'Europe/Istanbul';
     const spanH = data.length > 1
       ? (new Date(data[data.length - 1].ts).getTime() - new Date(data[0].ts).getTime()) / 3.6e6
       : 0;
+    const stepH = data.length > 1 ? spanH / (data.length - 1) : 0;
     const fmt = new Intl.DateTimeFormat('tr-TR',
       spanH < 6 ? { timeZone: tz, hour: '2-digit', minute: '2-digit' }
-      : spanH < 72 ? { timeZone: tz, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }
       // Yıllar boyunca uzanan seride gün/ay etiketi okunmaz; yıl ayırt edicidir.
       : spanH > 24 * 400 ? { timeZone: tz, year: 'numeric', month: 'short' }
+      // Günde birden fazla gözlem varsa ayırt edici olan saattir.
+      : stepH < 20 ? { timeZone: tz, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }
       : { timeZone: tz, day: '2-digit', month: 'short' });
 
     return data.map((d, i) => {
-      const r: Row = { label: fmt.format(new Date(d.ts)) };
+      // x anahtarı SIRA NUMARASI, biçimlenmiş tarih DEĞİL. Etiket metni
+      // tekrar edebiliyor (aynı güne düşen gözlemler) ve recharts aynı
+      // kategoriyi tek noktaya indirdiği için 25 gözlem 6 noktaya çöküyordu:
+      // günün son okumasına hiç ulaşılamıyor, hep daha eski biri seçili
+      // kalıyordu. Sıra numarası benzersiz; okunur etiket tickFormatter'da.
+      const r: Row = { i, label: fmt.format(new Date(d.ts)) };
       const t = pickTotal(d);
       if (base[TOTAL_KEY] === undefined && t > 0) base[TOTAL_KEY] = t;
 
@@ -138,6 +146,9 @@ export default function PortfolioChart({
   const fmtV = (n: number) => mode === 'pct'
     ? `${n >= 0 ? '+' : ''}${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 2 }).format(n)}%`
     : `${new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(n)} ${unit}`;
+
+  // Eksen ve tooltip metni sıra numarasından okunur.
+  const labelOf = (i: number) => String(rows[i]?.label ?? '');
 
   // 1–3 noktalı seride "monotone" çizgi bir yol üretmiyor: aralık kısa ya da
   // geçmiş henüz kısaysa grafik bomboş görünüyordu. O durumda noktaları çiz.
@@ -192,13 +203,16 @@ export default function PortfolioChart({
                 veriye hiç ulaşılamıyordu. 16px'lik pay son noktaya rahat bir
                 yakalama alanı bırakır. */}
             <XAxis
-              dataKey="label" tick={{ fontSize: 12.5, fill: '#a8a8a8' }} minTickGap={40}
+              dataKey="i" type="category" tickFormatter={(v) => labelOf(Number(v))}
+              tick={{ fontSize: 12.5, fill: '#a8a8a8' }} minTickGap={56}
               padding={{ right: 16 }} axisLine={false} tickLine={false} />
             <YAxis tickFormatter={fmtY} tick={{ fontSize: 12.5, fill: '#a8a8a8' }} width={52} axisLine={false} tickLine={false} />
             {mode === 'pct' && <ReferenceLine y={0} stroke="#3d3d3d" />}
             <Tooltip
               cursor={{ stroke: '#3d3d3d', strokeWidth: 1 }}
-              content={(props) => <ChartTooltip {...props} fmt={fmtV} />} />
+              content={(props) => (
+                <ChartTooltip {...props} fmt={fmtV} labelText={labelOf(Number(props.label))} />
+              )} />
 
             {symbols.map((sym) => hidden.has(sym) ? null : (
               <Line
@@ -292,8 +306,8 @@ function LegendChip({ label, color, dashed, on, onClick }: {
 
 // Çok serili grafikte varsayılan tooltip okunmaz uzunlukta oluyor:
 // büyükten küçüğe sıralayıp ilk 8'i gösteriyoruz.
-function ChartTooltip({ active, payload, label, fmt }:
-  TooltipContentProps & { fmt: (n: number) => string }) {
+function ChartTooltip({ active, payload, labelText, fmt }:
+  TooltipContentProps & { fmt: (n: number) => string; labelText: string }) {
   if (!active || !payload?.length) return null;
   const items = [...payload]
     .filter((p) => p.value != null)
@@ -304,7 +318,7 @@ function ChartTooltip({ active, payload, label, fmt }:
       background: '#1c1c1c', borderRadius: 4, fontSize: 14.5, padding: '8px 10px',
       boxShadow: '0 4px 16px rgba(0,0,0,0.5)', minWidth: 140,
     }}>
-      <div style={{ color: '#a8a8a8', marginBottom: 4 }}>{label}</div>
+      <div style={{ color: '#a8a8a8', marginBottom: 4 }}>{labelText}</div>
       {shown.map((p) => (
         <div key={String(p.dataKey)} className="flex items-baseline justify-between gap-3">
           <span className="flex items-center gap-1.5" style={{ color: '#f4f4f4' }}>
