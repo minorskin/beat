@@ -13,7 +13,7 @@ const TX_LABEL: Record<string, string> = {
 const ANIM_MS = 160;
 const NO_LOC = '__konumsuz__'; // "konumu girilmemiş" için sentinel — gerçek konum adıyla çakışmaz
 
-type ColKey = 'symbol' | 'class' | 'currency' | 'location' | 'qty' | 'price' | 'value' | 'pnl' | 'weight' | 'opened' | 'closed';
+type ColKey = 'symbol' | 'class' | 'currency' | 'location' | 'qty' | 'avgCost' | 'price' | 'value' | 'pnl' | 'weight' | 'opened' | 'closed';
 type FilterKey = 'class' | 'currency' | 'location' | 'weight';
 type SortDir = 'asc' | 'desc';
 
@@ -142,6 +142,10 @@ export default function PositionsTable({
     { key: 'currency', label: 'Kur Riski', align: 'center', cls: 'px-3', filter: 'currency', sortVal: (p) => p.currency },
     { key: 'location', label: 'Konum', align: 'left', cls: 'px-3', filter: 'location', sortVal: (p) => p.locations.join(', ') },
     { key: 'qty', label: 'Adet', align: 'right', cls: 'px-3', sortVal: (p) => qtyOf(p) },
+    // Maliyet, Fiyat'ın hemen SOLUNDA: "birimine ne ödedim → bugün ne ediyor"
+    // yan yana okunsun. İkisi de fiyatın kendi para biriminde (avg_cost,
+    // v_holdings'te işlemlerin birim fiyatından türer; girilmemişse 0 → "—").
+    { key: 'avgCost', label: 'Ort. Maliyet', align: 'right', cls: 'px-3', sortVal: (p) => p.avg_cost ?? -Infinity },
     { key: 'price', label: 'Fiyat', align: 'right', cls: 'px-3', sortVal: (p) => p.price ?? -Infinity },
     { key: 'value', label: `Değer (${curSymbol(cur)})`, align: 'right', cls: 'px-3', sortVal: (p) => valOf(p) ?? -Infinity },
     { key: 'pnl', label: 'Kar/Zarar', align: 'right', cls: 'px-3', sortVal: (p) => p.pnl_pct ?? -Infinity },
@@ -284,7 +288,7 @@ export default function PositionsTable({
         {/* min-w 11 kolonun tamamını sığdırır: dar ekranda kolon GİZLEMEK
             yerine yatay kaydırma bırakıyoruz — mobilde de konum, açılış,
             kapanış gibi sütunlara erişilebilsin. */}
-        <table className="tbl w-full t-head min-w-[1040px]">
+        <table className="tbl w-full t-head min-w-[1140px]">
           <thead>
             <tr style={{ color: 'var(--muted)' }} className="t-label uppercase tracking-wide">
               {columns.map((c) => {
@@ -344,6 +348,7 @@ export default function PositionsTable({
                 <td className="px-3 py-2" />
                 <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
                 <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
                 <td className="text-right px-3 py-2 tnum t-body font-medium whitespace-nowrap">
                   {money(totals.value, cur)}
                 </td>
@@ -365,7 +370,7 @@ export default function PositionsTable({
             )}
             {displayRows.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-4 sm:px-5 py-6 text-center t-label" style={{ color: 'var(--faint)' }}>
+                <td colSpan={12} className="px-4 sm:px-5 py-6 text-center t-label" style={{ color: 'var(--faint)' }}>
                   Filtreye uyan pozisyon yok.
                 </td>
               </tr>
@@ -423,6 +428,14 @@ export default function PositionsTable({
                         </div>
                       )}
                     </td>
+                    {/* Alış fiyatı girilmemişse maliyet 0 DEĞİL meçhuldür — sayı
+                        uydurmak yerine "—". Kullanıcı işlemi girdikçe dolar. */}
+                    <td className="text-right px-3 py-3 tnum whitespace-nowrap"
+                        title={p.avg_cost && p.avg_cost > 0 ? num(p.avg_cost, 4) : 'Alış fiyatı girilmemiş'}>
+                      {p.avg_cost && p.avg_cost > 0
+                        ? `${numInt(p.avg_cost)} ${p.price_currency === 'USD' ? '$' : '₺'}`
+                        : <span style={{ color: 'var(--faint)' }}>—</span>}
+                    </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap"
                         title={p.price != null ? num(p.price, 4) : undefined}>
                       {p.price != null
@@ -445,7 +458,7 @@ export default function PositionsTable({
                   </tr>
                   {(isOpen || isClosing) && tx.length === 0 && (
                     <tr className={`tx-row ${isClosing ? 'tx-row-out' : ''}`}>
-                      <td colSpan={11} className="px-4 sm:px-5 py-3 t-label" style={{ color: 'var(--faint)' }}>İşlem kaydı yok.</td>
+                      <td colSpan={12} className="px-4 sm:px-5 py-3 t-label" style={{ color: 'var(--faint)' }}>İşlem kaydı yok.</td>
                     </tr>
                   )}
                   {(isOpen || isClosing) && tx.map((t) => {
@@ -476,6 +489,11 @@ export default function PositionsTable({
                             title={t.unit_price != null ? num(t.unit_price, 4) : undefined}>
                           {t.unit_price != null ? `${numInt(t.unit_price)} ${t.currency === 'USD' ? '$' : '₺'}` : '—'}
                         </td>
+                        {/* İşlemin kendi fiyatı MALİYET sütununda: üstündeki
+                            pozisyon satırının ortalaması tam da bu satırların
+                            ağırlıklı ortalaması. Piyasa fiyatı sütunu işlem
+                            satırında boş — o an geçerli olan fiyat değil. */}
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
