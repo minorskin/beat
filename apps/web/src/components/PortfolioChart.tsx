@@ -162,11 +162,12 @@ export default function PortfolioChart({
   return (
     <div className="panel p-3 sm:p-5">
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+        {/* Başlık çıplak: sahiplik ("bana ait") ve seri türü ("yıl kapanışları")
+            ekleri kaldırıldı — ikisi de üst bardaki anahtarlardan okunuyor,
+            başlıkta tekrar edilince gürültü oluyordu. Yıl kapanışları serisinin
+            kendine has kuralları zaten grafiğin altındaki notta. */}
         <h2 className="t-head font-medium" style={{ color: 'var(--muted)' }}>
           Varlık Değişimi
-          {yearly
-            ? <span style={{ color: 'var(--faint)' }}> · yıl kapanışları</span>
-            : own && <span style={{ color: 'var(--faint)' }}> · bana ait</span>}
         </h2>
         <div className="flex gap-2 shrink-0">
           <div className="flex gap-1">
@@ -183,7 +184,16 @@ export default function PortfolioChart({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ left: 0, right: 6, top: 4, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="#232323" />
-            <XAxis dataKey="label" tick={{ fontSize: 12.5, fill: '#a8a8a8' }} minTickGap={40} axisLine={false} tickLine={false} />
+            {/* padding.right ŞART: nokta ölçeğinde son gözlem tam çizim
+                alanının sağ kenarına oturuyor ve recharts imleç çizim alanının
+                DIŞINA çıktığı anda aktif noktayı güncellemeyi bırakıyor
+                (combineActiveCartesianProps → isInCartesianRange). Sonuç:
+                en sağa gidince bir önceki nokta seçili kalıyor, en güncel
+                veriye hiç ulaşılamıyordu. 16px'lik pay son noktaya rahat bir
+                yakalama alanı bırakır. */}
+            <XAxis
+              dataKey="label" tick={{ fontSize: 12.5, fill: '#a8a8a8' }} minTickGap={40}
+              padding={{ right: 16 }} axisLine={false} tickLine={false} />
             <YAxis tickFormatter={fmtY} tick={{ fontSize: 12.5, fill: '#a8a8a8' }} width={52} axisLine={false} tickLine={false} />
             {mode === 'pct' && <ReferenceLine y={0} stroke="#3d3d3d" />}
             <Tooltip

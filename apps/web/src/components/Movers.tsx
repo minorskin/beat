@@ -12,7 +12,6 @@ const BY_RANGE: Record<string, { key: PeriodKey; long: string }> = {
   '3A': { key: 'quarter', long: 'son 3 ay' },
   '1Y': { key: 'year',    long: 'son 1 yıl' },
 };
-const ORDER = ['S', 'G', 'H', 'A', '3A', '1Y'] as const;
 
 /**
  * İki kart tek bileşen — sayfadaki 4'lü grid'in iki hücresi olarak yerleşsin
@@ -21,18 +20,12 @@ const ORDER = ['S', 'G', 'H', 'A', '3A', '1Y'] as const;
 export default function Movers({ data, range, own, cur, rate }: {
   data: PeriodMovers; range: string; own: boolean; cur: Cur; rate: number;
 }) {
-  // Seçilen dönemin baz snapshot'ı yoksa (portföy o kadar eski değil) kartı boş
-  // bırakmak yerine geçmişi olan EN UZUN kısa döneme düşüyoruz — ve bunu
-  // altyazıda açıkça söylüyoruz; sessizce başka dönem göstermek yanıltıcı olur.
-  const want = ORDER.includes(range as (typeof ORDER)[number]) ? (range as (typeof ORDER)[number]) : 'A';
-  const wantMeta = BY_RANGE[want];
-  const i = ORDER.indexOf(want);
-  const fallback = ORDER.slice(0, i + 1).reverse().find((r) => data[BY_RANGE[r].key].length > 0);
-  const meta = fallback ? BY_RANGE[fallback] : wantMeta;
+  // Geriye düşüş artık SORGUDA: dönem başına ait snapshot yoksa getPeriodMovers
+  // elimizdeki en eski gözlemi baz alıyor (bkz. bases/coalesce). Bileşenin
+  // döneme göre kısalıp "yeterli geçmiş yok" yazan altyazısı bu yüzden kalktı —
+  // hangi dönemin seçili olduğu zaten üst bardaki anahtarda duruyor.
+  const meta = BY_RANGE[range] ?? BY_RANGE['A'];
   const rows = data[meta.key];
-  const note = meta.key === wantMeta.key
-    ? meta.long
-    : `${meta.long} · ${wantMeta.long} için yeterli geçmiş yok`;
   // Tutarlar veritabanında TL; görüntüleme birimi USD ise güncel kurla çevrilir.
   const amountOf = (m: MoverRow) => conv(own ? m.own_abs : m.abs, cur, rate);
 
@@ -47,11 +40,11 @@ export default function Movers({ data, range, own, cur, rate }: {
 
   return (
     <>
-      <Card title="Öne Çıkanlar — Oran" note={note}
+      <Card title="Öne Çıkanlar — Oran" period={meta.long}
         up={pctUp.map((m) => ({ symbol: m.symbol, text: pct(m.pct), positive: m.pct >= 0 }))}
         down={pctDown.map((m) => ({ symbol: m.symbol, text: pct(m.pct), positive: m.pct >= 0 }))}
         empty={rows.length === 0} />
-      <Card title="Öne Çıkanlar — Tutar" note={note}
+      <Card title="Öne Çıkanlar — Tutar" period={meta.long}
         up={amtUp.map((m) => ({ symbol: m.symbol, text: signed(amountOf(m), cur), positive: amountOf(m) >= 0 }))}
         down={amtDown.map((m) => ({ symbol: m.symbol, text: signed(amountOf(m), cur), positive: amountOf(m) >= 0 }))}
         empty={rows.length === 0} />
@@ -63,14 +56,13 @@ const signed = (n: number, c: Cur) => `${n >= 0 ? '+' : ''}${money(n, c)}`;
 
 interface Item { symbol: string; text: string; positive: boolean }
 
-function Card({ title, note, up, down, empty }: {
-  title: string; note: string; up: Item[]; down: Item[]; empty: boolean;
+function Card({ title, period, up, down, empty }: {
+  title: string; period: string; up: Item[]; down: Item[]; empty: boolean;
 }) {
   return (
-    <div className="panel p-3 sm:p-4 flex flex-col">
+    <div className="panel p-3 sm:p-4 flex flex-col" title={`${title} · ${period}`}>
       <div className="min-w-0 mb-2">
         <div className="t-label truncate" style={{ color: 'var(--muted)' }}>{title}</div>
-        <div className="t-micro truncate" style={{ color: 'var(--faint)' }}>{note}</div>
       </div>
       {empty ? (
         <div className="t-label flex-1 flex items-center" style={{ color: 'var(--faint)' }}>

@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { money, num, pct, dateStr, curSymbol, type Cur } from '@/lib/format';
+import { money, num, numInt, pct, dateStr, curSymbol, type Cur } from '@/lib/format';
 import type { AssetClass, Position, TxRow } from '@/lib/data';
 import EditInstrument from './EditInstrument';
 import EditTransaction from './EditTransaction';
@@ -138,16 +138,16 @@ export default function PositionsTable({
     // w-[1%]: tablo hücresi içeriğine göre daralsın — sütun genişliğini varlık
     // KODU belirlesin, altındaki uzun görünen ad değil (o zaten kırpılıyor).
     { key: 'symbol', label: 'Varlık', align: 'left', cls: 'px-4 sm:px-5 w-[1%]', sortVal: (p) => p.symbol },
-    { key: 'class', label: 'Grup', align: 'left', cls: 'px-3 hidden md:table-cell', filter: 'class', sortVal: (p) => p.class_name },
-    { key: 'currency', label: 'Kur Riski', align: 'center', cls: 'px-3 hidden md:table-cell', filter: 'currency', sortVal: (p) => p.currency },
-    { key: 'location', label: 'Konum', align: 'left', cls: 'px-3 hidden lg:table-cell', filter: 'location', sortVal: (p) => p.locations.join(', ') },
+    { key: 'class', label: 'Grup', align: 'left', cls: 'px-3', filter: 'class', sortVal: (p) => p.class_name },
+    { key: 'currency', label: 'Kur Riski', align: 'center', cls: 'px-3', filter: 'currency', sortVal: (p) => p.currency },
+    { key: 'location', label: 'Konum', align: 'left', cls: 'px-3', filter: 'location', sortVal: (p) => p.locations.join(', ') },
     { key: 'qty', label: 'Adet', align: 'right', cls: 'px-3', sortVal: (p) => qtyOf(p) },
     { key: 'price', label: 'Fiyat', align: 'right', cls: 'px-3', sortVal: (p) => p.price ?? -Infinity },
     { key: 'value', label: `Değer (${curSymbol(cur)})`, align: 'right', cls: 'px-3', sortVal: (p) => valOf(p) ?? -Infinity },
-    { key: 'pnl', label: 'Kar/Zarar', align: 'right', cls: 'px-3 hidden sm:table-cell', sortVal: (p) => p.pnl_pct ?? -Infinity },
-    { key: 'weight', label: 'Ağırlık', align: 'right', cls: 'px-3 hidden sm:table-cell', filter: 'weight', sortVal: (p) => wOf(p) ?? -Infinity },
-    { key: 'opened', label: 'Açılış', align: 'left', cls: 'px-3 hidden lg:table-cell', sortVal: (p) => p.opened_at ?? '' },
-    { key: 'closed', label: 'Kapanış', align: 'left', cls: 'px-4 sm:px-5 hidden lg:table-cell', sortVal: (p) => p.closed_at ?? '' },
+    { key: 'pnl', label: 'Kar/Zarar', align: 'right', cls: 'px-3', sortVal: (p) => p.pnl_pct ?? -Infinity },
+    { key: 'weight', label: 'Ağırlık', align: 'right', cls: 'px-3', filter: 'weight', sortVal: (p) => wOf(p) ?? -Infinity },
+    { key: 'opened', label: 'Açılış', align: 'left', cls: 'px-3', sortVal: (p) => p.opened_at ?? '' },
+    { key: 'closed', label: 'Kapanış', align: 'left', cls: 'px-4 sm:px-5', sortVal: (p) => p.closed_at ?? '' },
   ];
 
   // Seçenekler her zaman FİLTRESİZ listeden türetilir — bir seçim yapınca
@@ -281,7 +281,10 @@ export default function PositionsTable({
         </div>
       )}
       <div className="overflow-x-auto">
-        <table className="tbl w-full t-head min-w-[760px]">
+        {/* min-w 11 kolonun tamamını sığdırır: dar ekranda kolon GİZLEMEK
+            yerine yatay kaydırma bırakıyoruz — mobilde de konum, açılış,
+            kapanış gibi sütunlara erişilebilsin. */}
+        <table className="tbl w-full t-head min-w-[1040px]">
           <thead>
             <tr style={{ color: 'var(--muted)' }} className="t-label uppercase tracking-wide">
               {columns.map((c) => {
@@ -336,16 +339,16 @@ export default function PositionsTable({
                     {displayRows.length} pozisyon
                   </div>
                 </td>
-                <td className="px-3 py-2 hidden md:table-cell" />
-                <td className="px-3 py-2 hidden md:table-cell" />
-                <td className="px-3 py-2 hidden lg:table-cell" />
+                <td className="px-3 py-2" />
+                <td className="px-3 py-2" />
+                <td className="px-3 py-2" />
                 <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
                 <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
                 <td className="text-right px-3 py-2 tnum t-body font-medium whitespace-nowrap">
                   {money(totals.value, cur)}
                 </td>
                 <td
-                  className="text-right px-3 py-2 tnum t-body hidden sm:table-cell whitespace-nowrap"
+                  className="text-right px-3 py-2 tnum t-body whitespace-nowrap"
                   style={{ color: totals.pnlPct == null ? 'var(--faint)' : totals.pnlPct >= 0 ? 'var(--up)' : 'var(--down)' }}
                   title={totals.pnlPct == null
                     ? `${totals.noCost} pozisyonda alış fiyatı girilmemiş — toplam oran hesaplanamıyor`
@@ -353,11 +356,11 @@ export default function PositionsTable({
                 >
                   {totals.pnlPct != null ? pct(totals.pnlPct) : '—'}
                 </td>
-                <td className="text-right px-3 py-2 tnum t-body hidden sm:table-cell whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                <td className="text-right px-3 py-2 tnum t-body whitespace-nowrap" style={{ color: 'var(--muted)' }}>
                   %{num(totals.weight, 1)}
                 </td>
-                <td className="px-3 py-2 hidden lg:table-cell" />
-                <td className="px-4 sm:px-5 py-2 hidden lg:table-cell" />
+                <td className="px-3 py-2" />
+                <td className="px-4 sm:px-5 py-2" />
               </tr>
             )}
             {displayRows.length === 0 && (
@@ -395,45 +398,48 @@ export default function PositionsTable({
                           classes={classes} locations={locations}
                         />
                       </div>
+                      {/* Grup/kur ve K/Z'nin mobile özel kopyaları kaldırıldı:
+                          o sütunlar artık her ekranda görünüyor, ikinci kez
+                          yazmak satırı gereksiz yükseltiyordu. */}
                       <div className="t-label truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
-                      <div className="t-label mt-0.5 md:hidden truncate max-w-[84px]" style={{ color: 'var(--faint)' }}>{p.class_name} · {p.currency}</div>
-                      <div className="t-label tnum mt-0.5 sm:hidden" style={{ color: pnlColor(p.pnl_pct) }}>
-                        {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
-                      </div>
                     </td>
-                    <td className="px-3 py-3 hidden md:table-cell t-label" style={{ color: 'var(--muted)' }}>{p.class_name}</td>
-                    <td className="px-3 py-3 hidden md:table-cell text-center">
+                    <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{p.class_name}</td>
+                    <td className="px-3 py-3 text-center">
                       <CurrencyDot currency={p.currency} />
                     </td>
-                    <td className="px-3 py-3 hidden lg:table-cell t-label" style={{ color: 'var(--muted)' }}>
+                    <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>
                       {p.locations.length ? p.locations.join(', ') : '—'}
                     </td>
-                    <td className="text-right px-3 py-3 tnum whitespace-nowrap">
-                      {num(qtyOf(p), Math.abs(qtyOf(p)) < 1 ? 4 : 2)}
+                    {/* Adet ve fiyat TAM SAYI: kuruş basamağı sütunu uzatıyor,
+                        okuyuşa bir şey katmıyordu. numInt yalnız 1'in altındaki
+                        değerlerde (0,08 BTC) basamak bırakır; tamı title'da. */}
+                    <td className="text-right px-3 py-3 tnum whitespace-nowrap" title={num(qtyOf(p), 4)}>
+                      {numInt(qtyOf(p))}
                       {p.external_quantity > 0 && (
                         <div className="t-label" style={{ color: 'var(--faint)' }}>
                           {own
-                            ? `${num(p.quantity, p.quantity < 1 ? 4 : 2)} toplam`
-                            : `${num(p.external_quantity, p.external_quantity < 1 ? 4 : 2)} emanet`}
+                            ? `${numInt(p.quantity)} toplam`
+                            : `${numInt(p.external_quantity)} emanet`}
                         </div>
                       )}
                     </td>
-                    <td className="text-right px-3 py-3 tnum whitespace-nowrap">
+                    <td className="text-right px-3 py-3 tnum whitespace-nowrap"
+                        title={p.price != null ? num(p.price, 4) : undefined}>
                       {p.price != null
-                        ? `${num(p.price, 2)} ${p.price_currency === 'USD' ? '$' : '₺'}`
+                        ? `${numInt(p.price)} ${p.price_currency === 'USD' ? '$' : '₺'}`
                         : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
                     </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap">{valOf(p) != null ? money(valOf(p)!, cur) : '—'}</td>
-                    <td className="text-right px-3 py-3 tnum hidden sm:table-cell whitespace-nowrap" style={{ color: pnlColor(p.pnl_pct) }}>
+                    <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: pnlColor(p.pnl_pct) }}>
                       {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
                     </td>
-                    <td className="text-right px-3 py-3 tnum hidden sm:table-cell whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                    <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: 'var(--muted)' }}>
                       {wOf(p) != null ? `%${num(wOf(p)!, 1)}` : '—'}
                     </td>
-                    <td className="px-3 py-3 hidden lg:table-cell whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                    <td className="px-3 py-3 whitespace-nowrap" style={{ color: 'var(--muted)' }}>
                       {p.opened_at ? dateStr(p.opened_at) : '—'}
                     </td>
-                    <td className="px-4 sm:px-5 py-3 hidden lg:table-cell whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                    <td className="px-4 sm:px-5 py-3 whitespace-nowrap" style={{ color: 'var(--muted)' }}>
                       {p.closed_at ? dateStr(p.closed_at) : '—'}
                     </td>
                   </tr>
@@ -455,27 +461,28 @@ export default function PositionsTable({
                             <EditTransaction tx={t} locations={locations} />
                           </div>
                         </td>
-                        <td className="px-3 py-2 hidden md:table-cell t-label" style={{ color: 'var(--muted)' }}>—</td>
-                        <td className="px-3 py-2 hidden md:table-cell text-center">
+                        <td className="px-3 py-2 t-label" style={{ color: 'var(--muted)' }}>—</td>
+                        <td className="px-3 py-2 text-center">
                           <CurrencyDot currency={t.currency} />
                         </td>
-                        <td className="px-3 py-2 hidden lg:table-cell t-label" style={{ color: 'var(--muted)' }}>{t.location ?? '—'}</td>
-                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body">
-                          {num(t.quantity, Math.abs(t.quantity) < 1 ? 4 : 2)}
+                        <td className="px-3 py-2 t-label" style={{ color: 'var(--muted)' }}>{t.location ?? '—'}</td>
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" title={num(t.quantity, 4)}>
+                          {numInt(t.quantity)}
                           {t.external_quantity > 0 && (
-                            <div className="t-label" style={{ color: 'var(--faint)' }}>{num(t.external_quantity, 2)} emanet</div>
+                            <div className="t-label" style={{ color: 'var(--faint)' }}>{numInt(t.external_quantity)} emanet</div>
                           )}
                         </td>
-                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body">
-                          {t.unit_price != null ? `${num(t.unit_price, 2)} ${t.currency === 'USD' ? '$' : '₺'}` : '—'}
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body"
+                            title={t.unit_price != null ? num(t.unit_price, 4) : undefined}>
+                          {t.unit_price != null ? `${numInt(t.unit_price)} ${t.currency === 'USD' ? '$' : '₺'}` : '—'}
                         </td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
-                        <td className="text-right px-3 py-2 tnum hidden sm:table-cell whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
-                        <td className="text-right px-3 py-2 tnum hidden sm:table-cell whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
-                        <td className="px-3 py-2 hidden lg:table-cell t-body whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
+                        <td className="px-3 py-2 t-body whitespace-nowrap" style={{ color: 'var(--muted)' }}>
                           {dateInOpen ? dateStr(t.executed_at) : '—'}
                         </td>
-                        <td className="px-4 sm:px-5 py-2 hidden lg:table-cell t-body whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                        <td className="px-4 sm:px-5 py-2 t-body whitespace-nowrap" style={{ color: 'var(--muted)' }}>
                           {dateInOpen ? '—' : dateStr(t.executed_at)}
                         </td>
                       </tr>

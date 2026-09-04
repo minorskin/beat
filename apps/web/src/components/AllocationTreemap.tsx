@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { money, num, type Cur } from '@/lib/format';
+import { money, moneyShort, num, type Cur } from '@/lib/format';
 
 export type AllocItem = { symbol: string; name: string; group: string; value: number };
 type Rect = AllocItem & { x: number; y: number; w: number; h: number };
@@ -120,14 +120,22 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
         })}
       </div>
 
+      {/* Grup kırılımı: pay + TUTAR. Yüzde tek başına "portföyün ne kadarı"
+          sorusunu cevaplıyor ama "ne kadar para" sorusunu değil; iki sütuna
+          tam tutar sığmadığı için kısaltma (₺2,3m). Tamı title'da. */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-3">
         {groups.map((g) => (
-          <div key={g.name} className="flex items-center gap-2 t-label min-w-0">
+          <div
+            key={g.name}
+            className="flex items-center gap-1.5 t-label min-w-0"
+            title={`${g.name} — ${money(g.value, cur)} · %${num((g.value / gTotal) * 100, 1)}`}
+          >
             <span
               className="w-2 h-2 rounded-[2px] shrink-0"
               style={{ background: tone(Math.sqrt(g.value / (groups[0]?.value || 1))) }} />
             <span className="truncate" style={{ color: 'var(--muted)' }}>{g.name}</span>
-            <span className="ml-auto tnum shrink-0" style={{ color: 'var(--text)' }}>%{num((g.value / gTotal) * 100, 1)}</span>
+            <span className="ml-auto tnum shrink-0" style={{ color: 'var(--text)' }}>{moneyShort(g.value, cur)}</span>
+            <span className="tnum shrink-0" style={{ color: 'var(--faint)' }}>%{num((g.value / gTotal) * 100, 1)}</span>
           </div>
         ))}
       </div>

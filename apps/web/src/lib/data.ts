@@ -329,7 +329,10 @@ export async function getLastFetch(): Promise<{ kind: string; status: string; fi
 
 // ── Dönemsel değişim (saat/gün/hafta/ay/çeyrek/yıl) ───────────────────────
 // Hem toplam hem own_* için; own görünümünde payda da own alınır (yoksa yanlış oran).
-export interface Change { abs: number; pct: number | null }
+// since = değişimin ÖLÇÜLDÜĞÜ baz gözlemin zamanı. Dönemin tamamına yetecek
+// geçmiş yoksa bu, dönem başı değil elimizdeki EN ESKİ gözlemdir; sayı yine
+// üretilir, hangi tarihten beri ölçüldüğü buradan okunur (bkz. getPeriodChanges).
+export interface Change { abs: number; pct: number | null; since: string | null }
 export type PeriodKey = 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
 export type PeriodChanges = Record<PeriodKey, { total: Change | null; own: Change | null }>;
 
@@ -343,27 +346,42 @@ export async function getPeriodChanges(): Promise<PeriodChanges> {
   // Dönem içinde alınan varlık bu ölçüye girmez (o gün elde değildi);
   // tamamen satılan da girmez (bugünkü birim değeri bilinmiyor, satış zaten
   // bir nakit akışı). Kapsam ikisinde de aynı sepet olduğu için oran tutarlı.
+  //
+  // Dönemin tamamına yetecek geçmiş yoksa "—" YAZILMAZ: elimizdeki en eski
+  // gözleme düşülür ve sayı oradan üretilir (piyasa uygulamalarının standardı
+  // bu — 3 aylık bir hisseye "1 yıl" dendiğinde 3 aylık grafik gelir). Hangi
+  // tarihten ölçüldüğü `since` ile taşınır, arayüzde ipucu olarak görünür.
   const rows = await q<{
-    period: PeriodKey;
+    period: PeriodKey; base_ts: string | null;
     base_try: number | null; now_try: number | null;
     base_own: number | null; now_own: number | null;
   }>(`
     with cur as (
       select id, ts from portfolio_snapshots where granularity='hourly' order by ts desc limit 1
     ),
+    first_snap as (
+      select id, ts from portfolio_snapshots where granularity='hourly' order by ts limit 1
+    ),
     periods(k, iv) as (
       values ('hour', interval '1 hour'), ('day', interval '1 day'), ('week', interval '7 days'),
              ('month', interval '30 days'), ('quarter', interval '90 days'), ('year', interval '365 days')
     ),
     bases as (
-      select p.k, b.id as base_id
+      -- coalesce = geriye düşüş: dönem başına ait snapshot yoksa en eskisi.
+      -- Tek snapshot varken baz = güncel olurdu; o durumda satır elenir
+      -- (kendisiyle karşılaştırılan sıfır bir ölçü değil, gürültüdür).
+      select p.k,
+             coalesce(b.id, f.id) as base_id,
+             coalesce(b.ts, f.ts) as base_ts
       from periods p
       cross join cur c
+      cross join first_snap f
       left join lateral (
-        select ps.id from portfolio_snapshots ps
+        select ps.id, ps.ts from portfolio_snapshots ps
         where ps.granularity='hourly' and ps.ts <= c.ts - p.iv
         order by ps.ts desc limit 1
       ) b on true
+      where coalesce(b.id, f.id) <> c.id
     ),
     -- Bugünkü BİRİM değer (TL cinsinden fiyat). Adet değil fiyat taşınır.
     now_unit as (
@@ -371,7 +389,7 @@ export async function getPeriodChanges(): Promise<PeriodChanges> {
       from position_snapshots pos join cur c on c.id = pos.snapshot_id
       where pos.quantity <> 0
     )
-    select b.k as period,
+    select b.k as period, max(b.base_ts) as base_ts,
            sum(bp.value_try)                as base_try,
            sum(bp.quantity * n.unit_try)    as now_try,
            sum(bp.own_value_try)            as base_own,
@@ -382,14 +400,19 @@ export async function getPeriodChanges(): Promise<PeriodChanges> {
     where n.unit_try is not null
     group by b.k`);
 
-  const mk = (now: number | null, base: number | null): Change | null =>
-    now == null || base == null ? null : { abs: now - base, pct: base ? ((now - base) / base) * 100 : null };
+  const mk = (now: number | null, base: number | null, since: string | null): Change | null =>
+    now == null || base == null
+      ? null
+      : { abs: now - base, pct: base ? ((now - base) / base) * 100 : null, since };
   const empty = { total: null, own: null };
   const out: PeriodChanges = {
     hour: empty, day: empty, week: empty, month: empty, quarter: empty, year: empty,
   };
   for (const r of rows) {
-    out[r.period] = { total: mk(r.now_try, r.base_try), own: mk(r.now_own, r.base_own) };
+    out[r.period] = {
+      total: mk(r.now_try, r.base_try, r.base_ts),
+      own: mk(r.now_own, r.base_own, r.base_ts),
+    };
   }
   return out;
 }
@@ -414,19 +437,26 @@ export async function getPeriodMovers(): Promise<PeriodMovers> {
     with cur as (
       select id, ts from portfolio_snapshots where granularity='hourly' order by ts desc limit 1
     ),
+    first_snap as (
+      select id, ts from portfolio_snapshots where granularity='hourly' order by ts limit 1
+    ),
     periods(k, iv) as (
       values ('hour', interval '1 hour'), ('day', interval '1 day'), ('week', interval '7 days'),
              ('month', interval '30 days'), ('quarter', interval '90 days'), ('year', interval '365 days')
     ),
     bases as (
-      select p.k, b.id as base_id
+      -- getPeriodChanges ile AYNI geriye düşüş: dönem başı yoksa en eski
+      -- gözlem. İki kart aynı dönemi gösteriyor, ölçüleri de ayrışmamalı.
+      select p.k, coalesce(b.id, f.id) as base_id
       from periods p
       cross join cur c
+      cross join first_snap f
       left join lateral (
         select ps.id from portfolio_snapshots ps
         where ps.granularity='hourly' and ps.ts <= c.ts - p.iv
         order by ps.ts desc limit 1
       ) b on true
+      where coalesce(b.id, f.id) <> c.id
     ),
     now_pos as (
       -- Birim değer snapshot'tan (dönem başıyla aynı ölçü), ADET ise

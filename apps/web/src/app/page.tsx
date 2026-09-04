@@ -5,7 +5,7 @@ import {
   getProjectionScenarios,
   type Change, type Position, type SeriesPoint, type PeriodKey,
 } from '@/lib/data';
-import { money, conv, num, pct, timeAgo, type Cur } from '@/lib/format';
+import { money, conv, num, pct, timeAgoShort, dateTimeStr, type Cur } from '@/lib/format';
 import PortfolioChart from '@/components/PortfolioChart';
 import AllocationTreemap from '@/components/AllocationTreemap';
 import AddTransaction from '@/components/AddTransaction';
@@ -111,9 +111,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   };
   const periodKey = PERIOD_OF[range];
   const periodChange = periodKey ? (own ? changes[periodKey].own : changes[periodKey].total) : null;
-  // O döneme yetecek geçmiş yoksa uydurmak yerine "—" yazılır. Movers gibi
-  // sessizce daha kısa bir döneme düşmek burada yanıltıcı olurdu: kart hangi
-  // dönemi gösterdiğini etiketinde söylüyor.
+  // O döneme yetecek geçmiş yoksa ölçü elimizdeki EN ESKİ gözlemden başlar
+  // (getPeriodChanges'teki geriye düşüş) — "—" yazıp kartı boş bırakmak yerine
+  // gidebildiği kadar geriye gider. Gerçek başlangıç title'da (sinceNote).
   const chgAbs = isAll ? pnl : (periodChange ? conv(periodChange.abs, cur, rate) : null);
   const chgPct = isAll ? pnlPct : (periodChange?.pct ?? null);
   const chgUp = (chgAbs ?? chgPct ?? 0) >= 0;
@@ -121,6 +121,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     ? undefined
     : chgUp ? 'var(--up)' : 'var(--down)';
   const rangeLong = rangeLongOf(range);
+  // Dönemin tamamına yetecek geçmiş yoksa ölçü artık "—" değil: elimizdeki en
+  // eski gözlemden başlıyor. Sayı görünür kalsın ama neyi ölçtüğü de bilinsin
+  // diye gerçek başlangıç title'a yazılır (bkz. getPeriodChanges).
+  const sinceNote = periodChange?.since ? ` Ölçüm başlangıcı: ${dateTimeStr(periodChange.since)}.` : '';
 
   return (
     <TabsProvider>
@@ -151,15 +155,25 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             </div>
           ) : (
           <>
-          <div className="mb-3 sm:mb-4">
+          {/* Güncelleme bilgisi başlığın SAĞ ucunda tek rozet: ikon + yaş.
+              Başlığın altındaki tam cümle satırı bir bilgi için koca bir şerit
+              harcıyordu; durum ve tam zaman damgası title'a taşındı. */}
+          <div className="mb-3 sm:mb-4 flex items-center justify-between gap-3">
             <h2 className="t-h2 font-semibold tracking-tight">Özet</h2>
-            {/* timeAgo Date.now()'a bakar: sunucudaki render ile tarayıcıdaki
+            {/* timeAgoShort Date.now()'a bakar: sunucudaki render ile tarayıcıdaki
                 hydration arasında saniyeler geçtiği için metin kaçınılmaz
-                olarak farklı çıkar ("12sn önce" / "14sn önce"). Bu tek satır
-                için uyuşmazlığı bastırıyoruz. */}
-            <p className="t-sub truncate" style={{ color: 'var(--muted)' }} suppressHydrationWarning>
-              {lastFetch ? `Son güncelleme ${timeAgo(lastFetch.finished_at)} · ${lastFetch.status}` : 'Henüz veri yok'}
-            </p>
+                olarak farklı çıkabilir. Bu tek düğüm için uyuşmazlığı bastırıyoruz. */}
+            <span
+              className="shrink-0 flex items-center gap-1.5 t-label whitespace-nowrap"
+              style={{ color: 'var(--muted)' }}
+              title={lastFetch
+                ? `Son güncelleme ${dateTimeStr(lastFetch.finished_at)} · ${lastFetch.status}`
+                : 'Henüz veri yok'}
+              suppressHydrationWarning
+            >
+              <RefreshIcon />
+              {lastFetch ? timeAgoShort(lastFetch.finished_at) : '—'}
+            </span>
           </div>
 
           {emanet !== 0 && (
@@ -189,7 +203,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                   note={range}
                   title={isAll
                     ? 'Alış fiyatına göre gerçekleşmemiş kâr/zarar — pozisyon açıldığından beri.'
-                    : `Değişim tutarı · ${rangeLong}. Dönem başındaki sepetin fiyat hareketi; araya giren para giriş/çıkışı sayılmaz.`}
+                    : `Değişim tutarı · ${rangeLong}. Dönem başındaki sepetin fiyat hareketi; araya giren para giriş/çıkışı sayılmaz.${sinceNote}`}
                   value={chgAbs == null ? '—' : `${chgUp ? '+' : ''}${money(chgAbs, cur)}`}
                   color={chgColor}
                 />
@@ -198,7 +212,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                   note={range}
                   title={isAll
                     ? 'Kâr/zarar ÷ maliyet. Yalnız alış fiyatı girilmiş pozisyonlar sayılır.'
-                    : `Değişim oranı · ${rangeLong}. Dönem başındaki sepetin fiyat hareketi.`}
+                    : `Değişim oranı · ${rangeLong}. Dönem başındaki sepetin fiyat hareketi.${sinceNote}`}
                   value={chgPct == null ? '—' : pct(chgPct)}
                   color={chgColor}
                 />
@@ -287,6 +301,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   );
 }
 
+// Güncelleme rozeti ikonu — döngüsel ok. Yalnız bir işaret, anlam metinde.
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" className="shrink-0"
+      fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" />
+      <path d="M13.5 2.2v3.1h-3.1" />
+    </svg>
+  );
+}
+
 function StatLine({ label, note, value, color, title }: {
   label: string; note?: string; value: string; color?: string; title?: string;
 }) {
@@ -310,7 +335,10 @@ function PeriodBox({ label, c, cur, rate }: { label: string; c: Change | null; c
   const good = has && (c!.pct as number) >= 0;
   const tone = !has ? 'tone-flat' : good ? 'tone-up' : 'tone-down';
   return (
-    <div className={`${tone} rounded-[var(--r-sm)] px-2 py-1.5 flex flex-col justify-center min-w-0`}>
+    <div
+      className={`${tone} rounded-[var(--r-sm)] px-2 py-1.5 flex flex-col justify-center min-w-0`}
+      title={c?.since ? `${label} — ölçüm başlangıcı ${dateTimeStr(c.since)}` : label}
+    >
       <div className="t-micro leading-none truncate" style={{ color: 'var(--muted)' }}>{label}</div>
       <div className="t-strong font-semibold tnum leading-tight mt-1 truncate">
         {has ? `${good ? '+' : ''}${num(c!.pct as number, 2)}%` : '—'}
