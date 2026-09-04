@@ -188,10 +188,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4 items-stretch">
 
             {/* 1 — Toplam varlık */}
-            <div className="panel p-3 sm:p-4 flex flex-col">
-              <div className="t-label mb-1 truncate" style={{ color: 'var(--muted)' }}>
-                {own ? 'Bana Ait Varlık' : 'Toplam Varlık'}
-              </div>
+            {/* Başlık satırı yok: kartın kendisi büyüklüğü söylüyor, hangi
+                sahiplik görünümünde olduğu da hemen üstteki emanet satırından
+                okunuyor. Mod yine de title'da duruyor. */}
+            <div className="panel p-3 sm:p-4 flex flex-col" title={own ? 'Bana ait varlık' : 'Toplam varlık'}>
               <div className="t-kpi font-semibold tnum truncate">{money(value, cur)}</div>
               <div className="t-label mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{money(altValue, altCur)}</div>
               <div className="mt-auto pt-3 space-y-1.5">

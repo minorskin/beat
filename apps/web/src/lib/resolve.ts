@@ -21,7 +21,11 @@ export type ResolveResult = Resolved | { error: string };
 /** Truncgil'de gerçekten satılan altın ürünleri — sabit liste, kullanıcı kod bilmek zorunda kalmasın. */
 export const GOLD_OPTIONS: { code: string; symbol: string; display_name: string }[] = [
   { code: 'GRA', symbol: 'GRAMALTIN', display_name: 'Gram Altın' },
-  { code: 'HAS', symbol: 'GRAMHASALTIN', display_name: 'Gram Has Altın' },
+  // Tek boşluklu sembol. SYMBOL_RE'ye uymuyor ama o kural yalnız ELLE girilen
+  // sembolleri (gerçek tickerlar) bağlar; altın seçenekleri bu listeden gelir
+  // ve fiyat `code` ('HAS') ile çekilir, sembolle değil. Sembol burada saf
+  // görüntü anahtarı — grafik lejantında ve kutucukta okunan ad bu.
+  { code: 'HAS', symbol: 'HAS GRAM', display_name: 'HAS GRAM' },
   { code: 'CEYREKALTIN', symbol: 'CEYREKALTIN', display_name: 'Çeyrek Altın' },
   { code: 'YARIMALTIN', symbol: 'YARIMALTIN', display_name: 'Yarım Altın' },
   { code: 'TAMALTIN', symbol: 'TAMALTIN', display_name: 'Tam Altın' },

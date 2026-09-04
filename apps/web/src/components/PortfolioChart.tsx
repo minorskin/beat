@@ -313,23 +313,29 @@ function ChartTooltip({ active, payload, labelText, fmt }:
     .filter((p) => p.value != null)
     .sort((a, b) => Number(b.value) - Number(a.value));
   const shown = items.slice(0, 8);
+  // Yarı saydam ve küçük: kutu grafiğin üstünde duruyor, altındaki çizgileri
+  // tamamen örtmesin. Bulanıklık okunurluğu koruyor — saydamlık tek başına
+  // metni arkadaki eğrilerle karıştırırdı.
   return (
     <div style={{
-      background: '#1c1c1c', borderRadius: 4, fontSize: 14.5, padding: '8px 10px',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.5)', minWidth: 140,
+      background: 'rgba(24,24,24,0.78)',
+      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+      border: '1px solid rgba(255,255,255,0.07)',
+      borderRadius: 5, fontSize: 12, lineHeight: 1.45, padding: '5px 7px',
+      boxShadow: '0 4px 14px rgba(0,0,0,0.4)', minWidth: 112,
     }}>
-      <div style={{ color: '#a8a8a8', marginBottom: 4 }}>{labelText}</div>
+      <div style={{ color: '#a8a8a8', marginBottom: 3 }}>{labelText}</div>
       {shown.map((p) => (
-        <div key={String(p.dataKey)} className="flex items-baseline justify-between gap-3">
+        <div key={String(p.dataKey)} className="flex items-baseline justify-between gap-2.5">
           <span className="flex items-center gap-1.5" style={{ color: '#f4f4f4' }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: p.color, display: 'inline-block' }} />
+            <span style={{ width: 7, height: 7, borderRadius: 2, background: p.color, display: 'inline-block' }} />
             {p.name}
           </span>
           <span className="tnum" style={{ color: '#f4f4f4' }}>{fmt(Number(p.value))}</span>
         </div>
       ))}
       {items.length > shown.length && (
-        <div style={{ color: '#7d7d7d', marginTop: 4 }}>+{items.length - shown.length} daha</div>
+        <div style={{ color: '#7d7d7d', marginTop: 3 }}>+{items.length - shown.length} daha</div>
       )}
     </div>
   );
