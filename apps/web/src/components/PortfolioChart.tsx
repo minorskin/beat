@@ -318,9 +318,12 @@ function ChartTooltip({ active, payload, labelText, fmt }:
   // metni arkadaki eğrilerle karıştırırdı.
   return (
     <div style={{
-      background: 'rgba(24,24,24,0.78)',
-      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      background: 'rgba(24,24,24,0.52)',
+      // Saydamlık arttıkça okunurluğu bulanıklık taşır: 12px blur olmadan
+      // metin altındaki eğrilerle karışıyor. Kenarlık da biraz belirginleşti,
+      // yoksa kutunun sınırı zeminde kayboluyor.
+      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      border: '1px solid rgba(255,255,255,0.10)',
       borderRadius: 5, fontSize: 12, lineHeight: 1.45, padding: '5px 7px',
       boxShadow: '0 4px 14px rgba(0,0,0,0.4)', minWidth: 112,
     }}>
