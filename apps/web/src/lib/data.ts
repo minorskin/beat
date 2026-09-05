@@ -54,8 +54,11 @@ export interface Instrument {
 }
 export interface WatchItem {
   instrument_id: string; symbol: string; display_name: string; class_code: string;
+  // currency = KUR RİSKİ etiketi; price_currency = fiyatın kote edildiği birim.
+  // İkisi ayrı: USDTRY kur riski taşımaz (USD) ama fiyatı TL cinsindendir.
   ui_group: string; currency: string; created_at: string;
   price: number | null; price_ts: string | null; source: string | null;
+  price_currency: string | null;
 }
 export interface AssetClass { code: string; name: string; ui_group: string }
 
@@ -388,7 +391,7 @@ export async function getInstruments(): Promise<Instrument[]> {
 export async function getWatchlist(): Promise<WatchItem[]> {
   return q<WatchItem>(`
     select instrument_id, symbol, display_name, class_code, ui_group, currency,
-           created_at, price, price_ts, source
+           created_at, price, price_ts, source, price_currency
     from v_watchlist
     order by ui_group, symbol`);
 }

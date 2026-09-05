@@ -85,7 +85,7 @@ function WatchRow({ wi, d, className, classes, locations }: {
       <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: 'var(--muted)' }}
           title={wi.price != null ? num(wi.price, 4) : undefined}>
         {wi.price != null
-          ? `${numPrice(wi.price)} ${wi.currency === 'USD' ? '$' : '₺'}`
+          ? `${numPrice(wi.price)} ${wi.price_currency === 'USD' ? '$' : '₺'}`
           : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
       </td>
       {/* Oran enstrümanın KENDİ para biriminden: izlenen bir endeksin günlük
