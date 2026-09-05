@@ -16,6 +16,14 @@ const NO_LOC = '__konumsuz__'; // "konumu girilmemiş" için sentinel — gerçe
 type ColKey = 'symbol' | 'class' | 'currency' | 'location' | 'qty' | 'avgCost' | 'price' | 'value' | 'day' | 'pnl' | 'weight' | 'opened' | 'closed';
 type FilterKey = 'class' | 'currency' | 'location' | 'weight';
 type SortDir = 'asc' | 'desc';
+/**
+ * Tablonun satırı iki şeyden biri: elde tutulan pozisyon ya da yalnız izlenen
+ * enstrüman. İkisi TEK listede yaşar — ayrı bölüm yok — ama izlenen satır
+ * hiçbir toplama girmez (bkz. totals: yalnız kind==='pos' sayılır).
+ */
+type Item =
+  | { kind: 'pos'; id: string; p: Position }
+  | { kind: 'watch'; id: string; w: WatchItem };
 
 /** Ağırlık sürekli bir sayı — dropdown'da anlamlı olması için kovalara bölünür. */
 const WEIGHT_BUCKETS = [
@@ -47,6 +55,58 @@ function CurrencyDot({ currency }: { currency: string }) {
       className="inline-block w-2 h-2 rounded-full align-middle"
       style={{ background: usd ? 'var(--up)' : 'var(--down)' }}
     />
+  );
+}
+
+/**
+ * İzlenen enstrüman satırı. Pozisyonlarla AYNI listede ve aynı sütun düzeninde
+ * durur; ayrımı soluk ton ile Adet sütunundaki "izleniyor" taşır. Adet olmadığı
+ * için değer, K/Z ve ağırlık hesaplanmaz — ve hiçbir toplama girmez.
+ */
+function WatchRow({ wi, d, className, classes, locations }: {
+  wi: WatchItem; d: DayChange | null; className: string;
+  classes: AssetClass[]; locations: string[];
+}) {
+  return (
+    <tr title={`${wi.symbol} — yalnız izleniyor, hesaba katılmaz`}>
+      <td className="px-4 sm:px-5 py-3 w-[1%]">
+        <div className="font-medium flex items-center gap-2 whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+          {wi.symbol}
+          {wi.price == null && <span title="Fiyat bekleniyor — bir sonraki turda gelir" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--c3)' }} />}
+          <EditInstrument
+            id={wi.instrument_id} symbol={wi.symbol} displayName={wi.display_name}
+            classCode={wi.class_code} currency={wi.currency} price={wi.price}
+            taxRate={null} txCount={0} positionLocations={[]}
+            classes={classes} locations={locations}
+          />
+        </div>
+        <div className="t-label truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--faint)' }}>{wi.display_name}</div>
+      </td>
+      <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{className}</td>
+      <td className="px-3 py-3 text-center"><CurrencyDot currency={wi.currency} /></td>
+      <td className="px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+      {/* Adet yerine ne olduğunu söyleyen tek kelime: boş satır bozuk veri gibi durur. */}
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>izleniyor</td>
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: 'var(--muted)' }}
+          title={wi.price != null ? num(wi.price, 4) : undefined}>
+        {wi.price != null
+          ? `${numInt(wi.price)} ${wi.currency === 'USD' ? '$' : '₺'}`
+          : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
+      </td>
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+      {/* Günlük oran var (fiyatı çekiliyor); tutar yok, elde adet yok. */}
+      <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: dayColor(d) }}
+          title={d ? `Ölçüm başlangıcı ${dateTimeStr(d.since)}` : 'Bugün yeni fiyat gözlemi yok'}>
+        {d?.pct != null ? pct(d.pct) : '—'}
+      </td>
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="px-3 py-3 whitespace-nowrap t-label" style={{ color: 'var(--faint)' }} title="İzlemeye alındığı tarih">
+        {dateStr(wi.created_at)}
+      </td>
+      <td className="px-4 sm:px-5 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+    </tr>
   );
 }
 
@@ -136,54 +196,72 @@ export default function PositionsTable({
   // Günlük tutar veritabanında TL; görüntüleme birimine çevrilir.
   const dayAmt = (d: DayChange) => conv(own ? d.own_abs_try : d.abs_try, cur, rate);
 
+  // Pozisyonlar ve izlenen enstrümanlar TEK liste. Ayrı bölüm yok: sıralama ve
+  // filtre ikisini birlikte gezdiriyor, izlenen satır da kendi fiyatına ya da
+  // günlük değişimine göre listenin ortasına oturabiliyor. Ayrımı taşıyan tek
+  // şey satırın kendi görünümü (soluk ton + Adet sütununda "izleniyor").
+  const classNameOf = (code: string) => classes.find((c) => c.code === code)?.name ?? code;
+  const items: Item[] = [
+    ...rows.map((p): Item => ({ kind: 'pos', id: p.instrument_id, p })),
+    ...watchlist.map((w): Item => ({ kind: 'watch', id: w.instrument_id, w })),
+  ];
+
   const columns: {
     key: ColKey; label: string; align: 'left' | 'right' | 'center'; cls: string;
-    filter?: FilterKey; sortVal: (p: Position) => string | number;
+    filter?: FilterKey; sortVal: (it: Item) => string | number;
   }[] = [
     // w-[1%]: tablo hücresi içeriğine göre daralsın — sütun genişliğini varlık
     // KODU belirlesin, altındaki uzun görünen ad değil (o zaten kırpılıyor).
-    { key: 'symbol', label: 'Varlık', align: 'left', cls: 'px-4 sm:px-5 w-[1%]', sortVal: (p) => p.symbol },
-    { key: 'class', label: 'Grup', align: 'left', cls: 'px-3', filter: 'class', sortVal: (p) => p.class_name },
-    { key: 'currency', label: 'Kur Riski', align: 'center', cls: 'px-3', filter: 'currency', sortVal: (p) => p.currency },
-    { key: 'location', label: 'Konum', align: 'left', cls: 'px-3', filter: 'location', sortVal: (p) => p.locations.join(', ') },
-    { key: 'qty', label: 'Adet', align: 'right', cls: 'px-3', sortVal: (p) => qtyOf(p) },
+    { key: 'symbol', label: 'Varlık', align: 'left', cls: 'px-4 sm:px-5 w-[1%]', sortVal: (it) => it.kind === 'pos' ? it.p.symbol : it.w.symbol },
+    { key: 'class', label: 'Grup', align: 'left', cls: 'px-3', filter: 'class', sortVal: (it) => it.kind === 'pos' ? it.p.class_name : classNameOf(it.w.class_code) },
+    { key: 'currency', label: 'Kur Riski', align: 'center', cls: 'px-3', filter: 'currency', sortVal: (it) => it.kind === 'pos' ? it.p.currency : it.w.currency },
+    { key: 'location', label: 'Konum', align: 'left', cls: 'px-3', filter: 'location', sortVal: (it) => it.kind === 'pos' ? it.p.locations.join(', ') : '' },
+    // Adedi/değeri olmayan izleme satırı sayısal sütunlarda listenin ucuna gider.
+    { key: 'qty', label: 'Adet', align: 'right', cls: 'px-3', sortVal: (it) => it.kind === 'pos' ? qtyOf(it.p) : -Infinity },
     // Maliyet, Fiyat'ın hemen SOLUNDA: "birimine ne ödedim → bugün ne ediyor"
     // yan yana okunsun. İkisi de fiyatın kendi para biriminde (avg_cost,
     // v_holdings'te işlemlerin birim fiyatından türer; girilmemişse 0 → "—").
-    { key: 'avgCost', label: 'Ort. Maliyet', align: 'right', cls: 'px-3', sortVal: (p) => p.avg_cost ?? -Infinity },
-    { key: 'price', label: 'Fiyat', align: 'right', cls: 'px-3', sortVal: (p) => p.price ?? -Infinity },
-    { key: 'value', label: `Değer (${curSymbol(cur)})`, align: 'right', cls: 'px-3', sortVal: (p) => valOf(p) ?? -Infinity },
+    { key: 'avgCost', label: 'Ort. Maliyet', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.avg_cost : null) ?? -Infinity },
+    // Fiyat ve Günlük ikisinde de var — izlenen satır burada gerçekten sıraya girer.
+    { key: 'price', label: 'Fiyat', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.price : it.w.price) ?? -Infinity },
+    { key: 'value', label: `Değer (${curSymbol(cur)})`, align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? valOf(it.p) : null) ?? -Infinity },
     // Günlük = TR saatiyle bugün 00:00'dan bu yana. Kar/Zarar'ın yanında ama
     // ondan bağımsız bir soru: "alışımdan beri" değil, "bugün".
-    { key: 'day', label: 'Günlük', align: 'right', cls: 'px-3', sortVal: (p) => dayOf(p)?.pct ?? -Infinity },
-    { key: 'pnl', label: 'Kar/Zarar', align: 'right', cls: 'px-3', sortVal: (p) => p.pnl_pct ?? -Infinity },
-    { key: 'weight', label: 'Ağırlık', align: 'right', cls: 'px-3', filter: 'weight', sortVal: (p) => wOf(p) ?? -Infinity },
-    { key: 'opened', label: 'Açılış', align: 'left', cls: 'px-3', sortVal: (p) => p.opened_at ?? '' },
-    { key: 'closed', label: 'Kapanış', align: 'left', cls: 'px-4 sm:px-5', sortVal: (p) => p.closed_at ?? '' },
+    { key: 'day', label: 'Günlük', align: 'right', cls: 'px-3', sortVal: (it) => dayChanges[it.id]?.pct ?? -Infinity },
+    { key: 'pnl', label: 'Kar/Zarar', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.pnl_pct : null) ?? -Infinity },
+    { key: 'weight', label: 'Ağırlık', align: 'right', cls: 'px-3', filter: 'weight', sortVal: (it) => (it.kind === 'pos' ? wOf(it.p) : null) ?? -Infinity },
+    // İzlenen satırda "açılış" = izlemeye alındığı tarih; ikisi de bir başlangıç.
+    { key: 'opened', label: 'Açılış', align: 'left', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.opened_at : it.w.created_at) ?? '' },
+    { key: 'closed', label: 'Kapanış', align: 'left', cls: 'px-4 sm:px-5', sortVal: (it) => (it.kind === 'pos' ? it.p.closed_at : null) ?? '' },
   ];
 
   // Seçenekler her zaman FİLTRESİZ listeden türetilir — bir seçim yapınca
   // diğer seçenekler menüden kaybolmasın.
   const uniq = (xs: string[]) => [...new Set(xs)].sort((a, b) => a.localeCompare(b, 'tr-TR'));
   const options: Record<FilterKey, { id: string; label: string }[]> = {
-    class: uniq(rows.map((p) => p.class_name)).map((v) => ({ id: v, label: v })),
-    currency: uniq(rows.map((p) => p.currency)).map((v) => ({ id: v, label: v })),
+    class: uniq([...rows.map((p) => p.class_name), ...watchlist.map((w) => classNameOf(w.class_code))]).map((v) => ({ id: v, label: v })),
+    currency: uniq([...rows.map((p) => p.currency), ...watchlist.map((w) => w.currency)]).map((v) => ({ id: v, label: v })),
     location: [
       ...uniq(rows.flatMap((p) => p.locations)).map((v) => ({ id: v, label: v })),
-      ...(rows.some((p) => p.locations.length === 0) ? [{ id: NO_LOC, label: 'Konumsuz' }] : []),
+      ...(rows.some((p) => p.locations.length === 0) || watchlist.length ? [{ id: NO_LOC, label: 'Konumsuz' }] : []),
     ],
     weight: WEIGHT_BUCKETS.map((b) => ({ id: b.id, label: b.label })),
   };
 
-  const matches = (p: Position, key: FilterKey): boolean => {
+  const matches = (it: Item, key: FilterKey): boolean => {
     const sel = filters[key];
     if (!sel.length) return true;
-    if (key === 'class') return sel.includes(p.class_name);
-    if (key === 'currency') return sel.includes(p.currency);
-    if (key === 'location') {
-      return p.locations.length ? p.locations.some((l) => sel.includes(l)) : sel.includes(NO_LOC);
+    if (key === 'class') {
+      return sel.includes(it.kind === 'pos' ? it.p.class_name : classNameOf(it.w.class_code));
     }
-    const w = wOf(p);
+    if (key === 'currency') return sel.includes(it.kind === 'pos' ? it.p.currency : it.w.currency);
+    if (key === 'location') {
+      if (it.kind === 'watch') return sel.includes(NO_LOC); // izlenen enstrümanın konumu olmaz
+      return it.p.locations.length ? it.p.locations.some((l) => sel.includes(l)) : sel.includes(NO_LOC);
+    }
+    // Ağırlık: izlenen satırın ağırlığı yok, o filtre seçiliyken elenir.
+    if (it.kind === 'watch') return false;
+    const w = wOf(it.p);
     if (w == null) return false;
     return WEIGHT_BUCKETS.some((b) => sel.includes(b.id) && b.test(w));
   };
@@ -204,7 +282,7 @@ export default function PositionsTable({
     }));
   };
 
-  let displayRows = rows.filter((p) => (['class', 'currency', 'location', 'weight'] as FilterKey[]).every((k) => matches(p, k)));
+  let displayRows = items.filter((it) => (['class', 'currency', 'location', 'weight'] as FilterKey[]).every((k) => matches(it, k)));
 
   if (sortKey) {
     const col = columns.find((c) => c.key === sortKey)!;
@@ -219,6 +297,8 @@ export default function PositionsTable({
 
   // Toplamlar filtreden GEÇMİŞ satırlara göre: kullanıcı bir grubu süzdüğünde
   // toplam da o grubun toplamı olmalı.
+  // Toplamlar YALNIZ pozisyonlardan; izlenen enstrüman hiçbir toplama girmez.
+  const posRows = displayRows.filter((it): it is Extract<Item, { kind: 'pos' }> => it.kind === 'pos');
   const totals = (() => {
     let value = 0, weight = 0, pnl = 0, cost = 0, noCost = 0;
     // Günlük: tutarlar toplanabilir. Oran da tutardan TÜRETİLİR — satır
@@ -226,7 +306,7 @@ export default function PositionsTable({
     // eksi bugünkü kazanç, oran da ikisinin bölümü. Yalnız günlük ölçüsü olan
     // satırlar paydaya girer, yoksa payda şişer ve oran olduğundan küçük çıkar.
     let dayAbs = 0, dayBase = 0;
-    for (const p of displayRows) {
+    for (const { p } of posRows) {
       value += valOf(p) ?? 0;
       weight += wOf(p) ?? 0;
       const d = dayOf(p);
@@ -253,15 +333,6 @@ export default function PositionsTable({
 
   const activeCount = Object.values(filters).reduce((n, v) => n + v.length, 0);
 
-  // İzleme listesi: kataloğa eklenmiş ama pozisyonu olmayan enstrüman. Hesaba
-  // KATILMAZ — ayrı bir dizi olarak geldiği için toplamlara, ağırlığa ve Özet
-  // sekmesine hiç girmiyor. Grup/kur filtreleri burada da geçerli; ağırlık
-  // filtresi anlamsız (ağırlıkları yok), o seçiliyken bölüm tamamen gizlenir.
-  const classNameOf = (code: string) => classes.find((c) => c.code === code)?.name ?? code;
-  const watchRows = filters.weight.length > 0 ? [] : watchlist.filter((wi) =>
-    (!filters.class.length || filters.class.includes(classNameOf(wi.class_code))) &&
-    (!filters.currency.length || filters.currency.includes(wi.currency)) &&
-    (!filters.location.length || filters.location.includes(NO_LOC)));
 
   // Filtre satır sayısını düşürdüğünde belge kısalır, tarayıcı scrollTop'u
   // kırpar ve sayfa gözle görülür biçimde kayar. İki adımda önlüyoruz:
@@ -300,7 +371,7 @@ export default function PositionsTable({
     <div className="panel overflow-hidden">
       {activeCount > 0 && (
         <div className="px-4 sm:px-5 pt-3 flex items-center gap-3 t-label" style={{ color: 'var(--muted)' }}>
-          <span>{displayRows.length} / {rows.length} pozisyon</span>
+          <span>{posRows.length} / {rows.length} pozisyon</span>
           <button
             type="button"
             onClick={() => setFilters({ class: [], currency: [], location: [], weight: [] })}
@@ -361,12 +432,12 @@ export default function PositionsTable({
                 listeye göre. Yalnız toplanabilir büyüklükler yazılır: adet ve
                 fiyat farklı varlıklarda farklı birim, toplamı anlamsız olurdu.
                 K/Z oranı ağırlıklı: toplam K/Z ÷ toplam maliyet. */}
-            {displayRows.length > 0 && (
+            {posRows.length > 0 && (
               <tr className="tbl-total">
                 <td className="px-4 sm:px-5 py-2 t-label font-medium">
                   Toplam
                   <div className="t-label font-normal" style={{ color: 'var(--muted)' }}>
-                    {displayRows.length} pozisyon
+                    {posRows.length} pozisyon
                   </div>
                 </td>
                 <td className="px-3 py-2" />
@@ -407,11 +478,14 @@ export default function PositionsTable({
             {displayRows.length === 0 && (
               <tr>
                 <td colSpan={13} className="px-4 sm:px-5 py-6 text-center t-label" style={{ color: 'var(--faint)' }}>
-                  {rows.length === 0 ? 'Henüz pozisyon yok — aşağıdaki enstrümanlar yalnız izleniyor.' : 'Filtreye uyan pozisyon yok.'}
+                  Filtreye uyan kayıt yok.
                 </td>
               </tr>
             )}
-            {displayRows.map((p) => {
+            {displayRows.map((it) => {
+              if (it.kind === 'watch') return <WatchRow key={it.id} wi={it.w} d={dayChanges[it.id] ?? null}
+                className={classNameOf(it.w.class_code)} classes={classes} locations={locations} />;
+              const p = it.p;
               const isOpen = openId === p.instrument_id;
               const isClosing = closingId === p.instrument_id;
               const tx = transactions[p.instrument_id] ?? [];
@@ -561,60 +635,6 @@ export default function PositionsTable({
               );
             })}
 
-            {watchRows.length > 0 && (
-              <>
-                <tr className="tbl-total">
-                  <td colSpan={13} className="px-4 sm:px-5 py-2 t-label" style={{ color: 'var(--muted)' }}>
-                    İzleme listesi
-                    <span style={{ color: 'var(--faint)' }}> · {watchRows.length} enstrüman · hesaba katılmaz</span>
-                  </td>
-                </tr>
-                {watchRows.map((wi) => {
-                  const d = dayChanges[wi.instrument_id] ?? null;
-                  return (
-                    <tr key={wi.instrument_id}>
-                      <td className="px-4 sm:px-5 py-3 w-[1%]">
-                        <div className="font-medium flex items-center gap-2 whitespace-nowrap" style={{ color: 'var(--muted)' }}>
-                          {wi.symbol}
-                          {wi.price == null && <span title="Fiyat bekleniyor — bir sonraki turda gelir" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--c3)' }} />}
-                          <EditInstrument
-                            id={wi.instrument_id} symbol={wi.symbol} displayName={wi.display_name}
-                            classCode={wi.class_code} currency={wi.currency} price={wi.price}
-                            taxRate={null} txCount={0} positionLocations={[]}
-                            classes={classes} locations={locations}
-                          />
-                        </div>
-                        <div className="t-label truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--faint)' }}>{wi.display_name}</div>
-                      </td>
-                      <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{classNameOf(wi.class_code)}</td>
-                      <td className="px-3 py-3 text-center"><CurrencyDot currency={wi.currency} /></td>
-                      <td className="px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                      <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: 'var(--muted)' }}
-                          title={wi.price != null ? num(wi.price, 4) : undefined}>
-                        {wi.price != null
-                          ? `${numInt(wi.price)} ${wi.currency === 'USD' ? '$' : '₺'}`
-                          : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
-                      </td>
-                      {/* Değer, K/Z, ağırlık: adet yok, hesaplanacak bir şey de yok. */}
-                      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                      <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: dayColor(d) }}
-                          title={d ? `Ölçüm başlangıcı ${dateTimeStr(d.since)}` : 'Bugün yeni fiyat gözlemi yok'}>
-                        {/* Tutar yok: elde adet yok. Yalnız oran. */}
-                        {d?.pct != null ? pct(d.pct) : '—'}
-                      </td>
-                      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                      <td className="px-3 py-3 whitespace-nowrap t-label" style={{ color: 'var(--faint)' }} title="İzlemeye alındığı tarih">
-                        {dateStr(wi.created_at)}
-                      </td>
-                      <td className="px-4 sm:px-5 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                    </tr>
-                  );
-                })}
-              </>
-            )}
           </tbody>
         </table>
       </div>
