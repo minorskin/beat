@@ -88,18 +88,18 @@ function WatchRow({ wi, d, className, classes, locations }: {
           ? `${numInt(wi.price)} ${wi.currency === 'USD' ? '$' : '₺'}`
           : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
       </td>
-      <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{className}</td>
-      <td className="px-3 py-3 text-center"><CurrencyDot currency={wi.currency} /></td>
-      {/* Adet yerine ne olduğunu söyleyen tek kelime: boş satır bozuk veri gibi durur. */}
-      <td className="px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>izleniyor</td>
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-      {/* Günlük oran var (fiyatı çekiliyor); tutar yok, elde adet yok. */}
       <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: dayColor(d) }}
           title={d ? `Ölçüm başlangıcı ${dateTimeStr(d.since)}` : 'Bugün yeni fiyat gözlemi yok'}>
         {d?.pct != null ? pct(d.pct) : '—'}
       </td>
+      <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{className}</td>
+      {/* Adet yerine ne olduğunu söyleyen tek kelime: boş satır bozuk veri gibi durur. */}
+      <td className="px-3 py-3 text-center"><CurrencyDot currency={wi.currency} /></td>
+      <td className="px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>izleniyor</td>
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+      {/* Günlük oran var (fiyatı çekiliyor); tutar yok, elde adet yok. */}
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
       <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
       <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
       <td className="px-3 py-3 whitespace-nowrap t-label" style={{ color: 'var(--faint)' }} title="İzlemeye alındığı tarih">
@@ -215,6 +215,9 @@ export default function PositionsTable({
     { key: 'symbol', label: 'Varlık', align: 'left', cls: 'px-4 sm:px-5 w-[1%]', sortVal: (it) => it.kind === 'pos' ? it.p.symbol : it.w.symbol },
     // Fiyat ve Günlük ikisinde de var — izlenen satır burada gerçekten sıraya girer.
     { key: 'price', label: 'Fiyat', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.price : it.w.price) ?? -Infinity },
+    // Günlük = TR saatiyle bugün 00:00'dan bu yana. Kar/Zarar'ın yanında ama
+    // ondan bağımsız bir soru: "alışımdan beri" değil, "bugün".
+    { key: 'day', label: 'Günlük', align: 'right', cls: 'px-3', sortVal: (it) => dayChanges[it.id]?.pct ?? -Infinity },
     { key: 'class', label: 'Grup', align: 'left', cls: 'px-3', filter: 'class', sortVal: (it) => it.kind === 'pos' ? it.p.class_name : classNameOf(it.w.class_code) },
     { key: 'currency', label: 'Kur Riski', align: 'center', cls: 'px-3', filter: 'currency', sortVal: (it) => it.kind === 'pos' ? it.p.currency : it.w.currency },
     { key: 'location', label: 'Konum', align: 'left', cls: 'px-3', filter: 'location', sortVal: (it) => it.kind === 'pos' ? it.p.locations.join(', ') : '' },
@@ -225,9 +228,6 @@ export default function PositionsTable({
     // v_holdings'te işlemlerin birim fiyatından türer; girilmemişse 0 → "—").
     { key: 'avgCost', label: 'Ort. Maliyet', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.avg_cost : null) ?? -Infinity },
     { key: 'value', label: `Değer (${curSymbol(cur)})`, align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? valOf(it.p) : null) ?? -Infinity },
-    // Günlük = TR saatiyle bugün 00:00'dan bu yana. Kar/Zarar'ın yanında ama
-    // ondan bağımsız bir soru: "alışımdan beri" değil, "bugün".
-    { key: 'day', label: 'Günlük', align: 'right', cls: 'px-3', sortVal: (it) => dayChanges[it.id]?.pct ?? -Infinity },
     { key: 'pnl', label: 'Kar/Zarar', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.pnl_pct : null) ?? -Infinity },
     { key: 'weight', label: 'Ağırlık', align: 'right', cls: 'px-3', filter: 'weight', sortVal: (it) => (it.kind === 'pos' ? wOf(it.p) : null) ?? -Infinity },
     // İzlenen satırda "açılış" = izlemeye alındığı tarih; ikisi de bir başlangıç.
@@ -448,14 +448,6 @@ export default function PositionsTable({
                   </div>
                 </td>
                 <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                <td className="px-3 py-2" />
-                <td className="px-3 py-2" />
-                <td className="px-3 py-2" />
-                <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                <td className="text-right px-3 py-2 tnum t-body font-medium whitespace-nowrap">
-                  {money(totals.value, cur)}
-                </td>
                 <td className="text-right px-3 py-2 tnum whitespace-nowrap"
                     style={{ color: totals.dayPct == null ? 'var(--faint)' : totals.dayPct >= 0 ? 'var(--up)' : 'var(--down)' }}
                     title="Bugün 00:00'dan (TR) bu yana — toplam kazanç ÷ gün başı büyüklük">
@@ -465,6 +457,14 @@ export default function PositionsTable({
                       <div className="t-label opacity-80">{totals.dayAbs >= 0 ? '+' : ''}{money(totals.dayAbs, cur)}</div>
                     </>
                   ) : '—'}
+                </td>
+                <td className="px-3 py-2" />
+                <td className="px-3 py-2" />
+                <td className="px-3 py-2" />
+                <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="text-right px-3 py-2 tnum t-body font-medium whitespace-nowrap">
+                  {money(totals.value, cur)}
                 </td>
                 <td
                   className="text-right px-3 py-2 tnum t-body whitespace-nowrap"
@@ -531,18 +531,29 @@ export default function PositionsTable({
                         ? `${numInt(p.price)} ${p.price_currency === 'USD' ? '$' : '₺'}`
                         : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
                     </td>
-                    <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{p.class_name}</td>
-                    <td className="px-3 py-3 text-center">
-                      <CurrencyDot currency={p.currency} />
+                    <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: dayColor(dayOf(p)) }}
+                        title={dayOf(p) ? `Ölçüm başlangıcı ${dateTimeStr(dayOf(p)!.since)}` : 'Bugün yeni fiyat gözlemi yok'}>
+                      {dayOf(p)?.pct != null ? (
+                        <>
+                          <div>{pct(dayOf(p)!.pct!)}</div>
+                          <div className="t-label opacity-80">
+                            {dayAmt(dayOf(p)!) >= 0 ? '+' : ''}{money(dayAmt(dayOf(p)!), cur)}
+                          </div>
+                        </>
+                      ) : '—'}
                     </td>
+                    <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{p.class_name}</td>
                     {/* Adet ve fiyat TAM SAYI: kuruş basamağı sütunu uzatıyor,
                         okuyuşa bir şey katmıyordu. numInt yalnız 1'in altındaki
                         değerlerde (0,08 BTC) basamak bırakır; tamı title'da. */}
-                    <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>
-                      {p.locations.length ? p.locations.join(', ') : '—'}
+                    <td className="px-3 py-3 text-center">
+                      <CurrencyDot currency={p.currency} />
                     </td>
                     {/* Alış fiyatı girilmemişse maliyet 0 DEĞİL meçhuldür — sayı
                         uydurmak yerine "—". Kullanıcı işlemi girdikçe dolar. */}
+                    <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>
+                      {p.locations.length ? p.locations.join(', ') : '—'}
+                    </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap" title={num(qtyOf(p), 4)}>
                       {numInt(qtyOf(p))}
                       {p.external_quantity > 0 && (
@@ -559,21 +570,10 @@ export default function PositionsTable({
                         ? `${numInt(p.avg_cost)} ${p.price_currency === 'USD' ? '$' : '₺'}`
                         : <span style={{ color: 'var(--faint)' }}>—</span>}
                     </td>
-                    <td className="text-right px-3 py-3 tnum whitespace-nowrap">{valOf(p) != null ? money(valOf(p)!, cur) : '—'}</td>
                     {/* Günlük: üstte oran, altında daha küçük puntoyla tutar.
                         Ölçülecek yeni gözlem yoksa (piyasa kapalı, fon NAV'ı
                         gelmemiş) sayı uydurulmaz — "—". */}
-                    <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: dayColor(dayOf(p)) }}
-                        title={dayOf(p) ? `Ölçüm başlangıcı ${dateTimeStr(dayOf(p)!.since)}` : 'Bugün yeni fiyat gözlemi yok'}>
-                      {dayOf(p)?.pct != null ? (
-                        <>
-                          <div>{pct(dayOf(p)!.pct!)}</div>
-                          <div className="t-label opacity-80">
-                            {dayAmt(dayOf(p)!) >= 0 ? '+' : ''}{money(dayAmt(dayOf(p)!), cur)}
-                          </div>
-                        </>
-                      ) : '—'}
-                    </td>
+                    <td className="text-right px-3 py-3 tnum whitespace-nowrap">{valOf(p) != null ? money(valOf(p)!, cur) : '—'}</td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: pnlColor(p.pnl_pct) }}>
                       {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
                     </td>
@@ -606,26 +606,26 @@ export default function PositionsTable({
                           </div>
                         </td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="px-3 py-2 t-label" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="px-3 py-2 text-center">
                           <CurrencyDot currency={t.currency} />
                         </td>
                         <td className="px-3 py-2 t-label" style={{ color: 'var(--muted)' }}>{t.location ?? '—'}</td>
+                        {/* İşlemin kendi fiyatı MALİYET sütununda: üstündeki
+                            pozisyon satırının ortalaması tam da bu satırların
+                            ağırlıklı ortalaması. Piyasa fiyatı sütunu işlem
+                            satırında boş — o an geçerli olan fiyat değil. */}
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" title={num(t.quantity, 4)}>
                           {numInt(t.quantity)}
                           {t.external_quantity > 0 && (
                             <div className="t-label" style={{ color: 'var(--faint)' }}>{numInt(t.external_quantity)} emanet</div>
                           )}
                         </td>
-                        {/* İşlemin kendi fiyatı MALİYET sütununda: üstündeki
-                            pozisyon satırının ortalaması tam da bu satırların
-                            ağırlıklı ortalaması. Piyasa fiyatı sütunu işlem
-                            satırında boş — o an geçerli olan fiyat değil. */}
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body"
                             title={t.unit_price != null ? num(t.unit_price, 4) : undefined}>
                           {t.unit_price != null ? `${numInt(t.unit_price)} ${t.currency === 'USD' ? '$' : '₺'}` : '—'}
                         </td>
-                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
