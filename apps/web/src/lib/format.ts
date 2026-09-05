@@ -59,15 +59,16 @@ export const timeAgo = (iso: string) => {
   return `${Math.floor(s / 86400)}g önce`;
 };
 /**
- * timeAgo'nun rozet hâli: "2 saat". Başlık satırının sağ ucunda tek satırlık
- * bir işaret olarak duruyor — "önce" sözcüğü ikonla birlikte gereksiz.
+ * timeAgo'nun en kısa hâli: "9sn" · "10dk" · "2sa" · "3g". Kartın sağ üst
+ * köşesinde tek başına duruyor; birim harfi timeAgo ile aynı aileden, tam
+ * zaman damgası title'da.
  */
 export const timeAgoShort = (iso: string) => {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return 'az önce';
-  if (s < 3600) return `${Math.floor(s / 60)} dakika`;
-  if (s < 86400) return `${Math.floor(s / 3600)} saat`;
-  return `${Math.floor(s / 86400)} gün`;
+  if (s < 60) return `${s}sn`;
+  if (s < 3600) return `${Math.floor(s / 60)}dk`;
+  if (s < 86400) return `${Math.floor(s / 3600)}sa`;
+  return `${Math.floor(s / 86400)}g`;
 };
 
 // ── Para birimi ──────────────────────────────────────────────────────────

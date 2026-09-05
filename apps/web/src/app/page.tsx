@@ -61,11 +61,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const pnl = conv(pnlTry, cur, rate);
   const pnlPct = costTry > 0 ? (pnlTry / costTry) * 100 : 0;
 
-  // Emanet: toplam ile bana-ait arasındaki fark. Anahtarın ne kadar şey
-  // gizlediğini/gösterdiğini kullanıcıya sayıyla söylemek gerekiyor.
-  const emanet = cur === 'USD' ? totalUsd - ownValueUsd : totalTry - ownValueTry;
-  const emanetCount = positions.filter((p) => p.external_quantity > 0).length;
-
   // "Bana ait" görünümünde payı sıfırlanmış pozisyonlar listede yer tutmasın.
   const rows = own ? positions.filter((p) => p.own_quantity !== 0) : positions;
   const valOf = (p: (typeof positions)[number]) =>
@@ -76,7 +71,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // Dağılım kutucukları: alan = büyüklük, kutu grubunun rengiyle boyanır.
   const alloc = rows
     .filter((p) => valOf(p) > 0)
-    .map((p) => ({ symbol: p.symbol, name: p.display_name, group: p.ui_group, value: valOf(p) }))
+    .map((p) => ({ symbol: p.symbol, name: p.display_name, group: p.ui_group, value: valOf(p), currency: p.currency }))
     .sort((a, b) => b.value - a.value);
 
   // "TÜM" aralığı: motor öncesi yıl kapanışları + bugünkü değer. Bu seride
@@ -155,35 +150,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             </div>
           ) : (
           <>
-          {/* Güncelleme bilgisi başlığın SAĞ ucunda tek rozet: ikon + yaş.
-              Başlığın altındaki tam cümle satırı bir bilgi için koca bir şerit
-              harcıyordu; durum ve tam zaman damgası title'a taşındı. */}
-          <div className="mb-3 sm:mb-4 flex items-center justify-between gap-3">
-            <h2 className="t-h2 font-semibold tracking-tight">Özet</h2>
-            {/* timeAgoShort Date.now()'a bakar: sunucudaki render ile tarayıcıdaki
-                hydration arasında saniyeler geçtiği için metin kaçınılmaz
-                olarak farklı çıkabilir. Bu tek düğüm için uyuşmazlığı bastırıyoruz. */}
-            <span
-              className="shrink-0 flex items-center gap-1.5 t-label whitespace-nowrap"
-              style={{ color: 'var(--muted)' }}
-              title={lastFetch
-                ? `Son güncelleme ${dateTimeStr(lastFetch.finished_at)} · ${lastFetch.status}`
-                : 'Henüz veri yok'}
-              suppressHydrationWarning
-            >
-              <RefreshIcon />
-              {lastFetch ? timeAgoShort(lastFetch.finished_at) : '—'}
-            </span>
-          </div>
-
-          {emanet !== 0 && (
-            <p className="t-label mb-3 tnum" style={{ color: 'var(--faint)' }}>
-              {own
-                ? `${money(emanet, cur)} emanet düşüldü · ${emanetCount} pozisyon`
-                : `${money(emanet, cur)}’si emanet (${emanetCount} pozisyon) — “BT” ile hariç tut`}
-            </p>
-          )}
-
+          {/* Özet başlığı ve emanet özeti kaldırıldı: sekme adı zaten "Özet",
+              başlık satırı bir bilgi taşımadan yükseklik harcıyordu. Güncelleme
+              yaşı birinci kartın sağ üst köşesine taşındı. */}
           {/* KPI — dört kart: varlık · dönemsel K/Z · oransal öne çıkanlar · tutarsal öne çıkanlar */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4 items-stretch">
 
@@ -192,8 +161,25 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                 sahiplik görünümünde olduğu da hemen üstteki emanet satırından
                 okunuyor. Mod yine de title'da duruyor. */}
             <div className="panel p-3 sm:p-4 flex flex-col" title={own ? 'Bana ait varlık' : 'Toplam varlık'}>
-              <div className="t-kpi font-semibold tnum truncate">{money(value, cur)}</div>
-              <div className="t-label mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{money(altValue, altCur)}</div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="t-kpi font-semibold tnum truncate">{money(value, cur)}</div>
+                  <div className="t-label mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{money(altValue, altCur)}</div>
+                </div>
+                {/* timeAgoShort Date.now()'a bakar: sunucu render'ı ile tarayıcı
+                    hydration'ı arasında saniyeler geçtiği için metin farklı
+                    çıkabilir; bu tek düğüm için uyuşmazlık bastırılıyor. */}
+                <span
+                  className="shrink-0 t-label tnum leading-none pt-0.5"
+                  style={{ color: 'var(--faint)' }}
+                  title={lastFetch
+                    ? `Son güncelleme ${dateTimeStr(lastFetch.finished_at)} · ${lastFetch.status}`
+                    : 'Henüz veri yok'}
+                  suppressHydrationWarning
+                >
+                  {lastFetch ? timeAgoShort(lastFetch.finished_at) : '—'}
+                </span>
+              </div>
               <div className="mt-auto pt-3 space-y-1.5">
                 {/* Tutar ve oran ayrı satırda: ikisi farklı soruyu cevaplıyor
                     ("ne kadar kazandım" / "ne kadar büyüdüm") ve tek satıra
@@ -258,15 +244,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           </TabPanel>
 
           <TabPanel id="varlik">
-          <div className="mb-3 sm:mb-4 flex items-end justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="t-h2 font-semibold tracking-tight">Varlık</h2>
-              <p className="t-sub" style={{ color: 'var(--muted)' }}>
-                {rows.length === 0
-                  ? `Henüz pozisyon yok · katalogda ${instruments.length} enstrüman`
-                  : `${rows.length} pozisyon · ${money(value, cur)}${own ? ' · yalnız bana ait' : ''}`}
-              </p>
-            </div>
+          {/* Başlık ve özet satırı kaldırıldı: sekme adı zaten "Varlık", pozisyon
+              sayısı ve toplam da tablonun kendi Toplam satırında duruyor. */}
+          <div className="mb-3 sm:mb-4 flex items-end justify-end gap-3">
             <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
               <AddInstrument classes={classes} />
               <AddTransaction instruments={instruments} locations={locations} />
@@ -298,17 +278,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           </TabPanel>
       </main>
     </TabsProvider>
-  );
-}
-
-// Güncelleme rozeti ikonu — döngüsel ok. Yalnız bir işaret, anlam metinde.
-function RefreshIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" className="shrink-0"
-      fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" />
-      <path d="M13.5 2.2v3.1h-3.1" />
-    </svg>
   );
 }
 

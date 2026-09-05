@@ -2,7 +2,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { money, moneyShort, num, type Cur } from '@/lib/format';
 
-export type AllocItem = { symbol: string; name: string; group: string; value: number };
+// currency = kur riski etiketi (instruments.currency). Varlık tablosundaki
+// nokta ile AYNI anlam: USD fiyatlı korunaklı (yeşil), TL fiyatlı kur
+// karşısında açık (kırmızı).
+export type AllocItem = { symbol: string; name: string; group: string; value: number; currency?: string };
 type Rect = AllocItem & { x: number; y: number; w: number; h: number };
 
 // 20 kutucuktan sonrası okunamayacak kadar küçülüyor — kuyruk "Diğer"de toplanır.
@@ -64,6 +67,7 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
     if (sorted.length <= MAX_TILES) return sorted;
     const head = sorted.slice(0, MAX_TILES - 1);
     const restVal = sorted.slice(MAX_TILES - 1).reduce((s, d) => s + d.value, 0);
+    // "Diğer" birden çok varlığın toplamı — tek bir kur riski taşımaz, noktasız.
     return [...head, { symbol: 'Diğer', name: `${sorted.length - head.length} varlık`, group: '—', value: restVal }];
   }, [data]);
 
@@ -99,7 +103,8 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
           return (
             <div
               key={r.symbol}
-              title={`${r.symbol} — ${r.name}\n${money(r.value, cur)} · %${num(share, 1)}`}
+              title={`${r.symbol} — ${r.name}\n${money(r.value, cur)} · %${num(share, 1)}${
+                r.currency ? `\n${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}` : ''}`}
               className="absolute overflow-hidden rounded-[2px] px-1.5 py-1 leading-tight"
               style={{
                 left: r.x + 1, top: r.y + 1,
@@ -117,6 +122,12 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
                   <div className="t-label font-medium truncate">{r.symbol}</div>
                   {r.h > 48 && <div className="t-micro tnum truncate opacity-90">%{num(share, 1)}</div>}
                   {r.h > 66 && <div className="t-micro tnum truncate opacity-75">{moneyShort(r.value, cur)}</div>}
+                  {r.h > 86 && r.currency && (
+                    <span
+                      aria-label={r.currency}
+                      className="inline-block w-2 h-2 rounded-full mt-1.5"
+                      style={{ background: r.currency === 'USD' ? 'var(--up)' : 'var(--down)' }} />
+                  )}
                 </>
               )}
             </div>
