@@ -82,18 +82,18 @@ function WatchRow({ wi, d, className, classes, locations }: {
         </div>
         <div className="t-label truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--faint)' }}>{wi.display_name}</div>
       </td>
-      <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{className}</td>
-      <td className="px-3 py-3 text-center"><CurrencyDot currency={wi.currency} /></td>
-      <td className="px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-      {/* Adet yerine ne olduğunu söyleyen tek kelime: boş satır bozuk veri gibi durur. */}
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>izleniyor</td>
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
       <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: 'var(--muted)' }}
           title={wi.price != null ? num(wi.price, 4) : undefined}>
         {wi.price != null
           ? `${numInt(wi.price)} ${wi.currency === 'USD' ? '$' : '₺'}`
           : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
       </td>
+      <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{className}</td>
+      <td className="px-3 py-3 text-center"><CurrencyDot currency={wi.currency} /></td>
+      {/* Adet yerine ne olduğunu söyleyen tek kelime: boş satır bozuk veri gibi durur. */}
+      <td className="px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>izleniyor</td>
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
       <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
       {/* Günlük oran var (fiyatı çekiliyor); tutar yok, elde adet yok. */}
       <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: dayColor(d) }}
@@ -213,6 +213,8 @@ export default function PositionsTable({
     // w-[1%]: tablo hücresi içeriğine göre daralsın — sütun genişliğini varlık
     // KODU belirlesin, altındaki uzun görünen ad değil (o zaten kırpılıyor).
     { key: 'symbol', label: 'Varlık', align: 'left', cls: 'px-4 sm:px-5 w-[1%]', sortVal: (it) => it.kind === 'pos' ? it.p.symbol : it.w.symbol },
+    // Fiyat ve Günlük ikisinde de var — izlenen satır burada gerçekten sıraya girer.
+    { key: 'price', label: 'Fiyat', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.price : it.w.price) ?? -Infinity },
     { key: 'class', label: 'Grup', align: 'left', cls: 'px-3', filter: 'class', sortVal: (it) => it.kind === 'pos' ? it.p.class_name : classNameOf(it.w.class_code) },
     { key: 'currency', label: 'Kur Riski', align: 'center', cls: 'px-3', filter: 'currency', sortVal: (it) => it.kind === 'pos' ? it.p.currency : it.w.currency },
     { key: 'location', label: 'Konum', align: 'left', cls: 'px-3', filter: 'location', sortVal: (it) => it.kind === 'pos' ? it.p.locations.join(', ') : '' },
@@ -222,8 +224,6 @@ export default function PositionsTable({
     // yan yana okunsun. İkisi de fiyatın kendi para biriminde (avg_cost,
     // v_holdings'te işlemlerin birim fiyatından türer; girilmemişse 0 → "—").
     { key: 'avgCost', label: 'Ort. Maliyet', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.avg_cost : null) ?? -Infinity },
-    // Fiyat ve Günlük ikisinde de var — izlenen satır burada gerçekten sıraya girer.
-    { key: 'price', label: 'Fiyat', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.price : it.w.price) ?? -Infinity },
     { key: 'value', label: `Değer (${curSymbol(cur)})`, align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? valOf(it.p) : null) ?? -Infinity },
     // Günlük = TR saatiyle bugün 00:00'dan bu yana. Kar/Zarar'ın yanında ama
     // ondan bağımsız bir soru: "alışımdan beri" değil, "bugün".
@@ -381,7 +381,14 @@ export default function PositionsTable({
           </button>
         </div>
       )}
-      <div className="overflow-x-auto">
+      {/* data-scrolled: sabit sütunun gölgesi yalnız yatayda kayınca çıksın. */}
+      <div
+        className="overflow-x-auto tbl-scroll"
+        onScroll={(e) => {
+          const on = e.currentTarget.scrollLeft > 0 ? '1' : '0';
+          if (e.currentTarget.dataset.scrolled !== on) e.currentTarget.dataset.scrolled = on;
+        }}
+      >
         {/* min-w 11 kolonun tamamını sığdırır: dar ekranda kolon GİZLEMEK
             yerine yatay kaydırma bırakıyoruz — mobilde de konum, açılış,
             kapanış gibi sütunlara erişilebilsin. */}
@@ -440,10 +447,10 @@ export default function PositionsTable({
                     {posRows.length} pozisyon
                   </div>
                 </td>
-                <td className="px-3 py-2" />
-                <td className="px-3 py-2" />
-                <td className="px-3 py-2" />
                 <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="px-3 py-2" />
+                <td className="px-3 py-2" />
+                <td className="px-3 py-2" />
                 <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
                 <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
                 <td className="text-right px-3 py-2 tnum t-body font-medium whitespace-nowrap">
@@ -518,16 +525,24 @@ export default function PositionsTable({
                           yazmak satırı gereksiz yükseltiyordu. */}
                       <div className="t-label truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
                     </td>
+                    <td className="text-right px-3 py-3 tnum whitespace-nowrap"
+                        title={p.price != null ? num(p.price, 4) : undefined}>
+                      {p.price != null
+                        ? `${numInt(p.price)} ${p.price_currency === 'USD' ? '$' : '₺'}`
+                        : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
+                    </td>
                     <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{p.class_name}</td>
                     <td className="px-3 py-3 text-center">
                       <CurrencyDot currency={p.currency} />
                     </td>
-                    <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>
-                      {p.locations.length ? p.locations.join(', ') : '—'}
-                    </td>
                     {/* Adet ve fiyat TAM SAYI: kuruş basamağı sütunu uzatıyor,
                         okuyuşa bir şey katmıyordu. numInt yalnız 1'in altındaki
                         değerlerde (0,08 BTC) basamak bırakır; tamı title'da. */}
+                    <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>
+                      {p.locations.length ? p.locations.join(', ') : '—'}
+                    </td>
+                    {/* Alış fiyatı girilmemişse maliyet 0 DEĞİL meçhuldür — sayı
+                        uydurmak yerine "—". Kullanıcı işlemi girdikçe dolar. */}
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap" title={num(qtyOf(p), 4)}>
                       {numInt(qtyOf(p))}
                       {p.external_quantity > 0 && (
@@ -538,19 +553,11 @@ export default function PositionsTable({
                         </div>
                       )}
                     </td>
-                    {/* Alış fiyatı girilmemişse maliyet 0 DEĞİL meçhuldür — sayı
-                        uydurmak yerine "—". Kullanıcı işlemi girdikçe dolar. */}
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap"
                         title={p.avg_cost && p.avg_cost > 0 ? num(p.avg_cost, 4) : 'Alış fiyatı girilmemiş'}>
                       {p.avg_cost && p.avg_cost > 0
                         ? `${numInt(p.avg_cost)} ${p.price_currency === 'USD' ? '$' : '₺'}`
                         : <span style={{ color: 'var(--faint)' }}>—</span>}
-                    </td>
-                    <td className="text-right px-3 py-3 tnum whitespace-nowrap"
-                        title={p.price != null ? num(p.price, 4) : undefined}>
-                      {p.price != null
-                        ? `${numInt(p.price)} ${p.price_currency === 'USD' ? '$' : '₺'}`
-                        : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
                     </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap">{valOf(p) != null ? money(valOf(p)!, cur) : '—'}</td>
                     {/* Günlük: üstte oran, altında daha küçük puntoyla tutar.
@@ -598,6 +605,7 @@ export default function PositionsTable({
                             <EditTransaction tx={t} locations={locations} />
                           </div>
                         </td>
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="px-3 py-2 t-label" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="px-3 py-2 text-center">
                           <CurrencyDot currency={t.currency} />
@@ -609,15 +617,14 @@ export default function PositionsTable({
                             <div className="t-label" style={{ color: 'var(--faint)' }}>{numInt(t.external_quantity)} emanet</div>
                           )}
                         </td>
-                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body"
-                            title={t.unit_price != null ? num(t.unit_price, 4) : undefined}>
-                          {t.unit_price != null ? `${numInt(t.unit_price)} ${t.currency === 'USD' ? '$' : '₺'}` : '—'}
-                        </td>
                         {/* İşlemin kendi fiyatı MALİYET sütununda: üstündeki
                             pozisyon satırının ortalaması tam da bu satırların
                             ağırlıklı ortalaması. Piyasa fiyatı sütunu işlem
                             satırında boş — o an geçerli olan fiyat değil. */}
-                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
+                        <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body"
+                            title={t.unit_price != null ? num(t.unit_price, 4) : undefined}>
+                          {t.unit_price != null ? `${numInt(t.unit_price)} ${t.currency === 'USD' ? '$' : '₺'}` : '—'}
+                        </td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
