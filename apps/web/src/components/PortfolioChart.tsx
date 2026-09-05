@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { useMemo, useState } from 'react';
 import type { SeriesPoint, SymPoint } from '@/lib/data';
-import type { Cur } from '@/lib/format';
+import { money, pct, type Cur } from '@/lib/format';
 
 /**
  * Kategorik seri renkleri — koyu yüzey (#131313) için seçilmiş 8 ton.
@@ -19,6 +19,11 @@ const PALETTE = [
 ];
 const TOTAL_COLOR = '#f4f4f4';
 const TOTAL_KEY = '__total';
+// Yıl kapanışı satırına iliştirilen ham büyüklükler — çizilen seri değil,
+// yalnız tooltip okur (bkz. rows useMemo).
+const YEAR_TRY = '__yearTry';
+const YEAR_USD = '__yearUsd';
+const YEAR_USD_PCT = '__yearUsdPct';
 
 /**
  * 8'den fazla varlıkta yeni ton üretmek yasak (CVD altında ayırt edilemez).
@@ -98,6 +103,20 @@ export default function PortfolioChart({
       // günün son okumasına hiç ulaşılamıyor, hep daha eski biri seçili
       // kalıyordu. Sıra numarası benzersiz; okunur etiket tickFormatter'da.
       const r: Row = { i, label: fmt.format(new Date(d.ts)) };
+      if (yearly) {
+        // Yıl kapanışları serisinde tooltip üç şey gösteriyor: TL tutar, USD
+        // tutar ve USD'nin bir önceki yıla göre değişimi. Bunlar çizilen bir
+        // seri değil, satıra iliştirilmiş ham veri — recharts yalnız <Line>
+        // dataKey'lerini payload'a koyduğu için eksene karışmazlar; tooltip
+        // onlara payload[0].payload üzerinden ulaşıyor.
+        //
+        // Sahiplik uygulanmaz: bu yıllarda varlık kırılımı yok, emanet ayrımı
+        // da yok (bkz. grafiğin altındaki not) — toplam neyse o.
+        const prevUsd = i > 0 ? data[i - 1].usd : null;
+        r[YEAR_TRY] = d.try;
+        r[YEAR_USD] = d.usd;
+        r[YEAR_USD_PCT] = prevUsd && prevUsd > 0 ? (d.usd / prevUsd - 1) * 100 : null;
+      }
       const t = pickTotal(d);
       if (base[TOTAL_KEY] === undefined && t > 0) base[TOTAL_KEY] = t;
 
@@ -135,7 +154,7 @@ export default function PortfolioChart({
       }
       return r;
     });
-  }, [data, symbols, cur, own, mode]);
+  }, [data, symbols, cur, own, mode, yearly]);
 
   const unit = cur === 'TRY' ? '₺' : '$';
   // 2 ondalık: günlük aralıkta oynama %1'in altında kalıyor, 0 ondalıkla
@@ -211,7 +230,7 @@ export default function PortfolioChart({
             <Tooltip
               cursor={{ stroke: '#3d3d3d', strokeWidth: 1 }}
               content={(props) => (
-                <ChartTooltip {...props} fmt={fmtV} labelText={labelOf(Number(props.label))} />
+                <ChartTooltip {...props} fmt={fmtV} yearly={yearly} labelText={labelOf(Number(props.label))} />
               )} />
 
             {symbols.map((sym) => hidden.has(sym) ? null : (
@@ -306,9 +325,12 @@ function LegendChip({ label, color, dashed, on, onClick }: {
 
 // Çok serili grafikte varsayılan tooltip okunmaz uzunlukta oluyor:
 // büyükten küçüğe sıralayıp ilk 8'i gösteriyoruz.
-function ChartTooltip({ active, payload, labelText, fmt }:
-  TooltipContentProps & { fmt: (n: number) => string; labelText: string }) {
+function ChartTooltip({ active, payload, labelText, fmt, yearly }:
+  TooltipContentProps & { fmt: (n: number) => string; labelText: string; yearly?: boolean }) {
   if (!active || !payload?.length) return null;
+  // Yıl kapanışları: tek çizgi var, seri listesi anlamsız. Onun yerine o yılın
+  // TL ve USD büyüklüğü ile USD'nin önceki yıla göre değişimi.
+  const yr = yearly ? (payload[0]?.payload as Record<string, number | null> | undefined) : undefined;
   const items = [...payload]
     .filter((p) => p.value != null)
     .sort((a, b) => Number(b.value) - Number(a.value));
@@ -328,7 +350,23 @@ function ChartTooltip({ active, payload, labelText, fmt }:
       boxShadow: '0 4px 14px rgba(0,0,0,0.4)', minWidth: 112,
     }}>
       <div style={{ color: '#a8a8a8', marginBottom: 3 }}>{labelText}</div>
-      {shown.map((p) => (
+      {yr ? (
+        <>
+          <div className="tnum" style={{ color: '#f4f4f4' }}>{money(Number(yr[YEAR_TRY] ?? 0), 'TRY')}</div>
+          <div className="tnum" style={{ color: '#a8a8a8' }}>{money(Number(yr[YEAR_USD] ?? 0), 'USD')}</div>
+          {/* Çıplak bir yüzde hangi büyüklüğe ait belli olmazdı; kısa etiket
+              kalıyor. İlk yılda karşılaştırılacak önceki yıl yok. */}
+          <div className="flex items-baseline justify-between gap-2.5" style={{ marginTop: 2 }}>
+            <span style={{ color: '#7d7d7d' }}>$ değişim</span>
+            <span className="tnum" style={{
+              color: yr[YEAR_USD_PCT] == null ? '#7d7d7d'
+                : (yr[YEAR_USD_PCT] as number) >= 0 ? 'var(--up)' : 'var(--down)',
+            }}>
+              {yr[YEAR_USD_PCT] == null ? '—' : pct(yr[YEAR_USD_PCT] as number)}
+            </span>
+          </div>
+        </>
+      ) : shown.map((p) => (
         <div key={String(p.dataKey)} className="flex items-baseline justify-between gap-2.5">
           <span className="flex items-center gap-1.5" style={{ color: '#f4f4f4' }}>
             <span style={{ width: 7, height: 7, borderRadius: 2, background: p.color, display: 'inline-block' }} />
@@ -337,7 +375,7 @@ function ChartTooltip({ active, payload, labelText, fmt }:
           <span className="tnum" style={{ color: '#f4f4f4' }}>{fmt(Number(p.value))}</span>
         </div>
       ))}
-      {items.length > shown.length && (
+      {!yr && items.length > shown.length && (
         <div style={{ color: '#7d7d7d', marginTop: 3 }}>+{items.length - shown.length} daha</div>
       )}
     </div>
