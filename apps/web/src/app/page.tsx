@@ -2,7 +2,7 @@ import {
   getLatestSnapshot, getPositions, getHistory, getInstruments,
   getLastFetch, getAssetClasses, getPeriodChanges, getPeriodMovers,
   getTransactionsByInstrument, getLocations, getUsdTry, getAnnualClosings,
-  getProjectionScenarios,
+  getProjectionScenarios, getDayChanges, getWatchlist,
   type Change, type Position, type SeriesPoint, type PeriodKey,
 } from '@/lib/data';
 import { money, conv, num, pct, timeAgoShort, dateTimeStr, type Cur } from '@/lib/format';
@@ -31,13 +31,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // ?cur=USD → tüm sayfa dolar üzerinden değerlendirilir.
   const cur: Cur = sp.cur === 'USD' ? 'USD' : 'TRY';
 
-  const [snap, positions, history, instruments, lastFetch, classes, changes, movers, transactions, locations, rate, closings, scenarios] =
+  const [snap, positions, history, instruments, lastFetch, classes, changes, movers, transactions, locations, rate, closings, scenarios, dayChanges, watchlist] =
     await Promise.all([
       getLatestSnapshot(), getPositions(), getHistory(range), getInstruments(),
       getLastFetch(), getAssetClasses(), getPeriodChanges(), getPeriodMovers(),
       getTransactionsByInstrument(), getLocations(), getUsdTry(), getAnnualClosings(),
-      getProjectionScenarios(),
+      getProjectionScenarios(), getDayChanges(), getWatchlist(),
     ]);
+  // İzleme listesi = kataloğa eklenmiş ama pozisyonu olmayan enstrüman
+  // (v_watchlist). Hesaba KATILMAZ: portföy büyüklüğü, dağılım, grafik ve
+  // dönemsel kartların hepsi `positions`tan besleniyor, bu dizi oraya hiç
+  // girmiyor — yalnız Varlık tablosunun altında ayrı bir bölüm olarak çizilir.
 
   // Özet büyüklükler CANLI pozisyonlardan toplanır, snapshot'tan OKUNMAZ.
   // Snapshot saat başı yazılır; arada bir işlem girildiğinde kart ile tablonun
@@ -253,7 +257,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             </div>
           </div>
 
-          {rows.length === 0 ? (
+          {rows.length === 0 && watchlist.length === 0 ? (
             <div className="panel p-8 text-center t-head" style={{ color: 'var(--muted)' }}>
               {instruments.length === 0 ? (
                 <>
@@ -273,7 +277,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
               )}
             </div>
           ) : (
-            <PositionsTable rows={rows} own={own} cur={cur} transactions={transactions} locations={locations} classes={classes} />
+            <PositionsTable
+              rows={rows} own={own} cur={cur} transactions={transactions}
+              locations={locations} classes={classes}
+              dayChanges={dayChanges} watchlist={watchlist} rate={rate} />
           )}
           </TabPanel>
       </main>

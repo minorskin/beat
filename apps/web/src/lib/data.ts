@@ -281,6 +281,84 @@ export async function getHistory(range: string): Promise<HistoryBundle> {
   return { points: [...byTs.values()], symbols: [...symbols].sort() };
 }
 
+// ── Günlük değişim (TR saatiyle bugün 00:00'dan bu yana) ─────────────────
+/**
+ * Bir enstrümanın bugünkü hareketi. Ölçü TL cinsinden BİRİM DEĞER: dolar
+ * kotalı bir varlık dolar bazında yatay dursa bile TL zayıflarsa bu portföy
+ * için gerçek bir değişimdir — oran ile tutarın işareti hep uyuşsun diye ikisi
+ * de aynı bazdan çıkar (Öne Çıkanlar kartlarıyla da aynı dil).
+ *
+ * since = ölçünün başladığı gözlem. Normalde gece yarısından önceki son fiyat;
+ * enstrüman bugün eklendiyse elimizdeki en erken fiyat.
+ */
+export interface DayChange { pct: number | null; abs_try: number; own_abs_try: number; since: string }
+
+export async function getDayChanges(): Promise<Record<string, DayChange>> {
+  const rows = await q<{
+    instrument_id: string; base_ts: string;
+    quantity: number; own_quantity: number;
+    base_try: number; now_try: number;
+  }>(`
+    with t0 as (
+      -- TR gün başı. date_trunc yerel duvar saatinde çalışsın diye önce
+      -- 'at time zone' ile TR'ye çevrilir, sonra geri timestamptz yapılır.
+      select (date_trunc('day', now() at time zone 'Europe/Istanbul')) at time zone 'Europe/Istanbul' as ts
+    ),
+    fx_now as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1),
+    cand as (
+      select i.id as instrument_id,
+             coalesce(h.quantity, 0) as quantity, coalesce(h.own_quantity, 0) as own_quantity
+      from instruments i
+      left join v_holdings h on h.instrument_id = i.id
+      where i.is_active
+    ),
+    b as (
+      select c.*, coalesce(bb.ts, ff.ts) as base_ts,
+             coalesce(bb.price, ff.price) as base_price,
+             coalesce(bb.currency, ff.currency) as base_currency
+      from cand c cross join t0
+      left join lateral (
+        select pr.ts, pr.price, pr.currency from prices pr
+        where pr.instrument_id = c.instrument_id and pr.ts <= t0.ts
+        order by pr.ts desc limit 1
+      ) bb on true
+      -- Gece yarısından önce hiç gözlem yoksa (bugün eklenmiş) en erkene düş.
+      left join lateral (
+        select pr.ts, pr.price, pr.currency from prices pr
+        where pr.instrument_id = c.instrument_id
+        order by pr.ts asc limit 1
+      ) ff on true
+    )
+    select b.instrument_id, b.base_ts, b.quantity, b.own_quantity,
+           b.base_price * case when b.base_currency='USD'
+                               then coalesce(fxb.rate, (select rate from fx_now)) else 1 end as base_try,
+           lp.price * case when lp.currency='USD' then (select rate from fx_now) else 1 end as now_try
+    from b
+    join v_latest_price lp on lp.instrument_id = b.instrument_id
+    -- Baz anındaki kur: geçmiş bir fiyatı BUGÜNKÜ kurla çevirmek sahte bir
+    -- hareket üretirdi.
+    left join lateral (
+      select fr.rate from fx_rates fr
+      where fr.base='USD' and fr.quote='TRY' and fr.ts <= b.base_ts
+      order by fr.ts desc limit 1
+    ) fxb on true
+    -- Baz gözlem AYNI ZAMANDA en güncel gözlemse bugün ölçülecek bir hareket
+    -- yok (piyasa kapalı, fon NAV'ı gelmemiş): satır düşer, arayüzde "—".
+    where b.base_ts is not null and b.base_ts < lp.price_ts`);
+
+  const out: Record<string, DayChange> = {};
+  for (const r of rows) {
+    const d = r.now_try - r.base_try;
+    out[r.instrument_id] = {
+      pct: r.base_try > 0 ? (r.now_try / r.base_try - 1) * 100 : null,
+      abs_try: d * r.quantity,
+      own_abs_try: d * r.own_quantity,
+      since: r.base_ts,
+    };
+  }
+  return out;
+}
+
 /** İşlem formu için: tüm aktif enstrümanlar + mevcut adet/emanet durumu. */
 export async function getInstruments(): Promise<Instrument[]> {
   return q<Instrument>(`
