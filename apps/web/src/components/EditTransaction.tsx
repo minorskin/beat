@@ -1,5 +1,6 @@
 'use client';
 import { useState, useTransition } from 'react';
+import { createPortal } from 'react-dom';
 import { updateTransaction } from '@/app/actions';
 import type { TxRow } from '@/lib/data';
 
@@ -32,7 +33,11 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
         ✎
       </button>
 
-      {open && (
+      {/* Pencere document.body'ye taşınıyor. Bu bileşen tablonun SABİT
+          (position:sticky) ilk sütununda duruyor ve sticky — z-index verilmese
+          bile — bir yığın bağlamı yaratıyor; içeride kalan tam ekran pencere
+          z-40'lı üst barın ALTINDA çiziliyordu. Portal onu kök seviyeye alır. */}
+      {open && createPortal((
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 whitespace-normal text-left normal-case tracking-normal"
           style={{ background: 'rgba(0,0,0,0.65)' }}
@@ -133,7 +138,7 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
             </div>
           </form>
         </div>
-      )}
+      ), document.body)}
     </>
   );
 }
