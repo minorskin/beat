@@ -176,7 +176,7 @@ input.field::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: po
 /* Ayraç yalnız kaydırma başlayınca: durağan halde tabloda çizgi yok. */
 .tbl-scroll[data-scrolled='1'] thead th:first-child,
 .tbl-scroll[data-scrolled='1'] tbody td:first-child:not([colspan]) {
-  box-shadow: 10px 0 14px -12px rgba(0, 0, 0, 0.95);
+  box-shadow: 8px 0 10px -6px rgba(0, 0, 0, 0.75);
 }
 
 /* Akordiyon: işlem satırları ana satırdan biraz daha açık, kısa bir açılış/kapanış animasyonu ile */
