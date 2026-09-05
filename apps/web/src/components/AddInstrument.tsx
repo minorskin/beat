@@ -2,7 +2,7 @@
 import { useState, useTransition } from 'react';
 import { addInstrument } from '@/app/actions';
 import { CLASS_DEFAULTS, defaultsFor, symbolFromName } from '@/lib/catalog';
-import { GOLD_OPTIONS } from '@/lib/resolve';
+import { GOLD_OPTIONS, INDEX_OPTIONS } from '@/lib/resolve';
 import type { AssetClass } from '@/lib/data';
 
 /**
@@ -30,6 +30,7 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
 
   const def = CLASS_DEFAULTS[cls];
   const isGold = cls === 'gold';
+  const isIndex = cls === 'index';
   const isRealty = cls === 'realty';
   // Bilgi satırı yazılan sembole göre çözülür: nakit (TRYTRY) döviz sınıfının
   // içinde ama takvimi 7/24 — sınıf varsayılanını göstermek yanlış olurdu.
@@ -103,6 +104,18 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
                   </span>
                 </label>
               </>
+            ) : isIndex ? (
+              <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+                Endeks / Çapraz Kur
+                <select name="index_code" className="field mt-1" required defaultValue="">
+                  <option value="" disabled>Seç…</option>
+                  {INDEX_OPTIONS.map((x) => <option key={x.code} value={x.code}>{x.display_name}</option>)}
+                </select>
+                <span className="block mt-1" style={{ color: 'var(--faint)' }}>
+                  Tutulan varlık değil, referans: izleme satırı olarak listelenir,
+                  hesaba ve özet sekmesine girmez.
+                </span>
+              </label>
             ) : isGold ? (
               <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
                 Altın Türü

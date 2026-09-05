@@ -291,13 +291,24 @@ export async function getHistory(range: string): Promise<HistoryBundle> {
  * since = ölçünün başladığı gözlem. Normalde gece yarısından önceki son fiyat;
  * enstrüman bugün eklendiyse elimizdeki en erken fiyat.
  */
-export interface DayChange { pct: number | null; abs_try: number; own_abs_try: number; since: string }
+export interface DayChange {
+  /** TL bazlı oran — elde tutulan varlık için doğru ölçü (kur hareketi dahil). */
+  pct: number | null;
+  /**
+   * Enstrümanın KENDİ para birimindeki oran. İzlenen referanslar (S&P 500,
+   * DXY, EUR/USD) için doğru olan bu: "S&P bugün ne yaptı" sorusunun cevabına
+   * TL'nin hareketi karışmamalı. Elde adet olmadığı için orada TL tutarı da yok.
+   */
+  pct_native: number | null;
+  abs_try: number; own_abs_try: number; since: string;
+}
 
 export async function getDayChanges(): Promise<Record<string, DayChange>> {
   const rows = await q<{
     instrument_id: string; base_ts: string;
     quantity: number; own_quantity: number;
     base_try: number; now_try: number;
+    base_native: number; now_native: number;
   }>(`
     with t0 as (
       -- TR gün başı. date_trunc yerel duvar saatinde çalışsın diye önce
@@ -332,7 +343,8 @@ export async function getDayChanges(): Promise<Record<string, DayChange>> {
     select b.instrument_id, b.base_ts, b.quantity, b.own_quantity,
            b.base_price * case when b.base_currency='USD'
                                then coalesce(fxb.rate, (select rate from fx_now)) else 1 end as base_try,
-           lp.price * case when lp.currency='USD' then (select rate from fx_now) else 1 end as now_try
+           lp.price * case when lp.currency='USD' then (select rate from fx_now) else 1 end as now_try,
+           b.base_price as base_native, lp.price as now_native
     from b
     join v_latest_price lp on lp.instrument_id = b.instrument_id
     -- Baz anındaki kur: geçmiş bir fiyatı BUGÜNKÜ kurla çevirmek sahte bir
@@ -351,6 +363,7 @@ export async function getDayChanges(): Promise<Record<string, DayChange>> {
     const d = r.now_try - r.base_try;
     out[r.instrument_id] = {
       pct: r.base_try > 0 ? (r.now_try / r.base_try - 1) * 100 : null,
+      pct_native: r.base_native > 0 ? (r.now_native / r.base_native - 1) * 100 : null,
       abs_try: d * r.quantity,
       own_abs_try: d * r.own_quantity,
       since: r.base_ts,

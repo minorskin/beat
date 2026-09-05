@@ -69,6 +69,15 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
     symbolHint: 'Mülkün adı — ör. Ataşehir AVM',
     sources: (_s, ps) => [{ provider: 'constant', providerSymbol: ps, priority: 10 }],
   },
+  index: {
+    // Endeks ve çapraz kur — izleme amaçlı referans enstrümanlar.
+    // Kanonik sembol temiz kalır (SP500, DXY, EURUSD); yahoo'nun kendi kodu
+    // (^GSPC, DX-Y.NYB, EURUSD=X) providerSymbol'de durur — altınla aynı desen.
+    // SYMBOL_RE'yi gevşetmeye gerek yok: kodlar ön tanımlı listeden geliyor.
+    currency: 'USD', calendar: 'FX_24_5', cadence: 'hourly',
+    symbolHint: '',
+    sources: (_s, ps) => [{ provider: 'yahoo', providerSymbol: ps, priority: 10 }],
+  },
   crypto: {
     currency: 'USD', calendar: 'CRYPTO_24_7', cadence: 'hourly',
     symbolHint: 'Kısa kod — SOL, AVAX',

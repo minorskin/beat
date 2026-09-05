@@ -20,9 +20,9 @@ async function one(providerSymbol: string) {
 
 export const yahooProvider: PriceProvider = {
   id: 'yahoo',
-  supports: ['stock_us', 'etf_us', 'stock_tr'],
+  supports: ['stock_us', 'etf_us', 'stock_tr', 'index'],
   capabilities: { batch: false, historical: true, rateLimit: { perMinute: 60 } },
-  canHandle: (s) => ['stock_us', 'etf_us', 'stock_tr'].includes(s.classCode),
+  canHandle: (s) => ['stock_us', 'etf_us', 'stock_tr', 'index'].includes(s.classCode),
 
   async fetchQuotes(syms): Promise<ProviderResult> {
     const quotes: Quote[] = [];

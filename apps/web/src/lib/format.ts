@@ -5,7 +5,7 @@ export const usd = (n: number) =>
 export const num = (n: number, d = 2) =>
   new Intl.NumberFormat('tr-TR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
 /**
- * Tam sayı gösterimi — adet ve fiyat sütunları için.
+ * Tam sayı gösterimi — ADET sütunu için.
  *
  * Tek istisna: 1'in ALTINDAKİ değerler. 0,08 BTC'yi "0" diye yazmak sayıyı
  * bilgi olmaktan çıkarır; orada iki anlamlı basamağa yuvarlanır.
@@ -15,6 +15,19 @@ export const numInt = (n: number) => {
   return a > 0 && a < 1
     ? new Intl.NumberFormat('tr-TR', { maximumSignificantDigits: 2 }).format(n)
     : new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(n);
+};
+/**
+ * FİYAT gösterimi. Kural "ondalık yok" ama 100'ün altında iki hane kalır:
+ * EUR/USD 1,1621 → "1" olurdu, yani sayı olmaktan çıkardı. Aynı sorun küçük
+ * fiyatlı her şeyde var (fon NAV'ı 2,7844 · VIX 14,53 · DXY 99,16).
+ * 100 ve üzeri hâlâ tam sayı — büyük fiyatlarda kuruş gürültüden başka bir şey
+ * değil (9.441 ₺, 4.500.000 ₺).
+ */
+export const numPrice = (n: number) => {
+  const a = Math.abs(n);
+  if (a > 0 && a < 1) return new Intl.NumberFormat('tr-TR', { maximumSignificantDigits: 2 }).format(n);
+  if (a < 100) return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 2 }).format(n);
+  return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 }).format(n);
 };
 /**
  * Kısaltılmış tutar: 2.340.000 → "2,3m". Dar yerlerde (dağılım kırılımı)

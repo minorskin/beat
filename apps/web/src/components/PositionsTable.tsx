@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { money, conv, num, numInt, pct, dateStr, dateTimeStr, curSymbol, type Cur } from '@/lib/format';
+import { money, conv, num, numInt, numPrice, pct, dateStr, dateTimeStr, curSymbol, type Cur } from '@/lib/format';
 import type { AssetClass, DayChange, Position, TxRow, WatchItem } from '@/lib/data';
 import EditInstrument from './EditInstrument';
 import EditTransaction from './EditTransaction';
@@ -85,12 +85,15 @@ function WatchRow({ wi, d, className, classes, locations }: {
       <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: 'var(--muted)' }}
           title={wi.price != null ? num(wi.price, 4) : undefined}>
         {wi.price != null
-          ? `${numInt(wi.price)} ${wi.currency === 'USD' ? '$' : '₺'}`
+          ? `${numPrice(wi.price)} ${wi.currency === 'USD' ? '$' : '₺'}`
           : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
       </td>
-      <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: dayColor(d) }}
-          title={d ? `Ölçüm başlangıcı ${dateTimeStr(d.since)}` : 'Bugün yeni fiyat gözlemi yok'}>
-        {d?.pct != null ? pct(d.pct) : '—'}
+      {/* Oran enstrümanın KENDİ para biriminden: izlenen bir endeksin günlük
+          hareketine TL'nin hareketi karışmamalı. Pozisyon satırında ise TL
+          bazlı olan doğru — orada kur farkı gerçek bir kazanç/kayıp. */}
+      <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: pnlColor(d?.pct_native ?? null) }}
+          title={d ? `Ölçüm başlangıcı ${dateTimeStr(d.since)} · kendi para biriminde` : 'Bugün yeni fiyat gözlemi yok'}>
+        {d?.pct_native != null ? pct(d.pct_native) : '—'}
       </td>
       <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{className}</td>
       {/* Adet yerine ne olduğunu söyleyen tek kelime: boş satır bozuk veri gibi durur. */}
@@ -528,7 +531,7 @@ export default function PositionsTable({
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap"
                         title={p.price != null ? num(p.price, 4) : undefined}>
                       {p.price != null
-                        ? `${numInt(p.price)} ${p.price_currency === 'USD' ? '$' : '₺'}`
+                        ? `${numPrice(p.price)} ${p.price_currency === 'USD' ? '$' : '₺'}`
                         : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}
                     </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: dayColor(dayOf(p)) }}
@@ -567,7 +570,7 @@ export default function PositionsTable({
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap"
                         title={p.avg_cost && p.avg_cost > 0 ? num(p.avg_cost, 4) : 'Alış fiyatı girilmemiş'}>
                       {p.avg_cost && p.avg_cost > 0
-                        ? `${numInt(p.avg_cost)} ${p.price_currency === 'USD' ? '$' : '₺'}`
+                        ? `${numPrice(p.avg_cost)} ${p.price_currency === 'USD' ? '$' : '₺'}`
                         : <span style={{ color: 'var(--faint)' }}>—</span>}
                     </td>
                     {/* Günlük: üstte oran, altında daha küçük puntoyla tutar.
@@ -624,7 +627,7 @@ export default function PositionsTable({
                         </td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body"
                             title={t.unit_price != null ? num(t.unit_price, 4) : undefined}>
-                          {t.unit_price != null ? `${numInt(t.unit_price)} ${t.currency === 'USD' ? '$' : '₺'}` : '—'}
+                          {t.unit_price != null ? `${numPrice(t.unit_price)} ${t.currency === 'USD' ? '$' : '₺'}` : '—'}
                         </td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>

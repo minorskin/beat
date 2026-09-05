@@ -18,6 +18,26 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
 export type Resolved = { display_name: string; provider_symbol: string };
 export type ResolveResult = Resolved | { error: string };
 
+/**
+ * İzlenebilir endeksler ve çapraz kurlar — hepsi yahoo'dan, hepsi USD kote.
+ * `code` yahoo'nun kendi sembolü, `symbol` arayüzde okunan kanonik kod.
+ * Dokuzu da canlı doğrulandı (chart endpoint, HTTP 200 + fiyat).
+ *
+ * Üçüncü bir para birimiyle kote edilen çiftler (USD/JPY → JPY) bilerek DIŞARIDA:
+ * fiyat sütunu şimdilik yalnız ₺ ve $ simgesi biliyor, yen'i "₺" diye yazardı.
+ */
+export const INDEX_OPTIONS: { code: string; symbol: string; display_name: string }[] = [
+  { code: '^GSPC',    symbol: 'SP500',     display_name: 'S&P 500' },
+  { code: '^IXIC',    symbol: 'NASDAQ',    display_name: 'Nasdaq Bileşik' },
+  { code: '^NDX',     symbol: 'NASDAQ100', display_name: 'Nasdaq 100' },
+  { code: '^NDXT',    symbol: 'NDXT',      display_name: 'Nasdaq 100 Teknoloji' },
+  { code: '^DJI',     symbol: 'DJI',       display_name: 'Dow Jones' },
+  { code: '^VIX',     symbol: 'VIX',       display_name: 'VIX Oynaklık Endeksi' },
+  { code: 'DX-Y.NYB', symbol: 'DXY',       display_name: 'Dolar Endeksi (DXY)' },
+  { code: 'EURUSD=X', symbol: 'EURUSD',    display_name: 'Euro / Dolar' },
+  { code: 'GBPUSD=X', symbol: 'GBPUSD',    display_name: 'Sterlin / Dolar' },
+];
+
 /** Truncgil'de gerçekten satılan altın ürünleri — sabit liste, kullanıcı kod bilmek zorunda kalmasın. */
 export const GOLD_OPTIONS: { code: string; symbol: string; display_name: string }[] = [
   { code: 'GRA', symbol: 'GRAMALTIN', display_name: 'Gram Altın' },

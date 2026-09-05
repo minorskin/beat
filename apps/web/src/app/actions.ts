@@ -2,7 +2,7 @@
 import { q, pool } from '@/lib/db';
 import { CLASS_DEFAULTS, SYMBOL_RE, defaultsFor, symbolFromName } from '@/lib/catalog';
 import { parseAmount } from '@/lib/format';
-import { resolveInstrumentMeta, GOLD_OPTIONS } from '@/lib/resolve';
+import { resolveInstrumentMeta, GOLD_OPTIONS, INDEX_OPTIONS } from '@/lib/resolve';
 import { revalidatePath } from 'next/cache';
 
 type Result = { ok: boolean; error?: string };
@@ -72,6 +72,14 @@ export async function addInstrument(formData: FormData): Promise<Result> {
     const value = parseAmount(String(formData.get('value') || ''));
     if (value == null || value <= 0) return { ok: false, error: 'Güncel değeri gir (ör. 25.000.000)' };
     provider_symbol = String(value);
+  } else if (class_code === 'index') {
+    // Endeks/çapraz kur: kullanıcı listeden seçer. Sembolü elle yazdırmak
+    // yahoo kodlarını (^GSPC, DX-Y.NYB) ezberletmek olurdu — ayrıca o kodlar
+    // SYMBOL_RE'ye uymuyor; listeden gelince kural gevşetilmeye gerek kalmıyor.
+    const idxCode = String(formData.get('index_code') || '');
+    const x = INDEX_OPTIONS.find((o) => o.code === idxCode);
+    if (!x) return { ok: false, error: 'Endeks seç' };
+    symbol = x.symbol; display_name = x.display_name; provider_symbol = x.code;
   } else if (class_code === 'gold') {
     const goldCode = String(formData.get('gold_code') || '');
     const g = GOLD_OPTIONS.find((o) => o.code === goldCode);
