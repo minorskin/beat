@@ -25,6 +25,10 @@ export interface MarketRow {
  * Oran `pct_native`: enstrümanın kendi para birimindeki değişim. TL bazlı oran
  * burada yanlış olurdu — "S&P bugün ne yaptı"nın cevabına TL'nin hareketi
  * karışmamalı (bkz. DayChange yorumu).
+ *
+ * Punto en küçük kademede (t-micro): kart diğer üçüyle aynı yükseklikte
+ * kalırken on satır sığsın diye. Bu satırlar okunmuyor TARANIYOR — göz
+ * aradığı sembolü bulup oranına bakıyor, metin gibi soldan sağa gitmiyor.
  */
 export default function MarketPulse({ rows }: { rows: MarketRow[] }) {
   return (
@@ -34,17 +38,20 @@ export default function MarketPulse({ rows }: { rows: MarketRow[] }) {
         <div className="t-micro shrink-0" style={{ color: 'var(--faint)' }}>bugün</div>
       </div>
 
+      {/* Satır yüksekliği ölçüldü, seçilmedi: on satır birinci kartın
+          boyunu aşmadan sığsın diye punto en küçük kademede (t-micro),
+          satır arası 1 ve leading-tight. Üçü birden ~19,5px veriyor. */}
       {rows.length === 0 ? (
-        <div className="t-label flex-1 flex items-center" style={{ color: 'var(--faint)' }}>
+        <div className="t-micro flex-1 flex items-center" style={{ color: 'var(--faint)' }}>
           İzlenen referans yok. Varlık sekmesinden enstrüman ekleyip işlem
           girmezsen burada referans olarak görünür.
         </div>
       ) : (
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           {rows.map((r) => (
             <div
               key={r.symbol}
-              className="flex items-baseline justify-between gap-2 t-label min-w-0"
+              className="flex items-baseline justify-between gap-2 t-micro leading-tight min-w-0"
               title={`${r.symbol} — ${r.name}${r.pct == null ? '\nBugün için ölçüm yok' : ''}`}
             >
               <span className="truncate" style={{ color: 'var(--muted)' }}>{r.symbol}</span>

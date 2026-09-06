@@ -20,6 +20,7 @@ import RangeSwitcher from '@/components/RangeSwitcher';
 import { rangeLongOf } from '@/lib/ranges';
 import Movers from '@/components/Movers';
 import MarketPulse, { type MarketRow } from '@/components/MarketPulse';
+import Balance from '@/components/Balance';
 import { logout } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -92,9 +93,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
       price: w.price, priceCur: w.price_currency,
       pct: dayChanges[w.instrument_id]?.pct_native ?? null,
     })),
-    // Kart bir liste değil bir gösterge: altıdan fazlası kartı diğer üçünden
-    // uzatır ve satır yüksekliğini okunmaz hale getirir.
-  ].slice(0, 6);
+    // Üst sınır 10: kartın yüksekliği diğer üçüyle aynı kalsın diye punto
+    // küçültüldü, sığan satır sayısı bu. Fazlası kartı uzatırdı.
+  ].slice(0, 10);
 
   // Kur riski kırılımı. instruments.currency artık para birimi değil RİSK
   // ETİKETİ (bkz. WatchItem yorumu): 'USD' = dolar bazlı, kur hareketine
@@ -109,7 +110,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     .map((p) => ({ symbol: p.symbol, name: p.display_name, group: p.ui_group, value: valOf(p), currency: p.currency }))
     .sort((a, b) => b.value - a.value);
 
-  // Yoğunlaşma kırılımı — eşikler lib/risk.ts'te, dağılım kutucuklarıyla ORTAK.
+  // Yoğunluk kırılımı — eşikler lib/risk.ts'te, dağılım kutucuklarıyla ORTAK.
   // Payda `alloc` toplamı: değeri henüz bilinmeyen (fiyatı bekleyen) pozisyon
   // paya girmez, yoksa herkesin oranı olduğundan küçük çıkar.
   const allocTotal = alloc.reduce((a, it) => a + it.value, 0);
@@ -204,25 +205,25 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                 sahiplik görünümünde olduğu da hemen üstteki emanet satırından
                 okunuyor. Mod yine de title'da duruyor. */}
             <div className="panel p-3 sm:p-4 flex flex-col" title={own ? 'Bana ait varlık' : 'Toplam varlık'}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="t-kpi font-semibold tnum truncate">{money(value, cur)}</div>
-                  <div className="t-label mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>{money(altValue, altCur)}</div>
-                </div>
-                {/* timeAgoShort Date.now()'a bakar: sunucu render'ı ile tarayıcı
-                    hydration'ı arasında saniyeler geçtiği için metin farklı
-                    çıkabilir; bu tek düğüm için uyuşmazlık bastırılıyor. */}
-                <span
-                  className="shrink-0 t-label tnum leading-none pt-0.5"
-                  style={{ color: 'var(--faint)' }}
-                  title={lastFetch
-                    ? `Son güncelleme ${dateTimeStr(lastFetch.finished_at)} · ${lastFetch.status}`
-                    : 'Henüz veri yok'}
-                  suppressHydrationWarning
-                >
-                  {lastFetch ? timeAgoShort(lastFetch.finished_at) : '—'}
-                </span>
-              </div>
+              {/* Tutarlar ve gizleme anahtarı istemci tarafında (bkz. Balance).
+                  Tazelik rozeti sunucuda çizilip prop olarak geçiliyor:
+                  timeAgoShort Date.now()'a bakar, istemcide hesaplansa
+                  hydration'da farklı metin üretirdi. */}
+              <Balance
+                main={money(value, cur)}
+                alt={money(altValue, altCur)}
+                badge={
+                  <span
+                    className="t-label tnum leading-none"
+                    style={{ color: 'var(--faint)' }}
+                    title={lastFetch
+                      ? `Son güncelleme ${dateTimeStr(lastFetch.finished_at)} · ${lastFetch.status}`
+                      : 'Henüz veri yok'}
+                    suppressHydrationWarning
+                  >
+                    {lastFetch ? timeAgoShort(lastFetch.finished_at) : '—'}
+                  </span>
+                } />
               <div className="mt-auto pt-3 space-y-1.5">
                 {/* Tutar ve oran ayrı satırda: ikisi farklı soruyu cevaplıyor
                     ("ne kadar kazandım" / "ne kadar büyüdüm") ve tek satıra
@@ -245,15 +246,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                   value={chgPct == null ? '—' : pct(chgPct)}
                   color={chgColor}
                 />
-                {/* Yoğunlaşma — kur riski satırıyla aynı dilbilgisi: kaç varlık
-                    hangi kovada. Kırmızı = payı %33 üstü (portföy artık o
-                    varlığın kendisi), sarı = %20–33 (izle), gri = toplam varlık.
-                    Eski "Pozisyon" satırı buraya taşındı: adet zaten gri
-                    rozette, bayat fiyat uyarısı da onun title'ında. */}
+                {/* Yoğunluk riski — kur riski satırıyla aynı dilbilgisi: kaç
+                    varlık hangi kovada. Kırmızı = payı %33 üstü (portföy artık
+                    o varlığın kendisi), sarı = %20–33 (izle), gri = toplam
+                    varlık. Eski "Pozisyon" satırı buraya taşındı: adet zaten
+                    gri rozette, bayat fiyat uyarısı da onun title'ında. */}
                 <div className="flex items-baseline justify-between gap-2 t-strong">
-                  <span className="shrink-0" style={{ color: 'var(--muted)' }}>Yoğunlaşma</span>
+                  <span className="shrink-0" style={{ color: 'var(--muted)' }}>Yoğunluk Riski</span>
                   <span className="flex items-center gap-1 shrink-0">
-                    <Chip tone="tone-down" n={concHigh} title={`${concHigh} varlığın payı %${CONC_HIGH} üstünde — yoğunlaşma riski yüksek`} />
+                    <Chip tone="tone-down" n={concHigh} title={`${concHigh} varlığın payı %${CONC_HIGH} üstünde — yoğunluk riski yüksek`} />
                     <Chip tone="tone-warn" n={concMid}  title={`${concMid} varlığın payı %${CONC_MID}–${CONC_HIGH} arasında — izlenmeli`} />
                     <Chip tone="tone-flat" n={rows.length}
                       title={staleCount

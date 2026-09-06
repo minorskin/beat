@@ -117,7 +117,10 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
     <div className="panel p-3 sm:p-5 flex flex-col">
       <h2 className="t-head font-medium mb-2" style={{ color: 'var(--muted)' }}>Varlık Dağılımı</h2>
 
-      <div ref={boxRef} className="relative w-full h-[220px] sm:h-[260px] overflow-hidden rounded-[var(--r-sm)]">
+      {/* Yükseklik grafiğin yanındaki panelin boşluğunu yiyecek kadar arttı:
+          kutucuklar büyüdükçe hem hacim farkı gözle okunur oluyor hem de
+          içlerine sığan satır sayısı artıyor (pay → tutar → kur → yoğunluk). */}
+      <div ref={boxRef} className="relative w-full h-[300px] sm:h-[380px] overflow-hidden rounded-[var(--r-sm)]">
         {rects.map((r) => {
           const share = (r.value / total) * 100;
           const t = Math.sqrt(r.value / max);
@@ -127,7 +130,7 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
               key={r.symbol}
               title={`${r.symbol} — ${r.name}\n${money(r.value, cur)} · %${num(share, 1)}${
                 r.currency ? `\nKur: ${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}` : ''}${
-                r.agg ? '' : `\nYoğunlaşma: ${CONC_LABEL[concLevel(share)]} — ${CONC_NOTE[concLevel(share)]}`}`}
+                r.agg ? '' : `\nYoğunluk: ${CONC_LABEL[concLevel(share)]} — ${CONC_NOTE[concLevel(share)]}`}`}
               className="absolute overflow-hidden rounded-[2px] px-1.5 py-1 leading-tight"
               style={{
                 left: r.x + 1, top: r.y + 1,
@@ -147,8 +150,8 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
                   {r.h > 66 && <div className="t-micro tnum truncate opacity-75">{moneyShort(r.value, cur)}</div>}
                   {/* Çıplak nokta neyin göstergesi olduğunu söylemiyordu —
                       artık her noktanın önünde adı var, ve altına ikinci bir
-                      risk satırı geldi. Eşikler lib/risk.ts'te, özet
-                      kartındaki rozet satırıyla ORTAK. */}
+                      risk satırı geldi. Eşikler lib/risk.ts'te, özet kartındaki
+                      "Yoğunluk Riski" rozetiyle ORTAK. */}
                   {r.h > 86 && r.currency && (
                     <Dot
                       label="Kur"
@@ -157,9 +160,9 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
                   )}
                   {r.h > 104 && !r.agg && (
                     <Dot
-                      label="Yoğunlaşma"
+                      label="Yoğunluk"
                       color={CONC_COLOR[concLevel(share)]}
-                      aria={`Yoğunlaşma ${CONC_LABEL[concLevel(share)]}`} />
+                      aria={`Yoğunluk riski ${CONC_LABEL[concLevel(share)]}`} />
                   )}
                 </>
               )}

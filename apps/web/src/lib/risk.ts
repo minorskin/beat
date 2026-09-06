@@ -1,5 +1,5 @@
 /**
- * Yoğunlaşma (konsantrasyon) eşikleri — TEK KAYNAK.
+ * Yoğunluk (konsantrasyon) eşikleri — TEK KAYNAK.
  *
  * Aynı kural üç yerde çiziliyor: özet kartındaki rozet satırı, dağılım
  * kutucuklarındaki nokta ve ikisinin title'ları. Eşik sayısı koda üç kez
@@ -28,7 +28,7 @@ export const CONC_LABEL: Record<ConcLevel, string> = {
   high: 'yüksek', mid: 'orta', low: 'düşük',
 };
 export const CONC_NOTE: Record<ConcLevel, string> = {
-  high: `payı %${CONC_HIGH} üstünde — yoğunlaşma riski yüksek`,
-  mid: `payı %${CONC_MID}–${CONC_HIGH} arasında — yoğunlaşma riski orta`,
-  low: `payı %${CONC_MID} altında — yoğunlaşma riski düşük`,
+  high: `payı %${CONC_HIGH} üstünde — yoğunluk riski yüksek`,
+  mid: `payı %${CONC_MID}–${CONC_HIGH} arasında — yoğunluk riski orta`,
+  low: `payı %${CONC_MID} altında — yoğunluk riski düşük`,
 };

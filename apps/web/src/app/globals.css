@@ -13,7 +13,7 @@
   --accent-fg: #0a0a0a;
   --up: #22c55e;
   --down: #ef4444;
-  /* Ara uyarı tonu — "kötü değil ama izle". Yoğunlaşma eşiklerinin ortası
+  /* Ara uyarı tonu — "kötü değil ama izle". Yoğunluk eşiklerinin ortası
      (bkz. lib/risk.ts) bu renkle çiziliyor; up/down ikilisi orada yetmiyor. */
   --warn: #f59e0b;
   --border: transparent;   /* borderlar kaldırıldı — eski referanslar için */
