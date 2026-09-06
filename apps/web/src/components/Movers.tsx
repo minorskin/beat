@@ -14,8 +14,13 @@ const BY_RANGE: Record<string, { key: PeriodKey; long: string }> = {
 };
 
 /**
- * İki kart tek bileşen — sayfadaki 4'lü grid'in iki hücresi olarak yerleşsin
- * diye Fragment döndürüyor.
+ * Öne çıkanlar — TEK kart, iki yarı: solda oransal, sağda tutarsal sıralama.
+ *
+ * Eskiden iki ayrı karttı ve 4'lü grid'in iki hücresini birden yiyordu. İkisi
+ * de aynı listeye iki farklı ölçüyle bakıyor; yan yana durunca "yüzdesi büyük
+ * ama tutarı küçük" ayrımı tek bakışta okunuyor, üstelik bir hücre serbest
+ * kalıyor. Grup başlıkları ("En çok kazandıran") iki yarıda ORTAK — iki kez
+ * yazılsa kartın yarısı etiketten ibaret olurdu.
  */
 export default function Movers({ data, range, own, cur, rate }: {
   data: PeriodMovers; range: string; own: boolean; cur: Cur; rate: number;
@@ -38,17 +43,43 @@ export default function Movers({ data, range, own, cur, rate }: {
   const [pctUp, pctDown] = split(byPct, (m) => m.pct);
   const [amtUp, amtDown] = split(byAmt, amountOf);
 
+  const item = (text: (m: MoverRow) => string, positive: (m: MoverRow) => boolean) =>
+    (m: MoverRow): Item => ({ symbol: m.symbol, text: text(m), positive: positive(m) });
+  const asPct = item((m) => pct(m.pct), (m) => m.pct >= 0);
+  const asAmt = item((m) => signed(amountOf(m), cur), (m) => amountOf(m) >= 0);
+
   return (
-    <>
-      <Card title="Öne Çıkanlar — Oran" period={meta.long}
-        up={pctUp.map((m) => ({ symbol: m.symbol, text: pct(m.pct), positive: m.pct >= 0 }))}
-        down={pctDown.map((m) => ({ symbol: m.symbol, text: pct(m.pct), positive: m.pct >= 0 }))}
-        empty={rows.length === 0} />
-      <Card title="Öne Çıkanlar — Tutar" period={meta.long}
-        up={amtUp.map((m) => ({ symbol: m.symbol, text: signed(amountOf(m), cur), positive: amountOf(m) >= 0 }))}
-        down={amtDown.map((m) => ({ symbol: m.symbol, text: signed(amountOf(m), cur), positive: amountOf(m) >= 0 }))}
-        empty={rows.length === 0} />
-    </>
+    <div className="panel p-3 sm:p-4 flex flex-col" title={`Öne çıkanlar · ${meta.long}`}>
+      <div className="flex items-baseline justify-between gap-2 mb-2 min-w-0">
+        <div className="t-label truncate" style={{ color: 'var(--muted)' }}>Öne Çıkanlar</div>
+        <div className="t-micro shrink-0 tnum" style={{ color: 'var(--faint)' }}>{meta.long}</div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="t-label flex-1 flex items-center" style={{ color: 'var(--faint)' }}>
+          Bu dönem için yeterli geçmiş yok.
+        </div>
+      ) : (
+        // Ayraç border DEĞİL: globals.css bütün border'ları kapatıyor. Mutlak
+        // konumlu 1px'lik şerit iki yarının tam ortasında, grup başlıklarının
+        // altından da kesintisiz geçer.
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-1/2 w-px" style={{ background: 'var(--panel-3)' }} />
+          <div className="grid grid-cols-2 gap-x-3">
+            <ColHead>Oran</ColHead>
+            <ColHead pad>Tutar</ColHead>
+
+            <GroupHead>En çok kazandıran</GroupHead>
+            <List items={pctUp.map(asPct)} />
+            <List items={amtUp.map(asAmt)} pad />
+
+            <GroupHead spaced>En çok kaybettiren</GroupHead>
+            <List items={pctDown.map(asPct)} />
+            <List items={amtDown.map(asAmt)} pad />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -56,44 +87,36 @@ const signed = (n: number, c: Cur) => `${n >= 0 ? '+' : ''}${money(n, c)}`;
 
 interface Item { symbol: string; text: string; positive: boolean }
 
-function Card({ title, period, up, down, empty }: {
-  title: string; period: string; up: Item[]; down: Item[]; empty: boolean;
-}) {
+// Sağ yarı ayraca yapışmasın diye 0.75rem içeriden başlar.
+function ColHead({ children, pad }: { children: React.ReactNode; pad?: boolean }) {
   return (
-    <div className="panel p-3 sm:p-4 flex flex-col" title={`${title} · ${period}`}>
-      <div className="min-w-0 mb-2">
-        <div className="t-label truncate" style={{ color: 'var(--muted)' }}>{title}</div>
-      </div>
-      {empty ? (
-        <div className="t-label flex-1 flex items-center" style={{ color: 'var(--faint)' }}>
-          Bu dönem için yeterli geçmiş yok.
-        </div>
-      ) : (
-        <>
-          <List label="En çok kazandıran" items={up} />
-          <div className="mt-2.5 flex-1"><List label="En çok kaybettiren" items={down} /></div>
-        </>
-      )}
+    <div className={`t-micro truncate mb-1 ${pad ? 'pl-3' : ''}`} style={{ color: 'var(--muted)' }}>
+      {children}
     </div>
   );
 }
 
-function List({ label, items }: { label: string; items: Item[] }) {
+// Grup başlığı iki yarıyı birden kapsar: aynı soru, iki farklı ölçü.
+function GroupHead({ children, spaced }: { children: React.ReactNode; spaced?: boolean }) {
   return (
-    <>
-      <div className="t-micro mb-1 truncate" style={{ color: 'var(--faint)' }}>{label}</div>
-      {items.length === 0 ? (
-        <div className="t-label" style={{ color: 'var(--faint)' }}>—</div>
-      ) : (
-        <ol className="space-y-1">
-          {items.map((m) => (
-            <li key={m.symbol} className="flex items-baseline justify-between gap-2 t-label min-w-0">
-              <span className="truncate">{m.symbol}</span>
-              <span className="tnum shrink-0" style={{ color: m.positive ? 'var(--up)' : 'var(--down)' }}>{m.text}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </>
+    <div className={`col-span-2 t-micro truncate mb-1 ${spaced ? 'mt-2.5' : ''}`} style={{ color: 'var(--faint)' }}>
+      {children}
+    </div>
+  );
+}
+
+function List({ items, pad }: { items: Item[]; pad?: boolean }) {
+  if (items.length === 0) {
+    return <div className={`t-label ${pad ? 'pl-3' : ''}`} style={{ color: 'var(--faint)' }}>—</div>;
+  }
+  return (
+    <ol className={`space-y-1 min-w-0 ${pad ? 'pl-3' : ''}`}>
+      {items.map((m) => (
+        <li key={m.symbol} className="flex items-baseline justify-between gap-1.5 t-label min-w-0">
+          <span className="truncate">{m.symbol}</span>
+          <span className="tnum shrink-0 truncate" style={{ color: m.positive ? 'var(--up)' : 'var(--down)' }}>{m.text}</span>
+        </li>
+      ))}
+    </ol>
   );
 }

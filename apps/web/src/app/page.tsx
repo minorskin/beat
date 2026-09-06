@@ -18,6 +18,7 @@ import SettingsMenu from '@/components/SettingsMenu';
 import RangeSwitcher from '@/components/RangeSwitcher';
 import { rangeLongOf } from '@/lib/ranges';
 import Movers from '@/components/Movers';
+import Concentration from '@/components/Concentration';
 import { logout } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     (cur === 'USD' ? (own ? p.own_value_usd : p.value_usd) : (own ? p.own_value_try : p.value_try)) ?? 0;
 
   const staleCount = rows.filter((p) => p.is_stale).length;
+
+  // Kur riski kırılımı. instruments.currency artık para birimi değil RİSK
+  // ETİKETİ (bkz. WatchItem yorumu): 'USD' = dolar bazlı, kur hareketine
+  // karşı korunaklı; geri kalanı TL bazlı, yani açık pozisyon. Varlık
+  // tablosundaki renkli nokta ile aynı kural — kartta yalnız sayısı duruyor.
+  const fxSafe = rows.filter((p) => p.currency === 'USD').length;
+  const fxRisky = rows.length - fxSafe;
 
   // Dağılım kutucukları: alan = büyüklük, kutu grubunun rengiyle boyanır.
   const alloc = rows
@@ -157,7 +165,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           {/* Özet başlığı ve emanet özeti kaldırıldı: sekme adı zaten "Özet",
               başlık satırı bir bilgi taşımadan yükseklik harcıyordu. Güncelleme
               yaşı birinci kartın sağ üst köşesine taşındı. */}
-          {/* KPI — dört kart: varlık · dönemsel K/Z · oransal öne çıkanlar · tutarsal öne çıkanlar */}
+          {/* KPI — dört kart: varlık · dönemsel K/Z · öne çıkanlar · yoğunlaşma riski */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-4 items-stretch">
 
             {/* 1 — Toplam varlık */}
@@ -207,6 +215,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                   color={chgColor}
                 />
                 <StatLine label="Pozisyon" value={staleCount ? `${rows.length} · ${staleCount} taşınmış` : String(rows.length)} />
+                {/* Kur riski — üç rozet: açık · korunaklı · toplam. Renk burada
+                    süs değil kodlama: kırmızı = TL bazlı (kur karşısında açık),
+                    yeşil = USD bazlı, gri = toplam varlık (ilk ikisinin
+                    toplamı, yani satır kendi kendini denetliyor). Renge tek
+                    başına güvenilmesin diye üçünün de anlamı title'da. */}
+                <div className="flex items-baseline justify-between gap-2 t-strong">
+                  <span className="shrink-0" style={{ color: 'var(--muted)' }}>Kur Riski</span>
+                  <span className="flex items-center gap-1 shrink-0">
+                    <FxChip tone="tone-down" n={fxRisky} title={`${fxRisky} varlık TL bazlı — kur riski var`} />
+                    <FxChip tone="tone-up"   n={fxSafe}  title={`${fxSafe} varlık USD bazlı — kur riski yok`} />
+                    <FxChip tone="tone-flat" n={rows.length} title={`Toplam ${rows.length} varlık`} />
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -223,8 +244,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
               </div>
             </div>
 
-            {/* 3 & 4 — Öne çıkanlar (oran + tutar). Dönem seçicisi ikisinde ortak. */}
+            {/* 3 — Öne çıkanlar: tek kart, iki yarı (oran | tutar). Dönem üst bardan. */}
             <Movers data={movers} range={range} own={own} cur={cur} rate={rate} />
+
+            {/* 4 — Yoğunlaşma riski. Diğer üçü "ne kadar / ne kazandım / hangi
+                varlık" diyor; portföyün kaç kâğıda bağlı olduğunu söyleyen
+                yoktu. Ağırlıklar dağılım kutucuklarıyla aynı sepetten. */}
+            <Concentration items={alloc} />
           </div>
 
           {/* Grafik + dağılım */}
@@ -302,6 +328,21 @@ function StatLine({ label, note, value, color, title }: {
       </span>
       <span className="tnum truncate text-right font-medium" style={{ color: color ?? 'var(--text)' }}>{value}</span>
     </div>
+  );
+}
+
+/**
+ * Kur riski rozeti — dönemsel kutularla aynı tonal aile (tone-up/down/flat),
+ * yalnız tek satıra sığacak kadar küçük.
+ */
+function FxChip({ tone, n, title }: { tone: string; n: number; title: string }) {
+  return (
+    <span
+      className={`${tone} rounded-[var(--r-sm)] px-1.5 py-0.5 t-label tnum leading-none font-medium`}
+      title={title}
+    >
+      {n}
+    </span>
   );
 }
 
