@@ -134,12 +134,11 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
           const share = (r.value / total) * 100;
           const t = Math.sqrt(r.value / max);
           const big = r.w > 62 && r.h > 30;
-          // Beş satırlık yığın (kod → pay → tutar → kur → yoğunluk) ancak bu
-          // ölçünün üstünde sığar. Altında kalan kutu iki satıra iner: üstte
-          // yalnız kod, altta kalan her şey yan yana. Aradaki kademeleri tek
-          // tek açmak (önce pay, sonra tutar, sonra bir nokta…) küçük kutuda
-          // hep eksik bilgi demekti; iki satır hepsini birden taşıyor.
-          const full = r.h > 104 && r.w > 96;
+          // Karar YALNIZ yüksekliğe bakar. Genişlik de şart koşulunca dar ama
+          // uzun kutular (DFI, RITIM) boş yer dururken iki satıra iniyordu;
+          // oysa orada beş satır rahat sığıyor. Dar kalırsa etiket truncate
+          // olur — o kutunun kendi sorunu, düzenin değil.
+          const full = r.h > 104;
           return (
             <div
               key={r.symbol}
@@ -182,13 +181,11 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
                     </>
                   ) : r.h > 44 && (
                     <div className="flex items-center gap-2 mt-0.5 t-micro leading-none min-w-0">
+                      {/* Pay da tutar da HER ZAMAN yazılır — "yüzdesi var ama
+                          tutarı yok" kutucuk yarım bilgi demekti. Sığmazsa
+                          truncate devreye girer, tamı title'da. */}
                       <span className="tnum shrink-0 opacity-90">%{num(share, 1)}</span>
-                      {/* Tutar ilk feda edilen: pay ve iki nokta olmadan satır
-                          anlamını yitirir, tutar ise kutucuğun alanından zaten
-                          okunuyor. Tamı title'da. */}
-                      {r.w > 108 && (
-                        <span className="tnum truncate opacity-75">{moneyShort(r.value, cur)}</span>
-                      )}
+                      <span className="tnum truncate opacity-75">{moneyShort(r.value, cur)}</span>
                       <span className="flex items-center gap-1 shrink-0 ml-auto">
                         {r.currency && (
                           <Dot

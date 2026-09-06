@@ -19,6 +19,29 @@ const PALETTE = [
 ];
 const TOTAL_COLOR = '#f4f4f4';
 const TOTAL_KEY = '__total';
+
+/**
+ * Risk serileri — varlık değil ÖLÇÜ. İkisi de portföyün o andaki bileşiminden
+ * türer ve ikisi de 0–100 arası bir PAY'dır, tutar ya da getiri değil.
+ *
+ * Renkler kasten sayfanın geri kalanıyla aynı: kırmızı kur riski, sarı
+ * yoğunluk (bkz. lib/risk.ts, kartlardaki rozetler ve dağılım noktaları).
+ * Varlık çizgilerinden ayrılmaları renge değil KESİK ÇİZGİYE yüklenmiş —
+ * palet zaten dolu ve yeni ton üretmek CVD altında ayrım kaybettiriyor.
+ */
+const FX_KEY = '__fxRisk';
+const CONC_KEY = '__concRisk';
+const RISK: Record<string, { label: string; color: string; dash: string; title: string }> = {
+  [FX_KEY]: {
+    label: 'Kur Riski', color: '#ef4444', dash: '7 4',
+    title: 'TL bazlı varlıkların portföy içindeki payı — kur karşısında açık kısım',
+  },
+  [CONC_KEY]: {
+    label: 'Yoğunluk Riski', color: '#f59e0b', dash: '3 3',
+    title: 'En büyük tek varlığın portföy içindeki payı',
+  },
+};
+const RISK_KEYS = [FX_KEY, CONC_KEY];
 // Yıl kapanışı satırına iliştirilen ham büyüklükler — çizilen seri değil,
 // yalnız tooltip okur (bkz. rows useMemo).
 const YEAR_TRY = '__yearTry';
@@ -38,8 +61,12 @@ type Mode = 'pct' | 'abs';
 type Row = Record<string, number | string | null>;
 
 export default function PortfolioChart({
-  data, symbols, currency, own, yearly = false,
-}: { data: SeriesPoint[]; symbols: string[]; currency: Cur; own: boolean; yearly?: boolean }) {
+  data, symbols, currency, own, yearly = false, symbolCurrency = {},
+}: {
+  data: SeriesPoint[]; symbols: string[]; currency: Cur; own: boolean; yearly?: boolean;
+  /** sembol → kur riski etiketi ('USD' korunaklı, gerisi TL bazlı). */
+  symbolCurrency?: Record<string, string>;
+}) {
   // Kur seçimi artık üst bardaki genel anahtarda — grafiğin kendi düğmesi
   // kaldırıldı; sayfanın geri kalanıyla farklı birimde durması karışıklıktı.
   const cur = currency;
@@ -146,6 +173,27 @@ export default function PortfolioChart({
         r[TOTAL_KEY] = (chain - 1) * 100;
       }
 
+      // Risk serileri her iki görünümde de AYNI: ikisi de pay, ölçekleri
+      // moddan bağımsız. Payda sembollerin toplamı (d.try değil) — pay ile
+      // paydanın kapsamı aynı sepet olsun diye.
+      //
+      // Oran TL/USD seçiminden bağımsız: aynı andaki bütün semboller aynı
+      // kurla çevriliyor, bölümde kur sadeleşiyor.
+      let sumAll = 0, sumFx = 0, maxOne = 0;
+      for (const sym of symbols) {
+        const v = d.s[sym];
+        if (!v) continue;
+        const val = pickSym(v);
+        if (!(val > 0)) continue;
+        sumAll += val;
+        // Katalogda bulunmayan sembol TL bazlı sayılır: kur riskini olduğundan
+        // KÜÇÜK göstermektense büyük göstermek doğru taraf.
+        if (symbolCurrency[sym] !== 'USD') sumFx += val;
+        if (val > maxOne) maxOne = val;
+      }
+      r[FX_KEY] = sumAll > 0 ? (sumFx / sumAll) * 100 : null;
+      r[CONC_KEY] = sumAll > 0 ? (maxOne / sumAll) * 100 : null;
+
       for (const sym of symbols) {
         const v = d.s[sym];
         if (!v) { r[sym] = null; continue; }
@@ -157,7 +205,7 @@ export default function PortfolioChart({
       }
       return r;
     });
-  }, [data, symbols, cur, own, mode, yearly]);
+  }, [data, symbols, cur, own, mode, yearly, symbolCurrency]);
 
   // ÇİFT EKSEN — yalnız "Değer" görünümünde ve varlık kırılımı varken.
   // Toplam ~₺1,4M iken tek tek varlıklar ₺4bin: ortak eksende toplam tavana
@@ -202,7 +250,10 @@ export default function PortfolioChart({
   // hepsini geri açmak) için. Tek tek 12 çizgiyi kapatmak, bir varlığı yalnız
   // görmek isteyen için katlanılmaz bir iş: kapat-hepsini + tek tık aç, iki
   // hamlede aynı yere varıyor.
-  const allKeys = [TOTAL_KEY, ...symbols];
+  // Risk serileri yalnız varlık kırılımı olan seride var (yıl kapanışlarında
+  // sembol yok, dolayısıyla pay da yok).
+  const hasRisk = symbols.length > 0;
+  const allKeys = [TOTAL_KEY, ...symbols, ...(hasRisk ? RISK_KEYS : [])];
   const allOn = allKeys.every((k) => !hidden.has(k));
   // Kısmi seçimde düğme "kapalı" görünür; o hâlde tıklamanın hepsini AÇMASI
   // beklenir. Bu yüzden karar görünen duruma bağlanıyor, gizlenen sayısına değil.
@@ -222,7 +273,7 @@ export default function PortfolioChart({
           <div className="flex gap-1">
             {(['pct', 'abs'] as const).map((m) => (
               <button key={m} onClick={() => setMode(m)} className={`seg ${mode === m ? 'seg-on' : ''}`}>
-                {m === 'pct' ? 'Değişim %' : 'Değer'}
+                {m === 'pct' ? 'Değişim' : 'Değer'}
               </button>
             ))}
           </div>
@@ -255,6 +306,13 @@ export default function PortfolioChart({
                 tick={{ fontSize: 12.5, fill: TOTAL_COLOR }}
                 width={52} axisLine={false} tickLine={false} />
             )}
+            {/* Risk serilerinin kendi ekseni: sabit 0–100, GİZLİ. Ne "% değişim"
+                (−4…+12) ne de "Değer" (₺ milyonlar) ekseninde bir payın yeri
+                var; ortak eksene sokulsalar ya kendileri düz çizgiye yapışır
+                ya diğer her şeyi ezerlerdi. Sabit aralık sayesinde çizginin
+                yüksekliği modlar arasında da, dönemler arasında da aynı şeyi
+                söylüyor: tepe %100, taban %0. Kesin sayı tooltip'te. */}
+            {hasRisk && <YAxis yAxisId="risk" domain={[0, 100]} hide />}
             {mode === 'pct' && <ReferenceLine yAxisId="left" y={0} stroke="#3d3d3d" />}
             <Tooltip
               cursor={{ stroke: '#3d3d3d', strokeWidth: 1 }}
@@ -269,6 +327,13 @@ export default function PortfolioChart({
                 strokeDasharray={styles[sym].dashed ? '5 3' : undefined}
                 dot={sparse ? { r: 3 } : false} isAnimationActive={false} connectNulls={false} />
             ))}
+            {/* Risk çizgileri varlıkların üstünde, toplamın altında. */}
+            {hasRisk && RISK_KEYS.map((k) => hidden.has(k) ? null : (
+              <Line
+                key={k} dataKey={k} name={RISK[k].label} type="monotone" yAxisId="risk"
+                stroke={RISK[k].color} strokeWidth={1.75} strokeDasharray={RISK[k].dash}
+                dot={sparse ? { r: 2.5 } : false} isAnimationActive={false} connectNulls />
+            ))}
             {/* Toplam en sonda: diğer çizgilerin üstünde kalsın */}
             {!hidden.has(TOTAL_KEY) && (
               <Line
@@ -279,6 +344,16 @@ export default function PortfolioChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {hasRisk && RISK_KEYS.some((k) => !hidden.has(k)) && (
+        <p className="t-label mt-2" style={{ color: 'var(--faint)' }}>
+          Kesik çizgiler risk ölçüsü, varlık değil: <b style={{ color: 'var(--muted)' }}>Kur
+          Riski</b> TL bazlı varlıkların payı, <b style={{ color: 'var(--muted)' }}>Yoğunluk
+          Riski</b> en büyük tek varlığın payı. İkisi de kendi gizli
+          eksenlerinde 0–100 arası okunur — yükseklikleri diğer çizgilerle
+          karşılaştırılmaz, kesin değerleri imleçte.
+        </p>
+      )}
 
       {dualAxis && (
         <p className="t-label mt-2" style={{ color: 'var(--faint)' }}>
@@ -325,6 +400,19 @@ export default function PortfolioChart({
             key={sym} label={sym} color={styles[sym].color} dashed={styles[sym].dashed}
             on={!hidden.has(sym)} onClick={() => toggle(sym)} />
         ))}
+        {/* Risk serileri ayracın ardında: varlık değil ölçü, ve birimleri de
+            diğerlerinden farklı (pay). */}
+        {hasRisk && (
+          <>
+            <span className="shrink-0" style={{ width: 1, height: 12, background: 'var(--panel-3)' }} />
+            {RISK_KEYS.map((k) => (
+              <LegendChip
+                key={k} label={RISK[k].label} color={RISK[k].color} dashed
+                title={RISK[k].title}
+                on={!hidden.has(k)} onClick={() => toggle(k)} />
+            ))}
+          </>
+        )}
       </div>
 
     </div>
@@ -333,14 +421,16 @@ export default function PortfolioChart({
 
 // Etiket de serinin renginde yazılır: gözün yazıyla çizgiyi eşleştirmek için
 // önce ince renk çubuğunu bulması gerekmesin.
-function LegendChip({ label, color, dashed, on, onClick }: {
+function LegendChip({ label, color, dashed, on, onClick, title }: {
   label: string; color: string; dashed?: boolean; on: boolean; onClick: () => void;
+  /** Serinin ne ölçtüğü — kodu kendi kendini anlatmayan seriler için. */
+  title?: string;
 }) {
   return (
     <button
       onClick={onClick}
       aria-pressed={on}
-      title={on ? `${label} — gizle` : `${label} — göster`}
+      title={`${title ? `${title}\n` : ''}${on ? `${label} — gizle` : `${label} — göster`}`}
       className="flex items-center gap-1.5 t-label leading-none py-0.5 cursor-pointer transition-opacity"
       style={{ opacity: on ? 1 : 0.35, color: on ? color : 'var(--muted)' }}
     >
@@ -364,8 +454,13 @@ function ChartTooltip({ active, payload, labelText, fmt, yearly }:
   // Yıl kapanışları: tek çizgi var, seri listesi anlamsız. Onun yerine o yılın
   // TL ve USD büyüklüğü ile USD'nin önceki yıla göre değişimi.
   const yr = yearly ? (payload[0]?.payload as Record<string, number | null> | undefined) : undefined;
-  const items = [...payload]
-    .filter((p) => p.value != null)
+  // Risk serileri ayrı toplanıyor: birimleri PAY, diğerleri tutar ya da
+  // getiri. Aynı listede sıralansalar "Değer" görünümünde %44 ile ₺9,1m yan
+  // yana küçükten büyüğe dizilir, ikisi de yanlış yerde durur.
+  const all = [...payload].filter((p) => p.value != null);
+  const risks = all.filter((p) => RISK_KEYS.includes(String(p.dataKey)));
+  const items = all
+    .filter((p) => !RISK_KEYS.includes(String(p.dataKey)))
     .sort((a, b) => Number(b.value) - Number(a.value));
   const shown = items.slice(0, 8);
   // Yarı saydam ve küçük: kutu grafiğin üstünde duruyor, altındaki çizgileri
@@ -410,6 +505,25 @@ function ChartTooltip({ active, payload, labelText, fmt, yearly }:
       ))}
       {!yr && items.length > shown.length && (
         <div style={{ color: '#7d7d7d', marginTop: 3 }}>+{items.length - shown.length} daha</div>
+      )}
+      {!yr && risks.length > 0 && (
+        <>
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.10)', margin: '4px 0 3px' }} />
+          {risks.map((p) => (
+            <div key={String(p.dataKey)} className="flex items-baseline justify-between gap-2.5">
+              <span className="flex items-center gap-1.5" style={{ color: '#a8a8a8' }}>
+                <span style={{
+                  width: 7, height: 0, display: 'inline-block',
+                  borderTop: `2px dashed ${p.color}`,
+                }} />
+                {p.name}
+              </span>
+              <span className="tnum" style={{ color: '#f4f4f4' }}>
+                %{new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 }).format(Number(p.value))}
+              </span>
+            </div>
+          ))}
+        </>
       )}
     </div>
   );

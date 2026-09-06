@@ -113,6 +113,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // Yoğunluk kırılımı — eşikler lib/risk.ts'te, dağılım kutucuklarıyla ORTAK.
   // Payda `alloc` toplamı: değeri henüz bilinmeyen (fiyatı bekleyen) pozisyon
   // paya girmez, yoksa herkesin oranı olduğundan küçük çıkar.
+  // Grafikteki kur riski serisi için: sembol → kur riski etiketi. Geçmiş
+  // seride artık elde olmayan sembol de geçebilir; katalogda bulunmayan
+  // sembolü grafik TL bazlı sayıyor (bkz. PortfolioChart).
+  const symbolCurrency = Object.fromEntries(positions.map((p) => [p.symbol, p.currency]));
+
   const allocTotal = alloc.reduce((a, it) => a + it.value, 0);
   const shares = allocTotal > 0 ? alloc.map((it) => (it.value / allocTotal) * 100) : [];
   const concHigh = shares.filter((v) => concLevel(v) === 'high').length;
@@ -308,6 +313,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                 data={isAll ? yearly : history.points}
                 symbols={isAll ? [] : history.symbols}
                 yearly={isAll}
+                symbolCurrency={symbolCurrency}
                 currency={cur} own={own} />
             </div>
             <AllocationTreemap data={alloc} cur={cur} />
