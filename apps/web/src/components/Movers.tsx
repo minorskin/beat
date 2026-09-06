@@ -19,8 +19,11 @@ const BY_RANGE: Record<string, { key: PeriodKey; long: string }> = {
  * Eskiden iki ayrı karttı ve 4'lü grid'in iki hücresini birden yiyordu. İkisi
  * de aynı listeye iki farklı ölçüyle bakıyor; yan yana durunca "yüzdesi büyük
  * ama tutarı küçük" ayrımı tek bakışta okunuyor, üstelik bir hücre serbest
- * kalıyor. Grup başlıkları ("En çok kazandıran") iki yarıda ORTAK — iki kez
- * yazılsa kartın yarısı etiketten ibaret olurdu.
+ * kalıyor.
+ *
+ * Grup başlıkları ("En çok kazandıran") HER İKİ yarıda da tekrar ediyor.
+ * Ortak tek başlık daha az mürekkepti ama sağdaki listeye bakan göz başlığı
+ * soldan almak zorunda kalıyordu — ayraç tam ortada dururken bu okuma kesiliyor.
  */
 export default function Movers({ data, range, own, cur, rate }: {
   data: PeriodMovers; range: string; own: boolean; cur: Cur; rate: number;
@@ -70,10 +73,12 @@ export default function Movers({ data, range, own, cur, rate }: {
             <ColHead pad>Tutar</ColHead>
 
             <GroupHead>En çok kazandıran</GroupHead>
+            <GroupHead pad>En çok kazandıran</GroupHead>
             <List items={pctUp.map(asPct)} />
             <List items={amtUp.map(asAmt)} pad />
 
             <GroupHead spaced>En çok kaybettiren</GroupHead>
+            <GroupHead spaced pad>En çok kaybettiren</GroupHead>
             <List items={pctDown.map(asPct)} />
             <List items={amtDown.map(asAmt)} pad />
           </div>
@@ -96,10 +101,15 @@ function ColHead({ children, pad }: { children: React.ReactNode; pad?: boolean }
   );
 }
 
-// Grup başlığı iki yarıyı birden kapsar: aynı soru, iki farklı ölçü.
-function GroupHead({ children, spaced }: { children: React.ReactNode; spaced?: boolean }) {
+// Her yarının kendi grup başlığı — iki sütun da tek başına okunabilsin.
+function GroupHead({ children, spaced, pad }: {
+  children: React.ReactNode; spaced?: boolean; pad?: boolean;
+}) {
   return (
-    <div className={`col-span-2 t-micro truncate mb-1 ${spaced ? 'mt-2.5' : ''}`} style={{ color: 'var(--faint)' }}>
+    <div
+      className={`t-micro truncate mb-1 ${spaced ? 'mt-2.5' : ''} ${pad ? 'pl-3' : ''}`}
+      style={{ color: 'var(--faint)' }}
+    >
       {children}
     </div>
   );

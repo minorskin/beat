@@ -13,6 +13,9 @@
   --accent-fg: #0a0a0a;
   --up: #22c55e;
   --down: #ef4444;
+  /* Ara uyarı tonu — "kötü değil ama izle". Yoğunlaşma eşiklerinin ortası
+     (bkz. lib/risk.ts) bu renkle çiziliyor; up/down ikilisi orada yetmiyor. */
+  --warn: #f59e0b;
   --border: transparent;   /* borderlar kaldırıldı — eski referanslar için */
 
   /* Grafik renkleri — arayüz nötr siyah, veri renkli */
@@ -270,6 +273,7 @@ input[type="range"]::-moz-range-thumb {
    Renk tek başına anlam taşımasın diye kutuda ayrıca +/- işareti var. */
 .tone-up   { background: rgba(34, 197, 94, 0.12);  color: var(--up); }
 .tone-down { background: rgba(239, 68, 68, 0.12);  color: var(--down); }
+.tone-warn { background: rgba(245, 158, 11, 0.12); color: var(--warn); }
 .tone-flat { background: var(--panel-2);           color: var(--muted); }
 
 /* Mobil okunabilirlik: 16px altındaki girdiler iOS'ta odaklanınca sayfayı

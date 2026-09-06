@@ -1,11 +1,16 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { money, moneyShort, num, type Cur } from '@/lib/format';
+import { concLevel, CONC_COLOR, CONC_LABEL, CONC_NOTE } from '@/lib/risk';
 
 // currency = kur riski etiketi (instruments.currency). Varlık tablosundaki
 // nokta ile AYNI anlam: USD fiyatlı korunaklı (yeşil), TL fiyatlı kur
 // karşısında açık (kırmızı).
-export type AllocItem = { symbol: string; name: string; group: string; value: number; currency?: string };
+export type AllocItem = {
+  symbol: string; name: string; group: string; value: number; currency?: string;
+  /** Kuyruğun toplandığı sanal kutucuk — tek bir varlık değil, risk noktası taşımaz. */
+  agg?: boolean;
+};
 type Rect = AllocItem & { x: number; y: number; w: number; h: number };
 
 // 20 kutucuktan sonrası okunamayacak kadar küçülüyor — kuyruk "Diğer"de toplanır.
@@ -23,6 +28,22 @@ function tone(t: number) {
   const l = 18 + t * 26;
   const s = 40 + t * 28;
   return `hsl(224 ${s}% ${l}%)`;
+}
+
+/**
+ * Kutucuk içi risk satırı: ad + renkli nokta. Renk tek başına anlam taşımasın
+ * diye adı hep yanında, tam açıklaması kutucuğun title'ında.
+ */
+function Dot({ label, color, aria }: { label: string; color: string; aria: string }) {
+  return (
+    <div className="flex items-center gap-1 mt-1 t-micro leading-none min-w-0">
+      <span className="truncate opacity-75">{label}</span>
+      <span
+        aria-label={aria}
+        className="inline-block w-2 h-2 rounded-full shrink-0"
+        style={{ background: color }} />
+    </div>
+  );
 }
 
 // Sıralı listeyi ikiye bölerek yerleştirir; her adımda uzun kenardan kesilir,
@@ -67,8 +88,9 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
     if (sorted.length <= MAX_TILES) return sorted;
     const head = sorted.slice(0, MAX_TILES - 1);
     const restVal = sorted.slice(MAX_TILES - 1).reduce((s, d) => s + d.value, 0);
-    // "Diğer" birden çok varlığın toplamı — tek bir kur riski taşımaz, noktasız.
-    return [...head, { symbol: 'Diğer', name: `${sorted.length - head.length} varlık`, group: '—', value: restVal }];
+    // "Diğer" birden çok varlığın toplamı — ne tek bir kur riski ne de tek
+    // bir yoğunlaşma payı taşır; iki nokta da orada çizilmez.
+    return [...head, { symbol: 'Diğer', name: `${sorted.length - head.length} varlık`, group: '—', value: restVal, agg: true }];
   }, [data]);
 
   const total = items.reduce((s, d) => s + d.value, 0) || 1;
@@ -104,7 +126,8 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
             <div
               key={r.symbol}
               title={`${r.symbol} — ${r.name}\n${money(r.value, cur)} · %${num(share, 1)}${
-                r.currency ? `\n${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}` : ''}`}
+                r.currency ? `\nKur: ${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}` : ''}${
+                r.agg ? '' : `\nYoğunlaşma: ${CONC_LABEL[concLevel(share)]} — ${CONC_NOTE[concLevel(share)]}`}`}
               className="absolute overflow-hidden rounded-[2px] px-1.5 py-1 leading-tight"
               style={{
                 left: r.x + 1, top: r.y + 1,
@@ -122,11 +145,21 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
                   <div className="t-label font-medium truncate">{r.symbol}</div>
                   {r.h > 48 && <div className="t-micro tnum truncate opacity-90">%{num(share, 1)}</div>}
                   {r.h > 66 && <div className="t-micro tnum truncate opacity-75">{moneyShort(r.value, cur)}</div>}
+                  {/* Çıplak nokta neyin göstergesi olduğunu söylemiyordu —
+                      artık her noktanın önünde adı var, ve altına ikinci bir
+                      risk satırı geldi. Eşikler lib/risk.ts'te, özet
+                      kartındaki rozet satırıyla ORTAK. */}
                   {r.h > 86 && r.currency && (
-                    <span
-                      aria-label={r.currency}
-                      className="inline-block w-2 h-2 rounded-full mt-1.5"
-                      style={{ background: r.currency === 'USD' ? 'var(--up)' : 'var(--down)' }} />
+                    <Dot
+                      label="Kur"
+                      color={r.currency === 'USD' ? 'var(--up)' : 'var(--down)'}
+                      aria={`${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}`} />
+                  )}
+                  {r.h > 104 && !r.agg && (
+                    <Dot
+                      label="Yoğunlaşma"
+                      color={CONC_COLOR[concLevel(share)]}
+                      aria={`Yoğunlaşma ${CONC_LABEL[concLevel(share)]}`} />
                   )}
                 </>
               )}
