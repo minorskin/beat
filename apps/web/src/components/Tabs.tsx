@@ -4,6 +4,10 @@ import { createContext, useCallback, useContext, useState } from 'react';
 export const TABS = [
   { id: 'ozet', label: 'Özet' },
   { id: 'varlik', label: 'Varlık' },
+  // Projeksiyon Özet'in en altındaydı: sayfanın geri kalanı "şu an ne var"
+  // sorusunu cevaplarken tek başına "ne olabilir" diyordu ve oraya ulaşmak
+  // için bütün özeti kaydırmak gerekiyordu. Kendi sekmesinde duruyor.
+  { id: 'simulasyon', label: 'Simülasyon' },
 ] as const;
 export type TabId = (typeof TABS)[number]['id'];
 
@@ -16,7 +20,7 @@ export function useTabs() {
 }
 
 /**
- * Özet ve Varlık artık tek akış değil, iki sekme. Durum URL'de değil React
+ * Özet, Varlık ve Simülasyon tek akış değil, üç sekme. Durum URL'de değil React
  * state'inde: sekme değişimi sunucuya gidip tüm sorguları tekrar çalıştırmasın,
  * geçiş anında olsun. İki panel de DOM'da kalır (yalnız gizlenir) — grafikler
  * her geçişte sıfırdan çizilmez.

@@ -166,9 +166,17 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
           const wide = r.w > 86;
           const on = active === r.symbol;
           return (
-            <button
+            <div
               key={r.symbol}
-              type="button"
+              // <button> DEĞİL — bilerek. Tarayıcılar button içeriğini kendi
+              // UA stilleriyle dikeyde ORTALAR; Chrome'da `display:block`
+              // bunu kaldırıyor ama Safari'de (masaüstü ve iOS) ortalama
+              // `appearance` ile birlikte geliyor ve kalkmıyordu. Kutucuk
+              // metni orada ortada asılı kalıyordu. role+tabIndex+onKeyDown
+              // ile klavye ve ekran okuyucu davranışı korunuyor, hiçbir UA
+              // stili devrede olmuyor.
+              role="button"
+              tabIndex={0}
               title={`${r.symbol} — ${r.name}\n${money(r.value, cur)} · %${num(share, 1)}${
                 r.currency ? `\nKur: ${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}` : ''}${
                 r.agg ? '' : `\nYoğunluk: ${CONC_LABEL[concLevel(share)]} — ${CONC_NOTE[concLevel(share)]}`}`}
@@ -238,7 +246,7 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
                   )}
                 </>
               )}
-            </button>
+            </div>
           );
         })}
 

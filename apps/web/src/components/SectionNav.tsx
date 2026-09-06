@@ -1,7 +1,7 @@
 'use client';
 import { TABS, useTabs } from './Tabs';
 
-/** Üst bardaki sekme anahtarı — Özet ↔ Varlık. */
+/** Üst bardaki sekme anahtarı — Özet · Varlık · Simülasyon. */
 export default function SectionNav() {
   const { tab, setTab } = useTabs();
   return (

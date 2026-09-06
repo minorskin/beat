@@ -142,12 +142,18 @@ export default function PortfolioChart({
         // dataKey'lerini payload'a koyduğu için eksene karışmazlar; tooltip
         // onlara payload[0].payload üzerinden ulaşıyor.
         //
-        // Sahiplik uygulanmaz: bu yıllarda varlık kırılımı yok, emanet ayrımı
-        // da yok (bkz. grafiğin altındaki not) — toplam neyse o.
-        const prevUsd = i > 0 ? data[i - 1].usd : null;
-        r[YEAR_TRY] = d.try;
-        r[YEAR_USD] = d.usd;
-        r[YEAR_USD_PCT] = prevUsd && prevUsd > 0 ? (d.usd / prevUsd - 1) * 100 : null;
+        // Sahiplik BURADA DA uygulanır (own_try/own_usd) — çizilen çizgi
+        // zaten pickTotal ile emanet payını düşüyordu, tooltip ise toplamı
+        // okuyordu: "bana ait" açıkken eğri bir sayıyı, imleç kutusu başka
+        // bir sayıyı gösteriyordu. Elle girilmiş geçmiş yıllarda kırılım
+        // olmadığı için own_* = toplam (bkz. page.tsx yearly); fark yalnız
+        // serinin son noktasında, yani içinde bulunulan yılda ortaya çıkar.
+        const ownTry = (x: SeriesPoint) => (own ? x.own_try : x.try);
+        const ownUsd = (x: SeriesPoint) => (own ? x.own_usd : x.usd);
+        const prevUsd = i > 0 ? ownUsd(data[i - 1]) : null;
+        r[YEAR_TRY] = ownTry(d);
+        r[YEAR_USD] = ownUsd(d);
+        r[YEAR_USD_PCT] = prevUsd && prevUsd > 0 ? (ownUsd(d) / prevUsd - 1) * 100 : null;
       }
       const t = pickTotal(d);
       if (base[TOTAL_KEY] === undefined && t > 0) base[TOTAL_KEY] = t;
@@ -309,9 +315,10 @@ export default function PortfolioChart({
             )}
             {yearly && (
               <p>
-                Elle girilen yıl sonu toplamları + bugünkü değer. Bu yıllarda
-                varlık kırılımı yok; emanet ayrımı da uygulanmaz (toplam
-                gösterilir).
+                Elle girilen yıl sonu toplamları + bugünkü değer. O yıllarda
+                varlık kırılımı tutulmadığı için emanet ayrımı yalnız serinin
+                son noktasına — içinde bulunulan yıla — uygulanabiliyor;
+                geçmiş yıllar girildiği gibi, toplam olarak duruyor.
               </p>
             )}
           </InfoTip>

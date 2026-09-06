@@ -319,10 +319,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             <AllocationTreemap data={alloc} cur={cur} />
           </div>
 
-          {/* Projeksiyon */}
-          <div>
-            <Projection current={value} cur={cur} rate={rate} scenarios={scenarios} />
-          </div>
           </>
           )}
           </TabPanel>
@@ -362,6 +358,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
               locations={locations} classes={classes}
               dayChanges={dayChanges} watchlist={watchlist} rate={rate} />
           )}
+          </TabPanel>
+
+          {/* Projeksiyon kendi sekmesinde: Özet'in dibinde dururken oraya
+              varmak için bütün sayfayı kaydırmak gerekiyordu, üstelik geri
+              kalanı "şu an ne var" derken tek başına "ne olabilir" diyordu.
+              Kart olduğu gibi taşındı — içindeki senaryolar, kaydetme ve
+              grafik aynı bileşen. */}
+          <TabPanel id="simulasyon">
+            <Projection current={value} cur={cur} rate={rate} scenarios={scenarios} />
           </TabPanel>
       </main>
     </TabsProvider>
