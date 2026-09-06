@@ -107,7 +107,7 @@ function GroupHead({ children, spaced, pad }: {
 }) {
   return (
     <div
-      className={`t-micro truncate mb-1 ${spaced ? 'mt-2.5' : ''} ${pad ? 'pl-3' : ''}`}
+      className={`t-micro truncate mb-1 ${spaced ? 'mt-2' : ''} ${pad ? 'pl-3' : ''}`}
       style={{ color: 'var(--faint)' }}
     >
       {children}
@@ -115,14 +115,20 @@ function GroupHead({ children, spaced, pad }: {
   );
 }
 
+/**
+ * Punto burada bilerek bir kademe küçük (t-micro): kart iki yarıda İKİŞER
+ * liste taşıyor ve her biri üçe kadar çıkabiliyor. "En çok kaybettiren"
+ * tarafı dolduğunda t-label ile 4'lü grid'in hücre yüksekliğine sığmıyordu —
+ * kartın kendi yüksekliği komşularına bağlı, tek başına uzayamıyor.
+ */
 function List({ items, pad }: { items: Item[]; pad?: boolean }) {
   if (items.length === 0) {
-    return <div className={`t-label ${pad ? 'pl-3' : ''}`} style={{ color: 'var(--faint)' }}>—</div>;
+    return <div className={`t-micro ${pad ? 'pl-3' : ''}`} style={{ color: 'var(--faint)' }}>—</div>;
   }
   return (
-    <ol className={`space-y-1 min-w-0 ${pad ? 'pl-3' : ''}`}>
+    <ol className={`space-y-0.5 min-w-0 ${pad ? 'pl-3' : ''}`}>
       {items.map((m) => (
-        <li key={m.symbol} className="flex items-baseline justify-between gap-1.5 t-label min-w-0">
+        <li key={m.symbol} className="flex items-baseline justify-between gap-1.5 t-micro min-w-0">
           <span className="truncate">{m.symbol}</span>
           <span className="tnum shrink-0 truncate" style={{ color: m.positive ? 'var(--up)' : 'var(--down)' }}>{m.text}</span>
         </li>

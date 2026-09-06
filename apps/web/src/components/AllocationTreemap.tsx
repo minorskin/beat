@@ -173,7 +173,10 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
                 r.currency ? `\nKur: ${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}` : ''}${
                 r.agg ? '' : `\nYoğunluk: ${CONC_LABEL[concLevel(share)]} — ${CONC_NOTE[concLevel(share)]}`}`}
               onClick={() => setActive((p) => (p === r.symbol ? null : r.symbol))}
-              className="absolute overflow-hidden rounded-[2px] px-1.5 py-1 leading-tight text-left cursor-pointer"
+              // block ŞART: <button> içeriğini varsayılan olarak dikeyde
+              // ORTALAR (anonim flex kutusu). Kutucuk metni ortada asılı
+              // kalıyordu; blok akışında üstten başlıyor.
+              className="absolute block overflow-hidden rounded-[2px] px-1.5 py-1 leading-tight text-left cursor-pointer"
               style={{
                 left: r.x + 1, top: r.y + 1,
                 width: Math.max(0, r.w - 2), height: Math.max(0, r.h - 2),

@@ -24,24 +24,22 @@ const TOTAL_KEY = '__total';
  * Risk serileri — varlık değil ÖLÇÜ. İkisi de portföyün o andaki bileşiminden
  * türer ve ikisi de 0–100 arası bir PAY'dır, tutar ya da getiri değil.
  *
- * İKİSİ DE AYNI KIRMIZI ve AYNI noktalı stil: "risk" tek bir görsel dil olsun
- * istendi — grafikte kırmızı noktalı ne varsa varlık değil risktir. Bedeli
- * açık: iki çizgi birbirinden RENKLE ayrılmıyor. Ayrım imleç kutusundan
- * (adlarıyla listelenirler) ve lejanttan (tek tıkla biri kapatılabilir)
- * okunuyor; ikisi birden açıkken hangisinin hangisi olduğu ancak kapatılarak
- * anlaşılır. Ayrı renk isteniyorsa değişmesi gereken tek yer burası.
+ * İKİSİ DE AYNI KIRMIZI: "risk" tek bir görsel dil olsun istendi — grafikte
+ * kırmızı kesik ne varsa varlık değil risktir. Renk ortak olduğu için ayrımı
+ * TİRE UZUNLUĞU taşıyor: kur riski uzun çizgi, yoğunluk kısa nokta. Lejant
+ * çipleri de aynı desenle çiziliyor (bkz. LegendChip), yani eşleştirme
+ * grafikle lejant arasında bire bir.
  */
 const FX_KEY = '__fxRisk';
 const CONC_KEY = '__concRisk';
 const RISK_COLOR = '#ef4444';
-const RISK_DASH = '3 3';
 const RISK: Record<string, { label: string; color: string; dash: string; title: string }> = {
   [FX_KEY]: {
-    label: 'Kur Riski', color: RISK_COLOR, dash: RISK_DASH,
+    label: 'Kur Riski', color: RISK_COLOR, dash: '12 5',
     title: 'TL bazlı varlıkların portföy içindeki payı — kur karşısında açık kısım',
   },
   [CONC_KEY]: {
-    label: 'Yoğunluk Riski', color: RISK_COLOR, dash: RISK_DASH,
+    label: 'Yoğunluk Riski', color: RISK_COLOR, dash: '3 3',
     title: 'En büyük tek varlığın portföy içindeki payı',
   },
 };
@@ -285,13 +283,12 @@ export default function PortfolioChart({
           <InfoTip>
             {hasRisk && (
               <p>
-                <b style={{ color: 'var(--text)' }}>Kırmızı noktalı çizgiler</b> risk
-                ölçüsü, varlık değil: <i>Kur Riski</i> TL bazlı varlıkların payı,
-                <i> Yoğunluk Riski</i> en büyük tek varlığın payı. İkisi de aynı
-                stilde çizilir — hangisinin hangisi olduğu imleç kutusundaki
-                adlarından okunur, lejanttan biri kapatılarak da ayrılabilir.
-                Kendi gizli eksenlerinde 0–100 arası okunurlar; yükseklikleri
-                diğer çizgilerle karşılaştırılmaz.
+                <b style={{ color: 'var(--text)' }}>Kırmızı kesik çizgiler</b> risk
+                ölçüsü, varlık değil: <i>Kur Riski</i> (uzun çizgi) TL bazlı
+                varlıkların payı, <i>Yoğunluk Riski</i> (kısa nokta) en büyük tek
+                varlığın payı. Kendi gizli eksenlerinde 0–100 arası okunurlar;
+                yükseklikleri diğer çizgilerle karşılaştırılmaz, kesin değerleri
+                imleçte.
               </p>
             )}
             {dualAxis && (
@@ -423,7 +420,7 @@ export default function PortfolioChart({
             <span className="shrink-0" style={{ width: 1, height: 12, background: 'var(--panel-3)' }} />
             {RISK_KEYS.map((k) => (
               <LegendChip
-                key={k} label={RISK[k].label} color={RISK[k].color} dashed
+                key={k} label={RISK[k].label} color={RISK[k].color} dash={RISK[k].dash}
                 title={RISK[k].title}
                 on={!hidden.has(k)} onClick={() => toggle(k)} />
             ))}
@@ -437,8 +434,10 @@ export default function PortfolioChart({
 
 // Etiket de serinin renginde yazılır: gözün yazıyla çizgiyi eşleştirmek için
 // önce ince renk çubuğunu bulması gerekmesin.
-function LegendChip({ label, color, dashed, on, onClick, title }: {
+function LegendChip({ label, color, dashed, dash, on, onClick, title }: {
   label: string; color: string; dashed?: boolean; on: boolean; onClick: () => void;
+  /** Grafikteki strokeDasharray'in aynısı — çip onunla AYNI deseni çizsin. */
+  dash?: string;
   /** Serinin ne ölçtüğü — kodu kendi kendini anlatmayan seriler için. */
   title?: string;
 }) {
@@ -450,13 +449,15 @@ function LegendChip({ label, color, dashed, on, onClick, title }: {
       className="flex items-center gap-1.5 t-label leading-none py-0.5 cursor-pointer transition-opacity"
       style={{ opacity: on ? 1 : 0.35, color: on ? color : 'var(--muted)' }}
     >
-      <span
-        className="inline-block shrink-0"
-        style={{
-          width: 14, height: 0,
-          borderTop: `2px ${dashed ? 'dashed' : 'solid'} ${color}`,
-          filter: on ? undefined : 'grayscale(1)',
-        }} />
+      {/* CSS `border-style: dashed` tire uzunluğunu tarayıcıya bırakır; iki
+          risk serisi aynı renkte olduğu için lejantta da desenin GRAFİKTEKİYLE
+          aynı olması gerekiyor. Bu yüzden çizgi minik bir SVG. */}
+      <svg width="18" height="2" viewBox="0 0 18 2" aria-hidden className="shrink-0"
+        style={{ filter: on ? undefined : 'grayscale(1)', overflow: 'visible' }}>
+        <line
+          x1="0" y1="1" x2="18" y2="1" stroke={color} strokeWidth="2"
+          strokeDasharray={dash ?? (dashed ? '5 3' : undefined)} />
+      </svg>
       <span className={on ? '' : 'line-through'}>{label}</span>
     </button>
   );
@@ -528,10 +529,10 @@ function ChartTooltip({ active, payload, labelText, fmt, yearly }:
           {risks.map((p) => (
             <div key={String(p.dataKey)} className="flex items-baseline justify-between gap-2.5">
               <span className="flex items-center gap-1.5" style={{ color: '#a8a8a8' }}>
-                <span style={{
-                  width: 7, height: 0, display: 'inline-block',
-                  borderTop: `2px dashed ${p.color}`,
-                }} />
+                <svg width="10" height="2" viewBox="0 0 10 2" aria-hidden style={{ overflow: 'visible' }}>
+                  <line x1="0" y1="1" x2="10" y2="1" stroke={p.color} strokeWidth="2"
+                    strokeDasharray={RISK[String(p.dataKey)]?.dash} />
+                </svg>
                 {p.name}
               </span>
               <span className="tnum" style={{ color: '#f4f4f4' }}>
