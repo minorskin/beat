@@ -44,8 +44,11 @@ export default function PortfolioChart({
   // kaldırıldı; sayfanın geri kalanıyla farklı birimde durması karışıklıktı.
   const cur = currency;
   // Varsayılan "%": toplam ~₺1,4M iken tek tek varlıklar ₺4bin — aynı eksende
-  // mutlak değerle çizilince küçükler düz çizgiye yapışıyor. Çift eksen ise
-  // uydurma bir korelasyon yaratır; doğru çözüm ortak baza indekslemek.
+  // mutlak değerle çizilince küçükler düz çizgiye yapışıyor. Karşılaştırma
+  // sorusunun doğru cevabı ortak baza indekslemek, o yüzden açılış görünümü bu.
+  // "Değer" görünümü tutarı göstermek zorunda olduğu için orada aynı sorun çift
+  // eksenle çözülüyor (bkz. dualAxis) — bedeli, iki eğrinin dikey mesafesinin
+  // bir şey ifade etmemesi; grafiğin altındaki not bunu söylüyor.
   const [mode, setMode] = useState<Mode>('pct');
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
@@ -156,6 +159,22 @@ export default function PortfolioChart({
     });
   }, [data, symbols, cur, own, mode, yearly]);
 
+  // ÇİFT EKSEN — yalnız "Değer" görünümünde ve varlık kırılımı varken.
+  // Toplam ~₺1,4M iken tek tek varlıklar ₺4bin: ortak eksende toplam tavana
+  // yapışıyor, geri kalan her şey tabanda tek bir şeride eziliyordu. Toplamı
+  // SAĞ eksene alınca sol eksen yalnız varlıkların aralığına göre ölçekleniyor
+  // ve onlar grafiğin tam yüksekliğine yayılıyor.
+  //
+  // "% değişim" görünümünde ikinci eksen ANLAMSIZ: orada zaten hepsi ortak
+  // baza indekslenmiş, tek ölçek doğru olan. Yıl kapanışları serisinde de
+  // (symbols boş) sol eksene çizecek bir şey kalmadığı için tek eksen.
+  //
+  // Toplam lejanttan kapatılırsa sağ eksen de gider — veri beslemeyen bir
+  // eksen kendi uydurma 0–1 aralığını çizerdi.
+  const dualAxis = mode === 'abs' && symbols.length > 0;
+  const totalAxis = dualAxis ? 'right' : 'left';
+  const showRightAxis = dualAxis && !hidden.has(TOTAL_KEY);
+
   const unit = cur === 'TRY' ? '₺' : '$';
   // 2 ondalık: günlük aralıkta oynama %1'in altında kalıyor, 0 ondalıkla
   // bütün etiketler "0%"a yuvarlanıp eksen okunmaz hale geliyordu.
@@ -225,8 +244,18 @@ export default function PortfolioChart({
               dataKey="i" type="category" tickFormatter={(v) => labelOf(Number(v))}
               tick={{ fontSize: 12.5, fill: '#a8a8a8' }} minTickGap={56}
               padding={{ right: 16 }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={fmtY} tick={{ fontSize: 12.5, fill: '#a8a8a8' }} width={52} axisLine={false} tickLine={false} />
-            {mode === 'pct' && <ReferenceLine y={0} stroke="#3d3d3d" />}
+            <YAxis
+              yAxisId="left" tickFormatter={fmtY} tick={{ fontSize: 12.5, fill: '#a8a8a8' }}
+              width={52} axisLine={false} tickLine={false} />
+            {/* Sağ eksenin yazıları TOPLAM'ın renginde: hangi eksenin hangi
+                çizgiyi ölçtüğü ayrı bir açıklama gerektirmesin. */}
+            {showRightAxis && (
+              <YAxis
+                yAxisId="right" orientation="right" tickFormatter={fmtY}
+                tick={{ fontSize: 12.5, fill: TOTAL_COLOR }}
+                width={52} axisLine={false} tickLine={false} />
+            )}
+            {mode === 'pct' && <ReferenceLine yAxisId="left" y={0} stroke="#3d3d3d" />}
             <Tooltip
               cursor={{ stroke: '#3d3d3d', strokeWidth: 1 }}
               content={(props) => (
@@ -235,7 +264,7 @@ export default function PortfolioChart({
 
             {symbols.map((sym) => hidden.has(sym) ? null : (
               <Line
-                key={sym} dataKey={sym} name={sym} type="monotone"
+                key={sym} dataKey={sym} name={sym} type="monotone" yAxisId="left"
                 stroke={styles[sym].color} strokeWidth={2}
                 strokeDasharray={styles[sym].dashed ? '5 3' : undefined}
                 dot={sparse ? { r: 3 } : false} isAnimationActive={false} connectNulls={false} />
@@ -243,13 +272,22 @@ export default function PortfolioChart({
             {/* Toplam en sonda: diğer çizgilerin üstünde kalsın */}
             {!hidden.has(TOTAL_KEY) && (
               <Line
-                dataKey={TOTAL_KEY} name="TOPLAM" type="monotone"
+                dataKey={TOTAL_KEY} name="TOPLAM" type="monotone" yAxisId={totalAxis}
                 stroke={TOTAL_COLOR} strokeWidth={2.5}
                 dot={sparse ? { r: 3.5 } : false} isAnimationActive={false} />
             )}
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {dualAxis && (
+        <p className="t-label mt-2" style={{ color: 'var(--faint)' }}>
+          İki eksen: TOPLAM sağdaki eksene, tek tek varlıklar soldakine göre
+          çizilir. Böylece varlıkların eğrisi toplamın büyüklüğü altında
+          ezilmez — ama iki eğrinin dikey mesafesi bir şey ifade etmez,
+          ölçekleri farklı.
+        </p>
+      )}
 
       {mode === 'pct' && !yearly && (
         <p className="t-label mt-2" style={{ color: 'var(--faint)' }}>
@@ -272,17 +310,12 @@ export default function PortfolioChart({
           onClick={toggleAll}
           aria-pressed={allOn}
           title={allOn ? 'Hepsini gizle' : 'Hepsini göster'}
-          className="flex items-center gap-1.5 t-label leading-none py-0.5 cursor-pointer"
+          className="t-label leading-none py-0.5 cursor-pointer"
           style={{ color: allOn ? 'var(--text)' : 'var(--muted)' }}
         >
-          {/* Renk çubuğu yerine kutu: bu bir seri değil, seri anahtarı. */}
-          <span
-            className="inline-block shrink-0 rounded-[2px]"
-            style={{
-              width: 11, height: 11,
-              background: allOn ? 'var(--text)' : 'transparent',
-              boxShadow: `inset 0 0 0 1.5px ${allOn ? 'var(--text)' : 'var(--faint)'}`,
-            }} />
+          {/* Kutucuk kaldırıldı: yanındaki seri çipleri renk çubuğu taşıyor,
+              buradaki kare onlarla aynı hizada durunca "bu da bir seri"
+              izlenimi veriyordu. Açık/kapalı durumu metnin tonundan okunuyor. */}
           HEPSİ
         </button>
         <span className="shrink-0" style={{ width: 1, height: 12, background: 'var(--panel-3)' }} />
