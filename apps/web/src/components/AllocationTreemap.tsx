@@ -31,17 +31,26 @@ function tone(t: number) {
 }
 
 /**
- * Kutucuk içi risk satırı: ad + renkli nokta. Renk tek başına anlam taşımasın
- * diye adı hep yanında, tam açıklaması kutucuğun title'ında.
+ * Kutucuk içi risk göstergesi.
+ *
+ * Geniş kutuda ADIYLA birlikte kendi satırında durur — renk tek başına anlam
+ * taşımasın diye. Dar kutuda ad düşer (`label` verilmez): orada iki nokta
+ * tutar satırının ucuna dizilir, anlamları kutucuğun title'ında ve ekran
+ * okuyucu etiketinde kalır. Alternatif, adı "Yoğunluk…" diye kesmekti;
+ * yarım kelime hiç kelimeden daha kötü.
  */
-function Dot({ label, color, aria }: { label: string; color: string; aria: string }) {
+function Dot({ label, color, aria }: { label?: string; color: string; aria: string }) {
+  const dot = (
+    <span
+      aria-label={aria}
+      className="inline-block w-2 h-2 rounded-full shrink-0"
+      style={{ background: color }} />
+  );
+  if (!label) return dot;
   return (
     <div className="flex items-center gap-1 mt-1 t-micro leading-none min-w-0">
       <span className="truncate opacity-75">{label}</span>
-      <span
-        aria-label={aria}
-        className="inline-block w-2 h-2 rounded-full shrink-0"
-        style={{ background: color }} />
+      {dot}
     </div>
   );
 }
@@ -125,6 +134,12 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
           const share = (r.value / total) * 100;
           const t = Math.sqrt(r.value / max);
           const big = r.w > 62 && r.h > 30;
+          // Beş satırlık yığın (kod → pay → tutar → kur → yoğunluk) ancak bu
+          // ölçünün üstünde sığar. Altında kalan kutu iki satıra iner: üstte
+          // yalnız kod, altta kalan her şey yan yana. Aradaki kademeleri tek
+          // tek açmak (önce pay, sonra tutar, sonra bir nokta…) küçük kutuda
+          // hep eksik bilgi demekti; iki satır hepsini birden taşıyor.
+          const full = r.h > 104 && r.w > 96;
           return (
             <div
               key={r.symbol}
@@ -146,23 +161,47 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
               {big && (
                 <>
                   <div className="t-label font-medium truncate">{r.symbol}</div>
-                  {r.h > 48 && <div className="t-micro tnum truncate opacity-90">%{num(share, 1)}</div>}
-                  {r.h > 66 && <div className="t-micro tnum truncate opacity-75">{moneyShort(r.value, cur)}</div>}
-                  {/* Çıplak nokta neyin göstergesi olduğunu söylemiyordu —
-                      artık her noktanın önünde adı var, ve altına ikinci bir
-                      risk satırı geldi. Eşikler lib/risk.ts'te, özet kartındaki
-                      "Yoğunluk Riski" rozetiyle ORTAK. */}
-                  {r.h > 86 && r.currency && (
-                    <Dot
-                      label="Kur"
-                      color={r.currency === 'USD' ? 'var(--up)' : 'var(--down)'}
-                      aria={`${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}`} />
-                  )}
-                  {r.h > 104 && !r.agg && (
-                    <Dot
-                      label="Yoğunluk"
-                      color={CONC_COLOR[concLevel(share)]}
-                      aria={`Yoğunluk riski ${CONC_LABEL[concLevel(share)]}`} />
+                  {/* Eşikler lib/risk.ts'te — özet kartındaki "Yoğunluk Riski"
+                      rozetiyle ORTAK, ikisi aynı sayıyı okuyor. */}
+                  {full ? (
+                    <>
+                      <div className="t-micro tnum truncate opacity-90">%{num(share, 1)}</div>
+                      <div className="t-micro tnum truncate opacity-75">{moneyShort(r.value, cur)}</div>
+                      {r.currency && (
+                        <Dot
+                          label="Kur"
+                          color={r.currency === 'USD' ? 'var(--up)' : 'var(--down)'}
+                          aria={`${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}`} />
+                      )}
+                      {!r.agg && (
+                        <Dot
+                          label="Yoğunluk"
+                          color={CONC_COLOR[concLevel(share)]}
+                          aria={`Yoğunluk riski ${CONC_LABEL[concLevel(share)]}`} />
+                      )}
+                    </>
+                  ) : r.h > 44 && (
+                    <div className="flex items-center gap-2 mt-0.5 t-micro leading-none min-w-0">
+                      <span className="tnum shrink-0 opacity-90">%{num(share, 1)}</span>
+                      {/* Tutar ilk feda edilen: pay ve iki nokta olmadan satır
+                          anlamını yitirir, tutar ise kutucuğun alanından zaten
+                          okunuyor. Tamı title'da. */}
+                      {r.w > 108 && (
+                        <span className="tnum truncate opacity-75">{moneyShort(r.value, cur)}</span>
+                      )}
+                      <span className="flex items-center gap-1 shrink-0 ml-auto">
+                        {r.currency && (
+                          <Dot
+                            color={r.currency === 'USD' ? 'var(--up)' : 'var(--down)'}
+                            aria={`${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}`} />
+                        )}
+                        {!r.agg && (
+                          <Dot
+                            color={CONC_COLOR[concLevel(share)]}
+                            aria={`Yoğunluk riski ${CONC_LABEL[concLevel(share)]}`} />
+                        )}
+                      </span>
+                    </div>
                   )}
                 </>
               )}
