@@ -8,11 +8,16 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Beat' },
   icons: {
     // SVG önce: destekleyen tarayıcı sekmede vektörü kullanır, kalanlar PNG'ye düşer.
+    //
+    // ?v= ŞART: ana ekrana eklenmiş bir PWA ikonu kurulum anında kopyalanır ve
+    // aynı URL'de kaldığı sürece bir daha istenmez — dosyayı değiştirmek yetmez,
+    // adresin de değişmesi gerekir. İkon her değiştiğinde bu sayı artırılmalı
+    // (manifest.webmanifest'teki değerlerle AYNI kalsın).
     icon: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
-      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon.svg?v=3', type: 'image/svg+xml' },
+      { url: '/icon-192.png?v=3', sizes: '192x192', type: 'image/png' },
     ],
-    apple: '/apple-touch-icon.png',
+    apple: '/apple-touch-icon.png?v=3',
   },
 };
 export const viewport: Viewport = {

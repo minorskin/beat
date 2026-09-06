@@ -2,24 +2,34 @@
   <!--
     Beat işareti — kesintisiz bir nabız/dalga. Beş dikey kol, dönüşlerde tam
     yarım daire; iki uç yatay kısa kuyruk (dalga devam ediyor duygusu).
-    Tek bir stroke path: kalınlık her yerde eşit, uçlar ve dönüşler yuvarlak.
-    Renk currentColor DEĞİL sabit: PNG türevlerinde de aynı görünsün.
+
+    ZEMİN YOK: PNG türevleri de saydam üretiliyor. İşaretin kendisi siyah,
+    ama siyah tek başına koyu bir ana ekranda ya da koyu sekme çubuğunda
+    kaybolurdu. Bu yüzden aynı yol İKİ KEZ çiziliyor: önce daha kalın beyaz
+    stroke (dört yana taşan bordür), üstüne siyah. Sonuç, işaretin çevresini
+    her yönden saran beyaz bir kenar — açık zeminde siyah, koyu zeminde beyaz
+    okunur, ikisinde de kayıp yok.
+
+    Renkler currentColor DEĞİL sabit: PNG türevlerinde de aynı görünsün.
   -->
-  <rect width="500" height="500" fill="#ffffff"/>
-  <path
-    d="M 88 265 L 98 265
-       A 30 30 0 0 0 128 235
-       L 128 175
-       A 30 30 0 0 1 188 175
-       L 188 355
-       A 30 30 0 0 0 248 355
-       L 248 125
-       A 30 30 0 0 1 308 125
-       L 308 300
-       A 30 30 0 0 0 368 300
-       L 368 240
-       A 30 30 0 0 1 398 210
-       L 412 210"
-    fill="none" stroke="#000000" stroke-width="26"
-    stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <path id="beat-mark"
+      d="M 88 265 L 98 265
+         A 30 30 0 0 0 128 235
+         L 128 175
+         A 30 30 0 0 1 188 175
+         L 188 355
+         A 30 30 0 0 0 248 355
+         L 248 125
+         A 30 30 0 0 1 308 125
+         L 308 300
+         A 30 30 0 0 0 368 300
+         L 368 240
+         A 30 30 0 0 1 398 210
+         L 412 210"/>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#beat-mark" stroke="#ffffff" stroke-width="46"/>
+    <use href="#beat-mark" stroke="#000000" stroke-width="26"/>
+  </g>
 </svg>

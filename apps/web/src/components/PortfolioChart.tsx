@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ReferenceLine, type TooltipContentProps,
 } from 'recharts';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SeriesPoint, SymPoint } from '@/lib/data';
 import { money, pct, type Cur } from '@/lib/format';
 
@@ -24,20 +24,24 @@ const TOTAL_KEY = '__total';
  * Risk serileri — varlık değil ÖLÇÜ. İkisi de portföyün o andaki bileşiminden
  * türer ve ikisi de 0–100 arası bir PAY'dır, tutar ya da getiri değil.
  *
- * Renkler kasten sayfanın geri kalanıyla aynı: kırmızı kur riski, sarı
- * yoğunluk (bkz. lib/risk.ts, kartlardaki rozetler ve dağılım noktaları).
- * Varlık çizgilerinden ayrılmaları renge değil KESİK ÇİZGİYE yüklenmiş —
- * palet zaten dolu ve yeni ton üretmek CVD altında ayrım kaybettiriyor.
+ * İKİSİ DE AYNI KIRMIZI ve AYNI noktalı stil: "risk" tek bir görsel dil olsun
+ * istendi — grafikte kırmızı noktalı ne varsa varlık değil risktir. Bedeli
+ * açık: iki çizgi birbirinden RENKLE ayrılmıyor. Ayrım imleç kutusundan
+ * (adlarıyla listelenirler) ve lejanttan (tek tıkla biri kapatılabilir)
+ * okunuyor; ikisi birden açıkken hangisinin hangisi olduğu ancak kapatılarak
+ * anlaşılır. Ayrı renk isteniyorsa değişmesi gereken tek yer burası.
  */
 const FX_KEY = '__fxRisk';
 const CONC_KEY = '__concRisk';
+const RISK_COLOR = '#ef4444';
+const RISK_DASH = '3 3';
 const RISK: Record<string, { label: string; color: string; dash: string; title: string }> = {
   [FX_KEY]: {
-    label: 'Kur Riski', color: '#ef4444', dash: '7 4',
+    label: 'Kur Riski', color: RISK_COLOR, dash: RISK_DASH,
     title: 'TL bazlı varlıkların portföy içindeki payı — kur karşısında açık kısım',
   },
   [CONC_KEY]: {
-    label: 'Yoğunluk Riski', color: '#f59e0b', dash: '3 3',
+    label: 'Yoğunluk Riski', color: RISK_COLOR, dash: RISK_DASH,
     title: 'En büyük tek varlığın portföy içindeki payı',
   },
 };
@@ -261,19 +265,65 @@ export default function PortfolioChart({
 
   return (
     <div className="panel p-3 sm:p-5">
-      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+      {/* relative: InfoTip'in açılan kutusu KONUMUNU BURADAN alıyor, kendi
+          düğmesinden değil. Düğmeye yapışık dururken dar ekranda kutu başlığın
+          bittiği yerden başlayıp sağdan taşıyordu; panelin sol kenarına
+          hizalanınca her genişlikte içeride kalıyor (bkz. InfoTip). */}
+      <div className="relative flex items-center justify-between mb-3 gap-2 flex-wrap">
         {/* Başlık çıplak: sahiplik ("bana ait") ve seri türü ("yıl kapanışları")
             ekleri kaldırıldı — ikisi de üst bardaki anahtarlardan okunuyor,
             başlıkta tekrar edilince gürültü oluyordu. Yıl kapanışları serisinin
             kendine has kuralları zaten grafiğin altındaki notta. */}
-        <h2 className="t-head font-medium" style={{ color: 'var(--muted)' }}>
-          Varlık Değişimi
-        </h2>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <h2 className="t-head font-medium" style={{ color: 'var(--muted)' }}>
+            Varlık Değişimi
+          </h2>
+          {/* Grafiğin okuma kuralları eskiden ALTINDA dört ayrı paragraf
+              hâlinde duruyordu: her mod değişiminde sayfa zıplıyor, grafikle
+              lejant arasına sürekli değişen bir metin bloğu giriyordu. Aynı
+              metinler artık burada, isteyenin açtığı bir kutuda. */}
+          <InfoTip>
+            {hasRisk && (
+              <p>
+                <b style={{ color: 'var(--text)' }}>Kırmızı noktalı çizgiler</b> risk
+                ölçüsü, varlık değil: <i>Kur Riski</i> TL bazlı varlıkların payı,
+                <i> Yoğunluk Riski</i> en büyük tek varlığın payı. İkisi de aynı
+                stilde çizilir — hangisinin hangisi olduğu imleç kutusundaki
+                adlarından okunur, lejanttan biri kapatılarak da ayrılabilir.
+                Kendi gizli eksenlerinde 0–100 arası okunurlar; yükseklikleri
+                diğer çizgilerle karşılaştırılmaz.
+              </p>
+            )}
+            {dualAxis && (
+              <p>
+                <b style={{ color: 'var(--text)' }}>İki eksen:</b> TOPLAM sağdaki
+                eksene, tek tek varlıklar soldakine göre çizilir. Böylece
+                varlıkların eğrisi toplamın büyüklüğü altında ezilmez — ama iki
+                eğrinin dikey mesafesi bir şey ifade etmez, ölçekleri farklı.
+              </p>
+            )}
+            {mode === 'pct' && !yearly && (
+              <p>
+                <b style={{ color: 'var(--text)' }}>Oran</b> görünümünde eğriler
+                birim değer (fiyat) üzerinden hesaplanır — alım, satım ve para
+                eklemesi eğriyi bozmaz. TOPLAM, her adımın ağırlıklı getirisinin
+                zinciri. Yatırılan tutarı görmek için “Değer”e geç.
+              </p>
+            )}
+            {yearly && (
+              <p>
+                Elle girilen yıl sonu toplamları + bugünkü değer. Bu yıllarda
+                varlık kırılımı yok; emanet ayrımı da uygulanmaz (toplam
+                gösterilir).
+              </p>
+            )}
+          </InfoTip>
+        </div>
         <div className="flex gap-2 shrink-0">
           <div className="flex gap-1">
             {(['pct', 'abs'] as const).map((m) => (
               <button key={m} onClick={() => setMode(m)} className={`seg ${mode === m ? 'seg-on' : ''}`}>
-                {m === 'pct' ? 'Değişim' : 'Değer'}
+                {m === 'pct' ? 'Oran' : 'Değer'}
               </button>
             ))}
           </div>
@@ -344,40 +394,6 @@ export default function PortfolioChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
-
-      {hasRisk && RISK_KEYS.some((k) => !hidden.has(k)) && (
-        <p className="t-label mt-2" style={{ color: 'var(--faint)' }}>
-          Kesik çizgiler risk ölçüsü, varlık değil: <b style={{ color: 'var(--muted)' }}>Kur
-          Riski</b> TL bazlı varlıkların payı, <b style={{ color: 'var(--muted)' }}>Yoğunluk
-          Riski</b> en büyük tek varlığın payı. İkisi de kendi gizli
-          eksenlerinde 0–100 arası okunur — yükseklikleri diğer çizgilerle
-          karşılaştırılmaz, kesin değerleri imleçte.
-        </p>
-      )}
-
-      {dualAxis && (
-        <p className="t-label mt-2" style={{ color: 'var(--faint)' }}>
-          İki eksen: TOPLAM sağdaki eksene, tek tek varlıklar soldakine göre
-          çizilir. Böylece varlıkların eğrisi toplamın büyüklüğü altında
-          ezilmez — ama iki eğrinin dikey mesafesi bir şey ifade etmez,
-          ölçekleri farklı.
-        </p>
-      )}
-
-      {mode === 'pct' && !yearly && (
-        <p className="t-label mt-2" style={{ color: 'var(--faint)' }}>
-          Oranlar birim değer (fiyat) üzerinden — alım, satım ve para eklemesi
-          eğriyi bozmaz. TOPLAM, her adımın ağırlıklı getirisinin zinciri.
-          Yatırılan tutarı görmek için “Değer”e geç.
-        </p>
-      )}
-
-      {yearly && (
-        <p className="t-label mt-2" style={{ color: 'var(--faint)' }}>
-          Elle girilen yıl sonu toplamları + bugünkü değer. Bu yıllarda varlık
-          kırılımı yok; emanet ayrımı da uygulanmaz (toplam gösterilir).
-        </p>
-      )}
 
       {/* Yatay lejant — tıklayınca ilgili çizgi açılıp kapanır */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3">
@@ -526,5 +542,80 @@ function ChartTooltip({ active, payload, labelText, fmt, yearly }:
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Başlığın yanındaki “i” — grafiğin okuma kuralları.
+ *
+ * Hem hover'da hem tıklamada açılır ve bu bilinçli: masaüstünde imleç
+ * üstünden geçince yeter, dokunmatikte hover diye bir şey yok. Tıklamayla
+ * açılan hâl SABİTLENİR (imleç çekilince kapanmaz) — kutunun içindeki metin
+ * uzun, okurken kaybolması can sıkıcı olurdu.
+ */
+function InfoTip({ children }: { children: React.ReactNode }) {
+  const [hover, setHover] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const open = hover || pinned;
+
+  // Sabitlenmiş kutu dışarı tıklayınca ya da Escape ile kapanır.
+  useEffect(() => {
+    if (!pinned) return;
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setPinned(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPinned(false); };
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [pinned]);
+
+  return (
+    <span
+      ref={ref}
+      className="inline-flex shrink-0"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <button
+        type="button"
+        aria-label="Grafik nasıl okunur"
+        aria-expanded={open}
+        onClick={() => setPinned((p) => !p)}
+        className="flex items-center justify-center rounded-full cursor-pointer transition-colors"
+        style={{
+          width: 18, height: 18, fontSize: 12, lineHeight: 1, fontStyle: 'italic',
+          fontFamily: 'Georgia, "Times New Roman", serif',
+          background: open ? 'var(--panel-3)' : 'var(--panel-2)',
+          color: open ? 'var(--text)' : 'var(--muted)',
+        }}
+      >i</button>
+
+      {open && (
+        <div
+          role="tooltip"
+          // Konum, düğmenin değil BAŞLIK SATIRININ soluna göre (o satır
+          // `relative`): kutu panelin sol kenarından başlar, altına açılır ve
+          // genişliği panelden asla taşmaz. Düğmeye yapışık dururken telefonda
+          // sağ kenardan taşıyordu.
+          className="absolute left-0 top-full mt-1.5 z-30 rounded-[var(--r-sm)] px-3 py-2.5"
+          style={{
+            width: 'min(340px, 100%)',
+            background: 'rgba(24,24,24,0.92)',
+            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.10)',
+            color: 'var(--muted)', fontSize: 'var(--t-label)', lineHeight: 1.45,
+            // Ardışık paragraflar arası boşluk — her not ayrı bir kural.
+            display: 'grid', gap: 8, whiteSpace: 'normal', textAlign: 'left',
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </span>
   );
 }
