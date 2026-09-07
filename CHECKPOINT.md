@@ -75,6 +75,26 @@ secret'ında — hiçbiri kodda değil.
   Katalog boş — kullanıcı kendi varlıklarını arayüzden ekliyor.
 - **Dönemsel değişim şeridi kısmen dolu** — Gün/Hafta/Ay pencereleri yeterli geçmiş
   snapshot birikince otomatik dolacak (şu an sadece "Başından" değeri var).
+- ~~XAUUSD fiyat alamıyor~~ — **07.09.2026'da çözüldü** (migration `0017`): döviz
+  zincirindeki truncgil/tcmb madeni yalnız TL karşılığı kote ediyor, pariteyi
+  veremiyordu; kaynak `goldapi`'ye alındı ve sağlayıcı maden/dolar paritesinde ham USD
+  fiyatını döndürecek şekilde genişletildi.
+
+## Güncelleme takvimi (07.09.2026'dan beri)
+
+Motor artık her enstrüman grubunu **kendi planına** göre çekiyor: gün + çalışma aralığı
++ zaman dilimi + sıklık, hepsi `market_calendars` tablosunda (migration `0016`).
+Ayrıntı ve tablo README'de "Enstrüman grubu güncelleme planı" başlığında.
+
+Yeni bir oturumda "veri neden gelmiyor" diye bakarken bunu bil:
+
+- **Boş tur normaldir.** Tetikleyici 10 dk'da bir denerken gruplar 30/60 dk'da bir
+  güncelleniyor; saatin :10 ve :20'sinde hiçbir enstrümanın sırası gelmez. Motor
+  `0 enstrüman` yazıp yeşil biter. Log'daki `atlandı (takvim): ...` satırı arızayı
+  değil kapının çalıştığını gösterir.
+- **Gayrimenkul hiç çekilmez** (belgede yedi gün de "hayır"). Yalnız arayüzden girilen
+  değerleme son yazılan fiyattan farklıysa tek seferlik çekilir.
+- Sıklık kapısının damgası `instruments.last_fetch_at`; sorun ararken önce ona bak.
 
 ## Son commit'ler (bu oturumda)
 
