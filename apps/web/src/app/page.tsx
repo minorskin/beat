@@ -187,16 +187,24 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
 
   return (
     <TabsProvider>
-      {/* Sticky üst bar — sol: sekmeler · sağ: sahiplik + ayarlar + dönem.
+      {/* Sticky üst bar — sol: sekmeler · sağ: ayarlar + dönem.
           Para birimi ve çıkış dişlinin içinde: ikisi de seyrek dokunulan
-          anahtarlar, barda yer kaplamalarına gerek yok. */}
+          anahtarlar, barda yer kaplamalarına gerek yok.
+
+          Üçü de TEK flex kutusunda, sarmalayıcı gruplar olmadan. Ayarlar ve
+          dönem eskiden ortak bir kutudaydı; dar ekranda o kutu bütün olarak
+          alt satıra düşüyor ve `justify-between` tek eleman kaldığı için onu
+          SOLA yaslıyordu — dişli sayfanın sol kenarında, dönem seçicisi
+          ortada asılı kalıyordu. Şimdi dişli `ms-auto` ile her genişlikte sağ
+          uca gidiyor; dönem seçicisi mobilde kendi satırını boydan boya
+          kaplıyor (bkz. RangeSwitcher), masaüstünde dişlinin yanında kalıyor. */}
       <div className="appbar">
-        <div className="w-full px-3 sm:px-5 lg:px-8 py-2 sm:py-0 sm:h-14 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <div className="w-full px-3 sm:px-5 lg:px-8 py-2 sm:py-0 sm:h-14 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <SectionNav />
-          <div className="shrink-0 flex items-center gap-2">
+          <div className="shrink-0 ms-auto">
             <SettingsMenu cur={cur} own={own} closings={closings} logoutAction={logout} />
-            <RangeSwitcher range={range} />
           </div>
+          <RangeSwitcher range={range} />
         </div>
       </div>
 

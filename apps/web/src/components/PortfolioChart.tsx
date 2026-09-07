@@ -128,13 +128,33 @@ export default function PortfolioChart({
       : stepH < 20 ? { timeZone: tz, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }
       : { timeZone: tz, day: '2-digit', month: 'short' });
 
+    // EKSEN ETİKETİ İKİ SATIR: üstte saat, altta gün. Tek satırlık
+    // "01 Eyl 11:00" biçimi ~95px yer istiyordu; minTickGap ile birlikte dar
+    // ekrana yalnız iki etiket sığıyor, grafiğin altı boş kalıyordu. İkiye
+    // bölününce en geniş satır ~34px'e iniyor ve aynı yere üç katı etiket
+    // giriyor. Gün "30/09" — ay adı ("Eyl") satırı gereksiz genişletiyordu.
+    const hourFmt = new Intl.DateTimeFormat('tr-TR', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+    // tr-TR'de gün+ay 2 haneli zaten "30/09" veriyor; elle birleştirme yok.
+    const dayFmt = new Intl.DateTimeFormat('tr-TR', { timeZone: tz, day: '2-digit', month: '2-digit' });
+    const yearFmt = new Intl.DateTimeFormat('tr-TR', { timeZone: tz, year: 'numeric', month: 'short' });
+    // Saat satırı yalnız gün içi çözünürlükte anlamlı: günlük ya da daha seyrek
+    // adımda hepsi aynı saati gösterip yanıltırdı. Orada tek satır kalır.
+    const withHour = spanH <= 24 * 400 && (spanH < 6 || stepH < 20);
+    const axisLabel = (at: Date): [string, string?] =>
+      spanH > 24 * 400 ? [yearFmt.format(at)]
+      : withHour ? [hourFmt.format(at), dayFmt.format(at)]
+      : [dayFmt.format(at)];
+
     return data.map((d, i) => {
       // x anahtarı SIRA NUMARASI, biçimlenmiş tarih DEĞİL. Etiket metni
       // tekrar edebiliyor (aynı güne düşen gözlemler) ve recharts aynı
       // kategoriyi tek noktaya indirdiği için 25 gözlem 6 noktaya çöküyordu:
       // günün son okumasına hiç ulaşılamıyor, hep daha eski biri seçili
       // kalıyordu. Sıra numarası benzersiz; okunur etiket tickFormatter'da.
-      const r: Row = { i, label: fmt.format(new Date(d.ts)) };
+      const at = new Date(d.ts);
+      // label → imleç kutusu (uzun, okunur biçim); t1/t2 → eksen (iki satır).
+      const [t1, t2] = axisLabel(at);
+      const r: Row = { i, label: fmt.format(at), t1, t2: t2 ?? null };
       if (yearly) {
         // Yıl kapanışları serisinde tooltip üç şey gösteriyor: TL tutar, USD
         // tutar ve USD'nin bir önceki yıla göre değişimi. Bunlar çizilen bir
@@ -243,6 +263,17 @@ export default function PortfolioChart({
 
   // Eksen ve tooltip metni sıra numarasından okunur.
   const labelOf = (i: number) => String(rows[i]?.label ?? '');
+  // recharts hangi etiketlerin sığdığını tickFormatter'ın DÖNDÜĞÜ metni
+  // ölçerek buluyor (getTicks → getStringSize); çizimi özel bileşen yapsa da
+  // ölçüm hâlâ buradan geliyor. O yüzden burası iki satırın GENİŞ olanını
+  // döndürür — birleşik metin dönseydi eksen olduğundan geniş sanılıp
+  // etiketlerin çoğu elenirdi.
+  const tickSizeOf = (i: number) => {
+    const r = rows[i];
+    if (!r) return '';
+    const a = String(r.t1 ?? ''), b = String(r.t2 ?? '');
+    return b.length > a.length ? b : a;
+  };
 
   // 1–3 noktalı seride "monotone" çizgi bir yol üretmiyor: aralık kısa ya da
   // geçmiş henüz kısaysa grafik bomboş görünüyordu. O durumda noktaları çiz.
@@ -336,7 +367,13 @@ export default function PortfolioChart({
 
       <div className="w-full h-[240px] sm:h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows} margin={{ left: 0, right: 6, top: 4, bottom: 0 }}>
+          {/* margin sıfır: çizim alanı kartın iç genişliğini boydan boya
+              kullansın. Sağdaki 6px'lik eski pay ile soldaki sabit 52px'lik
+              eksen (etiket "9%" iken yarısı boştu) grafiği iki yandan
+              daraltıyordu; kartın içinde ne kadar yer varsa o kadar veri
+              görünsün. Kenar boşluğunu artık YALNIZ panelin kendi p-3/p-5'i
+              veriyor. */}
+          <LineChart data={rows} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="#232323" />
             {/* padding.right ŞART: nokta ölçeğinde son gözlem tam çizim
                 alanının sağ kenarına oturuyor ve recharts imleç çizim alanının
@@ -345,20 +382,27 @@ export default function PortfolioChart({
                 en sağa gidince bir önceki nokta seçili kalıyor, en güncel
                 veriye hiç ulaşılamıyordu. 16px'lik pay son noktaya rahat bir
                 yakalama alanı bırakır. */}
+            {/* height 42: iki satırlık etiket (saat + gün) varsayılan 30px'e
+                sığmıyor, alt satır kırpılıyordu. */}
             <XAxis
-              dataKey="i" type="category" tickFormatter={(v) => labelOf(Number(v))}
-              tick={{ fontSize: 12.5, fill: '#a8a8a8' }} minTickGap={56}
+              dataKey="i" type="category" tickFormatter={(v) => tickSizeOf(Number(v))}
+              tick={<DateTick rows={rows} />} minTickGap={20} height={42}
               padding={{ right: 16 }} axisLine={false} tickLine={false} />
+            {/* width="auto": eksen etiketin gerçekten istediği kadar yer alır.
+                Sabit 52px "Oran" görünümünde ("9%", "-3%") 30px'e yakınını boşa
+                harcıyordu — grafiğin solundaki görünür boşluk buydu. "Değer"
+                görünümünde etiket uzun ("20,6 Mn") ve eksen kendiliğinden
+                genişliyor. */}
             <YAxis
               yAxisId="left" tickFormatter={fmtY} tick={{ fontSize: 12.5, fill: '#a8a8a8' }}
-              width={52} axisLine={false} tickLine={false} />
+              width="auto" axisLine={false} tickLine={false} />
             {/* Sağ eksenin yazıları TOPLAM'ın renginde: hangi eksenin hangi
                 çizgiyi ölçtüğü ayrı bir açıklama gerektirmesin. */}
             {showRightAxis && (
               <YAxis
                 yAxisId="right" orientation="right" tickFormatter={fmtY}
                 tick={{ fontSize: 12.5, fill: TOTAL_COLOR }}
-                width={52} axisLine={false} tickLine={false} />
+                width="auto" axisLine={false} tickLine={false} />
             )}
             {/* Risk serilerinin kendi ekseni: sabit 0–100, GİZLİ. Ne "% değişim"
                 (−4…+12) ne de "Değer" (₺ milyonlar) ekseninde bir payın yeri
@@ -436,6 +480,34 @@ export default function PortfolioChart({
       </div>
 
     </div>
+  );
+}
+
+/**
+ * X ekseninin iki satırlı etiketi — ÜSTTE SAAT, ALTTA GÜN (30/09).
+ *
+ * recharts, `tick` olarak verilen elemanı her etiket için `x`, `y` ve
+ * `payload` ile klonluyor; `payload.value` satırın sıra numarası (bkz. rows
+ * useMemo — x anahtarı tarih değil indeks). İki satır tek `<text>` içinde
+ * tspan olarak duruyor: ayrı `<text>` elemanları eksen yüksekliği ölçümünde
+ * (getCalculatedXAxisHeight) iki ayrı etiket sayılırdı.
+ *
+ * Gün satırı daha soluk ve bir punto küçük: aynı gün art arda birkaç saat
+ * etiketinin altında tekrarlanıyor, tam kontrastta okuma sırasını saatten
+ * çalıyordu.
+ */
+function DateTick({ rows, x, y, payload, className }: {
+  rows: Row[]; x?: number; y?: number; payload?: { value: string | number }; className?: string;
+}) {
+  const r = rows[Number(payload?.value)];
+  if (!r) return null;
+  const top = String(r.t1 ?? '');
+  const sub = r.t2 == null ? '' : String(r.t2);
+  return (
+    <text x={x} y={y} textAnchor="middle" fill="#a8a8a8" fontSize={12.5} className={className}>
+      <tspan x={x} dy="0.75em">{top}</tspan>
+      {sub && <tspan x={x} dy="1.35em" fill="#7d7d7d" fontSize={11.5}>{sub}</tspan>}
+    </text>
   );
 }
 

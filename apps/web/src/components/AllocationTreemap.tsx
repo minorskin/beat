@@ -30,26 +30,57 @@ function tone(t: number) {
   return `hsl(224 ${s}% ${l}%)`;
 }
 
-/**
- * Kutucuk içi risk göstergesi.
- *
- * Geniş kutuda ADIYLA birlikte kendi satırında durur — renk tek başına anlam
- * taşımasın diye. Dar kutuda ad düşer (`label` verilmez): orada iki nokta
- * tutar satırının ucuna dizilir, anlamları kutucuğun detay kartında ve ekran
- * okuyucu etiketinde kalır.
- */
-function Dot({ label, color, aria }: { label?: string; color: string; aria: string }) {
-  const dot = (
+/** Tek risk noktası — rengi ölçüyü, aria etiketi gerekçesini taşır. */
+function Dot({ color, aria }: { color: string; aria: string }) {
+  return (
     <span
       aria-label={aria}
       className="inline-block w-2 h-2 rounded-full shrink-0"
       style={{ background: color }} />
   );
-  if (!label) return dot;
+}
+
+/**
+ * Kutucuğun iki risk noktası: kur (USD → yeşil, TL → kırmızı) ve yoğunluk.
+ *
+ * Geniş kutuda ADLARIYLA yazılırlar — renk tek başına anlam taşımasın diye.
+ * İki satır TEK GRID: sütunlar max-content olduğu için etiket sütunu en geniş
+ * ada ("Yoğunluk") göre ölçülür ve iki nokta AYNI x'te dizilir. Eskiden her
+ * satır kendi flex kutusuydu, noktalar etiket uzunluğu kadar kayıyor ("Kur ●"
+ * ile "Yoğunluk ●" arasında ~30px fark) ve kutucuk hatalı hizalanmış
+ * görünüyordu.
+ *
+ * Dar kutuda ad düşer: iki nokta yan yana, sayıların hemen ardında durur;
+ * anlamları detay kartında ve ekran okuyucu etiketinde kalır.
+ */
+function Risks({ item, share, wide, className = '' }: {
+  item: AllocItem; share: number; wide: boolean; className?: string;
+}) {
+  const fx = item.currency
+    ? {
+      color: item.currency === 'USD' ? 'var(--up)' : 'var(--down)',
+      aria: `${item.currency} — ${item.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}`,
+    }
+    : null;
+  // "Diğer" birden çok varlığın toplamı — tek bir yoğunlaşma payı taşımaz.
+  const conc = item.agg
+    ? null
+    : { color: CONC_COLOR[concLevel(share)], aria: `Yoğunluk riski ${CONC_LABEL[concLevel(share)]}` };
+  if (!fx && !conc) return null;
+
+  if (!wide) {
+    return (
+      <span className={`flex items-center gap-1 shrink-0 ${className}`}>
+        {fx && <Dot {...fx} />}
+        {conc && <Dot {...conc} />}
+      </span>
+    );
+  }
   return (
-    <span className="flex flex-wrap items-center gap-x-1 mt-1 t-micro leading-tight min-w-0">
-      <span className="opacity-75">{label}</span>
-      {dot}
+    <span
+      className={`grid grid-cols-[max-content_max-content] items-center gap-x-1.5 gap-y-1 t-micro leading-tight ${className}`}>
+      {fx && (<><span className="opacity-75">Kur</span><Dot {...fx} /></>)}
+      {conc && (<><span className="opacity-75">Yoğunluk</span><Dot {...conc} /></>)}
     </span>
   );
 }
@@ -207,20 +238,7 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
                     <>
                       <span className="block t-micro tnum opacity-90">%{num(share, 1)}</span>
                       <span className="block t-micro tnum break-words opacity-75">{moneyShort(r.value, cur)}</span>
-                      <span className={wide ? '' : 'flex items-center gap-1 mt-1.5'}>
-                        {r.currency && (
-                          <Dot
-                            label={wide ? 'Kur' : undefined}
-                            color={r.currency === 'USD' ? 'var(--up)' : 'var(--down)'}
-                            aria={`${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}`} />
-                        )}
-                        {!r.agg && (
-                          <Dot
-                            label={wide ? 'Yoğunluk' : undefined}
-                            color={CONC_COLOR[concLevel(share)]}
-                            aria={`Yoğunluk riski ${CONC_LABEL[concLevel(share)]}`} />
-                        )}
-                      </span>
+                      <Risks item={r} share={share} wide={wide} className="mt-1.5" />
                     </>
                   ) : r.h > 44 && (
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 t-micro leading-tight min-w-0">
@@ -230,18 +248,11 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
                           serbest, kesme yok. */}
                       <span className="tnum shrink-0 opacity-90">%{num(share, 1)}</span>
                       <span className="tnum shrink-0 opacity-75">{moneyShort(r.value, cur)}</span>
-                      <span className="flex items-center gap-1 shrink-0 ml-auto">
-                        {r.currency && (
-                          <Dot
-                            color={r.currency === 'USD' ? 'var(--up)' : 'var(--down)'}
-                            aria={`${r.currency} — ${r.currency === 'USD' ? 'kur riski yok' : 'kur riski var'}`} />
-                        )}
-                        {!r.agg && (
-                          <Dot
-                            color={CONC_COLOR[concLevel(share)]}
-                            aria={`Yoğunluk riski ${CONC_LABEL[concLevel(share)]}`} />
-                        )}
-                      </span>
+                      {/* ml-auto: kalan boşluğu noktalar yutar, böylece iki
+                          sayının ardından SATIRDA KALIRLAR. Boşluksuz aktığında
+                          dar kutularda (RITIM, USDTRY) alt satıra düşüp
+                          kutunun dibinde kırpılıyorlardı. */}
+                      <Risks item={r} share={share} wide={false} className="ml-auto" />
                     </span>
                   )}
                 </>
