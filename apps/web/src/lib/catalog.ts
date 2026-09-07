@@ -18,6 +18,16 @@
 
 export interface SourceSpec { provider: string; providerSymbol: string; priority: number }
 
+/**
+ * Değerli maden / dolar paritesi mi (XAUUSD, XAGUSD…)? Döviz sınıfının içinde
+ * yaşayan ikinci istisna (birincisi nakit): XAU ISO 4217'de bir para birimi
+ * kodu, ama TL kotasyonu yapan döviz kaynakları bu pariteyi veremiyor.
+ * src/providers/goldapi.ts'teki METALS listesiyle aynı tutulmalı.
+ */
+export const isMetalUsdPair = (symbol: string) =>
+  symbol.length === 6 && ['XAU', 'XAG', 'XPT', 'XPD'].includes(symbol.slice(0, 3))
+  && symbol.slice(3) === 'USD';
+
 export interface ClassDefault {
   currency: string;
   /** market_calendars.code — grubun gün/aralık/sıklık planı */
@@ -62,11 +72,16 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
   fx: {
     currency: 'TRY', calendar: 'DOVIZ',
     symbolHint: '6 harf — GBPTRY, CHFTRY · nakit TL için TRYTRY',
-    // truncgil/tcmb baz para birimini bekler: GBPTRY -> GBP
-    sources: (s) => [
-      { provider: 'truncgil', providerSymbol: s.slice(0, 3), priority: 10 },
-      { provider: 'tcmb', providerSymbol: s.slice(0, 3), priority: 20 },
-    ],
+    // truncgil/tcmb baz para birimini bekler: GBPTRY -> GBP.
+    // Değerli maden / dolar paritesi (XAUUSD) bu zincirden çıkar: ikisi de
+    // madeni yalnız TL karşılığı kote ediyor, pariteyi veremiyor. gold-api
+    // ons başına USD fiyatını zaten yayınlıyor — bkz. src/providers/goldapi.ts.
+    sources: (s) => (isMetalUsdPair(s)
+      ? [{ provider: 'goldapi', providerSymbol: s.slice(0, 3), priority: 10 }]
+      : [
+          { provider: 'truncgil', providerSymbol: s.slice(0, 3), priority: 10 },
+          { provider: 'tcmb', providerSymbol: s.slice(0, 3), priority: 20 },
+        ]),
   },
   realty: {
     // Fiyatını yayınlayan servis yok: değerlemeyi kullanıcı giriyor, sabit
@@ -129,6 +144,11 @@ export function defaultsFor(classCode: string, symbol: string, providerSymbol = 
       calendar: def.calendar,
       sources: [{ provider: 'constant', providerSymbol: '1', priority: 10 }],
     };
+  }
+  // Maden/dolar paritesi dolar cinsinden kote: kur riski etiketi de USD olmalı,
+  // döviz sınıfının TL varsayılanı değil (bkz. instruments.currency = risk etiketi).
+  if (classCode === 'fx' && isMetalUsdPair(symbol)) {
+    return { currency: 'USD', calendar: def.calendar, sources: def.sources(symbol, providerSymbol) };
   }
   return {
     currency: def.currency,

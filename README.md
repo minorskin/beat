@@ -134,7 +134,7 @@ DST durumunu da kapsar ve GH cron'un 15–30 dk sapmasına geniş tolerans bıra
 | `coingecko` | Kripto | Batch; 10.000 çağrı/ay |
 | `truncgil` | Döviz + Kapalıçarşı altın | Tek istekte 86 alan |
 | `tcmb` | Resmi kurlar | `truncgil` yedeği |
-| `goldapi` | XAU/USD | Gram TL'ye türetir; `truncgil` GRA ile çapraz doğrulanır (fark %0,07) |
+| `goldapi` | XAU/USD spot | İki iş görür: `gold` sınıfında gram TL'ye türetir (`truncgil` GRA ile çapraz doğrulanır, fark %0,07), maden/dolar paritesinde (`XAUUSD`) ham USD fiyatını döndürür |
 | `constant` | Nakit (`TRYTRY`, `USDUSD`) | Ağa çıkmaz; bir para biriminin kendi cinsinden fiyatı tanım gereği 1 |
 
 ## Kurulum
@@ -153,5 +153,11 @@ yalnız yeni olanı çalıştırmak yeterli.
 
 ## Bilinen eksik
 
+- ~~**XAUUSD fiyat alamıyor.**~~ **Çözüldü (07.09.2026).** Döviz zincirindeki iki kaynak
+  (truncgil, tcmb) değerli madeni yalnız TL karşılığı kote ettiği için XAU/USD paritesini
+  veremiyordu; enstrüman kataloğa girdiği günden beri fiyatsızdı. Artık `goldapi`
+  sağlayıcısı maden/dolar paritesinde çevrim yapmadan ons başına USD fiyatını döndürüyor
+  (migration `0017`). Yahoo alternatifi elendi: `XAUUSD=X` diye bir sembol yok, karşılığı
+  `GC=F` ise COMEX vadelisi — spot değil.
 - **`DIF` fon kodu bulunamadı.** TEFAS kataloğundaki 2468 fonun tamamı 3 karakterli;
   beş fon tipinde de (YAT/EMK/BYF/GYF/GSYF) eşleşme yok. Doğru kod netleşince arayüzden “+ Enstrüman” ile eklenecek.
