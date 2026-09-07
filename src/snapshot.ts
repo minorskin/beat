@@ -12,17 +12,15 @@
 import './core/env.js';
 import { pool } from './core/db.js';
 
-// Bir gözlemin "taze" sayıldığı azami yaş (saniye) — cadence'e göre.
-const STALE_WINDOW: Record<string, number> = {
-  hourly: 3 * 3600,       // kripto/döviz/altın: 3 saatten eskiyse taşınmış
-  market_hours: 6 * 3600, // hisse: seans içi son tick 6 saati aşmışsa (kapalı) taşınmış
-  daily_close: 30 * 3600, // fon NAV: 30 saatten eskiyse taşınmış
-};
-
+// Bayatlık artık ENSTRÜMANIN KENDİ TAKVİMİNDEN geliyor (market_calendars,
+// bkz. migration 0016) ve SQL'de hesaplanıyor: yaş duvar saatiyle değil, o
+// grubun AÇIK geçen dakikalarıyla ölçülüyor. BIST cuma 18:30'da kapanıp
+// pazartesi 10:00'da açtığında aradaki hafta sonu fiyatı yaşlandırmaz — eski
+// sabit pencereler her hafta sonu bütün hisseleri "taşınmış" damgalıyordu.
 interface Row {
   instrument_id: string; symbol: string; class_code: string; currency: string;
   quantity: number; external_qty: number; own_quantity: number; avg_cost: number | null;
-  price: number | null; price_ts: Date | null; price_currency: string | null; cadence: string;
+  price: number | null; price_ts: Date | null; price_currency: string | null; is_stale: boolean;
 }
 
 async function main() {
@@ -37,14 +35,18 @@ async function main() {
   const { rows } = await pool.query<Row>(`
     select h.instrument_id, h.symbol, h.class_code, h.currency,
            h.quantity, h.external_qty, h.own_quantity, h.avg_cost,
-           lp.price, lp.price_ts, lp.currency as price_currency, i.cadence
+           lp.price, lp.price_ts, lp.currency as price_currency,
+           -- stale_after_minutes null (gayrimenkul) => hiçbir zaman bayat değil:
+           -- değerlemeyi kullanıcı giriyor, yaşlanması diye bir şey yok.
+           (lp.price_ts is not null and c.stale_after_minutes is not null
+            and schedule_open_minutes(i.calendar_code, lp.price_ts, now()) > c.stale_after_minutes) as is_stale
     from v_holdings h
     join instruments i on i.id = h.instrument_id
+    join market_calendars c on c.code = i.calendar_code
     left join v_latest_price lp on lp.instrument_id = h.instrument_id
     where h.quantity <> 0
     order by h.class_code, h.symbol`);
 
-  const now = new Date();
   const positions: {
     instrument_id: string; quantity: number; own_quantity: number;
     price: number; price_ts: Date; is_stale: boolean;
@@ -77,9 +79,6 @@ async function main() {
     const ownValueTry = toTry(r.own_quantity);
     const ownValueUsd = ownValueTry / usdtry;
 
-    const ageSec = (now.getTime() - new Date(r.price_ts).getTime()) / 1000;
-    const isStale = ageSec > (STALE_WINDOW[r.cadence] ?? 6 * 3600);
-
     // Maliyet de fiyatla AYNI birimden çevrilir: kullanıcı birim fiyatı
     // piyasanın kote ettiği cinsten giriyor. instruments.currency artık para
     // birimi değil kur riski etiketi (bkz. arayüzdeki "Kur Riski" sütunu).
@@ -98,7 +97,7 @@ async function main() {
       ownCostedTry += ownValueTry;
     }
     positions.push({ instrument_id: r.instrument_id, quantity: r.quantity, own_quantity: r.own_quantity,
-      price: r.price, price_ts: new Date(r.price_ts), is_stale: isStale,
+      price: r.price, price_ts: new Date(r.price_ts), is_stale: r.is_stale,
       value_try: valueTry, value_usd: valueUsd, own_value_try: ownValueTry, own_value_usd: ownValueUsd });
   }
 

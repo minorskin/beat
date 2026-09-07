@@ -122,9 +122,9 @@ export async function addInstrument(formData: FormData): Promise<Result> {
   try {
     await client.query('begin');
     const ins = await client.query<{ id: string }>(
-      `insert into instruments (class_code, symbol, display_name, currency, calendar_code, cadence, tax_rate)
-       values ($1,$2,$3,$4,$5,$6,$7) returning id`,
-      [class_code, symbol, display_name, currency, d.calendar, d.cadence, tax_rate]);
+      `insert into instruments (class_code, symbol, display_name, currency, calendar_code, tax_rate)
+       values ($1,$2,$3,$4,$5,$6) returning id`,
+      [class_code, symbol, display_name, currency, d.calendar, tax_rate]);
     const id = ins.rows[0].id;
     for (const s of sources) {
       await client.query(
@@ -235,9 +235,9 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
     await client.query('begin');
     if (def) {
       await client.query(
-        `update instruments set display_name=$2, class_code=$3, currency=$4, calendar_code=$5, cadence=$6, tax_rate=$7
+        `update instruments set display_name=$2, class_code=$3, currency=$4, calendar_code=$5, tax_rate=$6
          where id=$1`,
-        [instrument_id, display_name, class_code, currency, def.calendar, def.cadence, tax_rate]);
+        [instrument_id, display_name, class_code, currency, def.calendar, tax_rate]);
     } else {
       await client.query(
         `update instruments set display_name=$2, class_code=$3, currency=$4, tax_rate=$5 where id=$1`,
@@ -255,8 +255,10 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
       `update transactions set currency=$2 where instrument_id=$1 and currency is distinct from $2`,
       [instrument_id, currency]);
     // Gayrimenkulde "fiyat" = kullanıcının girdiği değerleme; sabit
-    // sağlayıcının provider_symbol'ünde durur. Yeni değer bir sonraki fetch
-    // turunda (≤30 dk) fiyata yansır.
+    // sağlayıcının provider_symbol'ünde durur. Gayrimenkul grubunun
+    // zamanlanmış çekimi YOK (belgede yedi gün de "hayır"), ama motor beyan
+    // edilen değerin son yazılan fiyattan farklı olduğunu görünce tek
+    // seferlik çeker — yeni değer bir sonraki turda (≤10 dk) fiyata yansır.
     if (newValue != null) {
       await client.query(
         `update instrument_sources set provider_symbol=$2

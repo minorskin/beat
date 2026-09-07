@@ -2,20 +2,26 @@
  * Yeni enstrüman eklerken kullanılan sınıf varsayılanları.
  *
  * Motor "yeni varlık = yeni satır" ilkesiyle çalışır: migration gerekmez.
- * Ama her sınıfın kendi para birimi, takvimi, ritmi ve failover zinciri var —
+ * Ama her sınıfın kendi para birimi, takvimi ve failover zinciri var —
  * bunları kullanıcıya sordurmak yerine sınıftan türetiyoruz. Kullanıcı yalnız
  * sembolü ve adı girer; kripto/altın gibi kaynağın kendi kodunu kullanan
  * sınıflarda ek olarak o kodu ister.
  *
- * seed.sql'deki zincirlerle aynı tutulmalı.
+ * TAKVİM = GRUBUN GÜNCELLEME PLANI. Her sınıf kendi grup takvimine bağlanır
+ * (FON, DOVIZ, KRIPTO, HISSE_TR, HISSE_ABD, ETF, ALTIN, ENDEKS, GAYRIMENKUL);
+ * gün/aralık/sıklık orada durur, burada yalnız hangi takvim olduğu yazar.
+ * Eski `cadence` alanı emekli — takvim artık dördünü de taşıyor (bkz.
+ * migration 0016).
+ *
+ * seed.sql'deki takvim ve zincirlerle aynı tutulmalı.
  */
 
 export interface SourceSpec { provider: string; providerSymbol: string; priority: number }
 
 export interface ClassDefault {
   currency: string;
+  /** market_calendars.code — grubun gün/aralık/sıklık planı */
   calendar: string;
-  cadence: 'hourly' | 'market_hours' | 'daily_close';
   /** Kanonik sembol için ipucu */
   symbolHint: string;
   sources: (symbol: string, providerSymbol: string) => SourceSpec[];
@@ -23,7 +29,7 @@ export interface ClassDefault {
 
 export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
   stock_us: {
-    currency: 'USD', calendar: 'NYSE', cadence: 'market_hours',
+    currency: 'USD', calendar: 'HISSE_ABD',
     symbolHint: 'Borsa kodu — AAPL, MSFT',
     sources: (s) => [
       { provider: 'yahoo', providerSymbol: s, priority: 10 },
@@ -31,7 +37,7 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
     ],
   },
   etf_us: {
-    currency: 'USD', calendar: 'NYSE', cadence: 'market_hours',
+    currency: 'USD', calendar: 'ETF',
     symbolHint: 'ETF kodu — VOO, QQQ',
     sources: (s) => [
       { provider: 'yahoo', providerSymbol: s, priority: 10 },
@@ -39,22 +45,22 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
     ],
   },
   stock_tr: {
-    currency: 'TRY', calendar: 'BIST', cadence: 'market_hours',
+    currency: 'TRY', calendar: 'HISSE_TR',
     symbolHint: 'BIST kodu — THYAO, ASELS',
     sources: (s) => [{ provider: 'yahoo', providerSymbol: `${s}.IS`, priority: 10 }],
   },
   fund_tr: {
-    currency: 'TRY', calendar: 'TEFAS_DAILY', cadence: 'daily_close',
+    currency: 'TRY', calendar: 'FON',
     symbolHint: 'TEFAS fon kodu — 3 harf, ör. THF',
     sources: (s) => [{ provider: 'tefas', providerSymbol: s, priority: 10 }],
   },
   gold: {
-    currency: 'TRY', calendar: 'CRYPTO_24_7', cadence: 'hourly',
+    currency: 'TRY', calendar: 'ALTIN',
     symbolHint: '',
     sources: (_s, ps) => [{ provider: 'truncgil', providerSymbol: ps, priority: 10 }],
   },
   fx: {
-    currency: 'TRY', calendar: 'FX_24_5', cadence: 'hourly',
+    currency: 'TRY', calendar: 'DOVIZ',
     symbolHint: '6 harf — GBPTRY, CHFTRY · nakit TL için TRYTRY',
     // truncgil/tcmb baz para birimini bekler: GBPTRY -> GBP
     sources: (s) => [
@@ -64,8 +70,10 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
   },
   realty: {
     // Fiyatını yayınlayan servis yok: değerlemeyi kullanıcı giriyor, sabit
-    // sağlayıcı her turda onu yazıyor. providerSymbol = değerlemenin kendisi.
-    currency: 'TRY', calendar: 'CRYPTO_24_7', cadence: 'hourly',
+    // sağlayıcı onu yazıyor. providerSymbol = değerlemenin kendisi.
+    // Takvimi boş (hiç zamanlanmaz); motor yalnız değerleme DEĞİŞTİĞİNDE tek
+    // seferlik yazar — bkz. src/core/db.ts loadCandidates.
+    currency: 'TRY', calendar: 'GAYRIMENKUL',
     symbolHint: 'Mülkün adı — ör. Ataşehir AVM',
     sources: (_s, ps) => [{ provider: 'constant', providerSymbol: ps, priority: 10 }],
   },
@@ -74,12 +82,12 @@ export const CLASS_DEFAULTS: Record<string, ClassDefault> = {
     // Kanonik sembol temiz kalır (SP500, DXY, EURUSD); yahoo'nun kendi kodu
     // (^GSPC, DX-Y.NYB, EURUSD=X) providerSymbol'de durur — altınla aynı desen.
     // SYMBOL_RE'yi gevşetmeye gerek yok: kodlar ön tanımlı listeden geliyor.
-    currency: 'USD', calendar: 'FX_24_5', cadence: 'hourly',
+    currency: 'USD', calendar: 'ENDEKS',
     symbolHint: '',
     sources: (_s, ps) => [{ provider: 'yahoo', providerSymbol: ps, priority: 10 }],
   },
   crypto: {
-    currency: 'USD', calendar: 'CRYPTO_24_7', cadence: 'hourly',
+    currency: 'USD', calendar: 'KRIPTO',
     symbolHint: 'Kısa kod — SOL, AVAX',
     sources: (_s, ps) => [{ provider: 'coingecko', providerSymbol: ps, priority: 10 }],
   },
@@ -108,9 +116,9 @@ export const isCash = (classCode: string, symbol: string) =>
 
 /**
  * Sınıf varsayılanlarını SEMBOLE göre çözer. Nakit, döviz sınıfının içinde
- * yaşayan bir istisna: para birimi kendi kodundan gelir (TRYTRY -> TRY),
- * takvimi 7/24'tür (nakit "kapanmaz", yoksa hafta sonu "taşınmış fiyat"
- * damgası yer) ve fiyatı sabit sağlayıcıdan okunur.
+ * yaşayan bir istisna: para birimi kendi kodundan gelir (TRYTRY -> TRY) ve
+ * fiyatı sabit sağlayıcıdan okunur. Takvimi yine DOVIZ grubudur — o grup
+ * belgede yedi gün 00:00–23:59 çalıştığı için nakit hiç "kapanmaz".
  */
 export function defaultsFor(classCode: string, symbol: string, providerSymbol = '') {
   const def = CLASS_DEFAULTS[classCode];
@@ -118,15 +126,13 @@ export function defaultsFor(classCode: string, symbol: string, providerSymbol = 
   if (isCash(classCode, symbol)) {
     return {
       currency: symbol.slice(0, 3),
-      calendar: 'CRYPTO_24_7',
-      cadence: 'hourly' as const,
+      calendar: def.calendar,
       sources: [{ provider: 'constant', providerSymbol: '1', priority: 10 }],
     };
   }
   return {
     currency: def.currency,
     calendar: def.calendar,
-    cadence: def.cadence,
     sources: def.sources(symbol, providerSymbol),
   };
 }

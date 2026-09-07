@@ -12,12 +12,23 @@ insert into asset_classes (code,name,default_currency,qty_precision,ui_group,sor
   ('fx',      'Döviz',    'TRY',4,'Döviz',60),
   ('crypto',  'Kripto',   'USD',10,'Kripto',70);
 
-insert into market_calendars (code,tz,open_time,close_time,weekdays) values
-  ('CRYPTO_24_7','UTC',        null,      null,      '{1,2,3,4,5,6,7}'),
-  ('FX_24_5',    'UTC',        null,      null,      '{1,2,3,4,5}'),
-  ('BIST',       'Europe/Istanbul','10:00','18:10',  '{1,2,3,4,5}'),
-  ('NYSE',       'America/New_York','09:30','16:00', '{1,2,3,4,5}'),
-  ('TEFAS_DAILY','Europe/Istanbul','20:00','20:30',  '{1,2,3,4,5}');
+-- Takvim = enstrüman GRUBUNUN güncelleme planı (gün + aralık + zaman dilimi +
+-- sıklık). Değerler kullanıcının verdiği grup tablosundan birebir gelir;
+-- gerekçeler migration 0016'da. stale_after_minutes: fiyatın kaç dakikalık
+-- AÇIK takvim süresi sonra taşınmış sayılacağı (sıklıktan ayrı eksen).
+insert into market_calendars (code,tz,open_time,close_time,weekdays,interval_minutes,stale_after_minutes) values
+  ('FON',        'Europe/Istanbul', null,   null,   '{1,2,3,4,5,6,7}', 60,  1800),
+  ('DOVIZ',      'Europe/Istanbul', null,   null,   '{1,2,3,4,5,6,7}', 30,   180),
+  ('KRIPTO',     'Europe/Istanbul', null,   null,   '{1,2,3,4,5,6,7}', 30,   180),
+  ('HISSE_TR',   'Europe/Istanbul','10:00','18:30', '{1,2,3,4,5}',     30,   360),
+  -- Kapanış belgede 23:00; 23:59 yaz ve kış saatinin ikisini de kapsıyor (0016).
+  ('HISSE_ABD',  'Europe/Istanbul','16:00','23:59', '{1,2,3,4,5}',     30,   360),
+  ('ETF',        'Europe/Istanbul', null,   null,   '{1,2,3,4,5}',     30,   360),
+  ('ALTIN',      'Europe/Istanbul', null,   null,   '{1,2,3,4,5}',     30,   180),
+  ('ENDEKS',     'Europe/Istanbul', null,   null,   '{1,2,3,4,5,6,7}', 30,   180),
+  -- Gayrimenkul belgede yedi gün de "hayır": zamanlanmış çekim yok, fiyatı
+  -- yaşlanmaz. Değerleme değiştiğinde motor tek seferlik yazar (bkz. db.ts).
+  ('GAYRIMENKUL','Europe/Istanbul', null,   null,   '{}',              null, null);
 
 -- Enstrüman YOK — bilerek.
 --

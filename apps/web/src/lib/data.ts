@@ -28,6 +28,9 @@ export interface Position {
   // Tutuluyor ama kullanılabilir fiyat yok (motor henüz çekmedi ya da kotasyon
   // TRY/USD dışı) — değer/K-Z/ağırlık "—" kalır.
   pending: boolean;
+  // Güncelleme planı: hangi grup takvimi, o takvim şu an kapalı mı, motor bu
+  // enstrümanı en son ne zaman ÇEKMEYE çalıştı (bkz. migration 0016).
+  calendar_code: string; is_closed: boolean; last_fetch_at: string | null;
 }
 export interface TxRow {
   id: string; instrument_id: string; type: string;
@@ -59,8 +62,22 @@ export interface WatchItem {
   ui_group: string; currency: string; created_at: string;
   price: number | null; price_ts: string | null; source: string | null;
   price_currency: string | null;
+  /** Grubun güncelleme takvimi — pozisyon satırlarıyla aynı planı gösterebilmek için. */
+  calendar_code: string;
 }
 export interface AssetClass { code: string; name: string; ui_group: string }
+/** market_calendars satırı — bir enstrüman grubunun güncelleme planı. */
+export interface Calendar {
+  code: string; tz: string;
+  /** null => gün boyu (00:00–23:59) */
+  open_time: string | null; close_time: string | null;
+  /** ISO gün numaraları: 1=Pzt … 7=Paz */
+  weekdays: number[];
+  /** Sıklık (dk). null => bu grup hiç zamanlanmaz. */
+  interval_minutes: number | null;
+  /** Kaç dakikalık AÇIK takvim süresi sonra fiyat taşınmış sayılır. null => hiç. */
+  stale_after_minutes: number | null;
+}
 
 export async function getLatestSnapshot(): Promise<Snapshot | null> {
   const r = await q<Snapshot>(
@@ -114,7 +131,7 @@ export async function getPositions(): Promise<Position[]> {
          -- kendi içinde çelişen bir satır gösteriyordu (adet canlı, değer bayat).
          base as (
            select h.instrument_id, h.quantity, h.own_quantity, coalesce(h.external_qty, 0) as external_quantity,
-                  h.avg_cost, i.cadence,
+                  h.avg_cost,
                   lp.price, lp.price_ts, lp.currency as price_currency,
                   -- Motorla (src/snapshot.ts) AYNI kural: çevrimde FİYATIN kendi
                   -- para birimi esastır, instruments.currency değil (o artık kur
@@ -143,11 +160,18 @@ export async function getPositions(): Promise<Position[]> {
     select i.id as instrument_id, i.symbol, i.display_name, i.class_code, ac.name as class_name, ac.ui_group,
            i.tax_rate, v.price_currency,
            v.quantity, v.price, i.currency, v.price_ts,
+           i.calendar_code, i.last_fetch_at,
            -- Bayatlık da CANLI: motor durursa fiyat yaşlanır ama snapshot'taki
-           -- is_stale donuk kalırdı. Eşikler src/snapshot.ts'teki STALE_WINDOW ile aynı.
-           (v.price_ts is not null and extract(epoch from (now() - v.price_ts)) >
-             case v.cadence when 'hourly' then 10800 when 'market_hours' then 21600
-                            when 'daily_close' then 108000 else 21600 end) as is_stale,
+           -- is_stale donuk kalırdı. Ölçü ENSTRÜMANIN KENDİ TAKVİMİ: yaş duvar
+           -- saatiyle değil, grubun AÇIK geçen dakikalarıyla sayılır (bkz.
+           -- schedule_open_minutes). Kapalı geçen hafta sonu fiyatı
+           -- yaşlandırmaz. stale_after_minutes null (gayrimenkul) => hiç bayat
+           -- olmaz: değerlemeyi kullanıcı giriyor.
+           (v.price_ts is not null and cal.stale_after_minutes is not null
+            and schedule_open_minutes(i.calendar_code, v.price_ts, now()) > cal.stale_after_minutes) as is_stale,
+           -- Grubun güncelleme penceresi ŞU AN kapalı mı. "Fiyat kımıldamıyor"
+           -- ile "veri gelmiyor" ayrı iki durum; arayüz ikisini ayrı gösteriyor.
+           not schedule_is_open(i.calendar_code, now()) as is_closed,
            v.value_try,
            v.value_try / nullif((select rate from fx), 0) as value_usd,
            case when (select t_try from tot) > 0 then v.value_try / (select t_try from tot) * 100 end as weight_pct,
@@ -164,6 +188,7 @@ export async function getPositions(): Promise<Position[]> {
     from valued v
     join instruments i on i.id = v.instrument_id
     join asset_classes ac on ac.code = i.class_code
+    join market_calendars cal on cal.code = i.calendar_code
     left join current_segment cs on cs.instrument_id = v.instrument_id
     order by v.value_try desc nulls last`);
 }
@@ -391,7 +416,7 @@ export async function getInstruments(): Promise<Instrument[]> {
 export async function getWatchlist(): Promise<WatchItem[]> {
   return q<WatchItem>(`
     select instrument_id, symbol, display_name, class_code, ui_group, currency,
-           created_at, price, price_ts, source, price_currency
+           created_at, price, price_ts, source, price_currency, calendar_code
     from v_watchlist
     order by ui_group, symbol`);
 }
@@ -409,6 +434,20 @@ export interface AnnualClosing { year: number; total_value_try: number; total_va
 export async function getAnnualClosings(): Promise<AnnualClosing[]> {
   return q<AnnualClosing>(
     `select year, total_value_try, total_value_usd, note from annual_closings order by year`);
+}
+
+/**
+ * Grup güncelleme takvimleri — kullanıcının verdiği "enstrüman grubu
+ * güncelleme gün, aralık, zaman dilimi ve sıklığı" tablosunun ta kendisi.
+ * Arayüz planı buradan okuyup insan diline çevirir (bkz. lib/schedule.ts);
+ * gün/saat bilgisini istemciye elle kopyalamak, tablo değiştiğinde sessizce
+ * yalan söyleyen ikinci bir kaynak yaratırdı.
+ */
+export async function getCalendars(): Promise<Calendar[]> {
+  return q<Calendar>(`
+    select code, tz, open_time::text as open_time, close_time::text as close_time,
+           weekdays, interval_minutes, stale_after_minutes
+    from market_calendars order by code`);
 }
 
 export async function getAssetClasses(): Promise<AssetClass[]> {

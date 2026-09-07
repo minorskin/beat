@@ -40,36 +40,77 @@ bölmek maliyet bazını bozacağı için sahiplik **ayrı bir boyut** olarak i�
 ## İzleme listesi
 
 Ayrı tablo yok. **Kataloğa eklenmiş ama pozisyonu olmayan enstrüman = izlenen enstrüman**
-(`v_watchlist`). Arayüzden eklenen enstrümanın para birimi, takvimi, ritmi ve failover
-zinciri varlık sınıfından türetilir (`apps/web/src/lib/catalog.ts`; `seed.sql`'deki
+(`v_watchlist`). Arayüzden eklenen enstrümanın para birimi, güncelleme takvimi ve
+failover zinciri varlık sınıfından türetilir (`apps/web/src/lib/catalog.ts`; `seed.sql`'deki
 zincirlerle aynı tutulmalı). Fiyatı bir sonraki fetch turundan itibaren birikmeye başlar;
 ilk alım girildiğinde satır kendiliğinden portföye geçer.
 
-## Enstrüman ritimleri
+## Enstrüman grubu güncelleme planı
 
-| Sınıf | Takvim | Cadence |
-|---|---|---|
-| Kripto | 7/24 | saatlik |
-| Döviz / Altın | 7/24 | saatlik |
-| BIST | 10:00–18:10 TR | piyasa saatleri |
-| ABD hisse/ETF | 09:30–16:00 NY | piyasa saatleri |
-| TEFAS fonları | sabah NAV (07:00–10:00 TR) | hafta içi 06:00–10:00 taranır, NAV gelince susar |
+Her enstrüman grubunun kendi **günü, çalışma aralığı, zaman dilimi ve sıklığı** var.
+Plan koda gömülü değil, `market_calendars` tablosunda durur ve motor onu birebir
+uygular (`loadCandidates`, `supabase/migrations/0016_group_schedules.sql`).
 
-> **Fonlar tek istisna: motor onları her turda çekmez.** TEFAS günde bir NAV
-> yayınlıyor, o yüzden fonlar yalnız **hafta içi, 06:00 ≤ saat < 10:00 TR ve o
-> günün NAV'ı henüz elde değilse** sorgulanır (`loadCandidates`,
-> `FUND_POLL_FROM_HOUR` / `FUND_POLL_TO_HOUR`). NAV geldiği an fon o gün bir daha
-> sorgulanmaz: günde ~144 istek yerine ~6. Hiç fiyatı olmayan enstrüman bu kapıya
-> takılmaz (fail-open) — yeni eklenen fon hafta sonu bile çekilir.
+| Grup | Takvim kodu | Günler | Çalışma aralığı (TSİ) | Sıklık |
+|---|---|---|---|---|
+| Fon | `FON` | her gün | 00:00–23:59 | saat başı |
+| Döviz | `DOVIZ` | her gün | 00:00–23:59 | yarım saatte bir |
+| Kripto | `KRIPTO` | her gün | 00:00–23:59 | yarım saatte bir |
+| TR hisse senedi | `HISSE_TR` | hafta içi | 10:00–18:30 | yarım saatte bir |
+| ABD hisse senedi | `HISSE_ABD` | hafta içi | 16:00–23:59 * | yarım saatte bir |
+| ETF | `ETF` | hafta içi | 00:00–23:59 | yarım saatte bir |
+| Altın | `ALTIN` | hafta içi | 00:00–23:59 | yarım saatte bir |
+| Endeks | `ENDEKS` | her gün | 00:00–23:59 | yarım saatte bir |
+| Gayrimenkul | `GAYRIMENKUL` | — | — | güncellenmez |
+
+Zaman dilimi hepsinde `Europe/Istanbul`.
+
+\* Tabloda verilen kapanış 23:00'ti; **23:59 kullanılıyor.** NYSE seansı 09:30–16:00 ET,
+yani TSİ ile yazın 16:30–23:00 ama **kışın 17:30–00:00**. 23:00'te kapatan bir pencere
+kışın seansın son saatini hiç görmezdi; 23:59 her iki DST durumunu da kapsıyor ve
+mevsimlik bakım gerektirmiyor (EOD kesiminin 02:00'de olmasıyla aynı gerekçe). Kışın
+00:00'de oluşan kapanış tick'i o günün penceresine yetişmez, ertesi gün 16:00'daki ilk
+turda alınır — Yahoo yeni seans başlayana kadar son kapanışı döndürdüğü için veri
+kaybolmuyor.
+
+**Sıklık nasıl uygulanıyor:** tetikleyiciler tam :00/:30'a oturmuyor (Worker 30 dk'da
+bir, GH Actions ayrıca 10 dk'da bir denemeye çalışıyor). Motor duvar saatini
+`interval_minutes`lik dilimlere böler ve bir enstrümanı **bir dilimde en fazla bir kez**
+çeker; damga `instruments.last_fetch_at`'te durur (deneme başarısız olsa da atılır —
+kaynak bozulduğunda sorgu sıklığı kendiliğinden artmasın diye).
+
+**İki istisna:**
+
+- **Fail-open** — hiç fiyatı olmayan enstrüman gün/pencere/dilim demeden her turda
+  çekilir; yoksa cuma akşamı eklenen bir BIST hissesi pazartesi 10:00'a kadar fiyatsız
+  kalırdı.
+- **Gayrimenkul** — zamanlanmış çekimi yok. Fiyatı `constant` sağlayıcıdan gelen bir
+  değerleme; kullanıcı arayüzden değiştirdiğinde motor beyan edilen değerin son yazılan
+  fiyattan farklı olduğunu görür ve **tek seferlik** çeker.
+
+> **Not — fonlar artık gün boyu sorgulanıyor.** Belgedeki plan "her gün, 00:00–23:59,
+> saat başı" diyor. Önceki tasarım fonları yalnız hafta içi 06:00–10:00 arası ve o günün
+> NAV'ı gelene kadar sorguluyordu (fon başına ~6 istek/gün); yeni plan fon başına
+> 24 istek/gün demek. TEFAS günde tek NAV yayınladığı için bu isteklerin çoğu aynı
+> değeri döndürür — `prices` tarafında yeni satır oluşmaz, maliyet yalnız boşa giden
+> istek. TEFAS'ın ~6 istek/dk sınırı aşılmıyor (tur başına fon sayısı kadar istek).
 >
 > Yayın saatleri ölçüldü (saatlik `position_snapshots`'ta `price_ts`'in atladığı an):
-> THF 07:00 · 07:00 · 07:00 — DFI 09:00 · 08:00 — TLY 10:00 · 08:00 · 07:00.
->
-> **Bilinen sınır:** TLY örneğindeki gibi NAV 10:00'a dayanır ya da geçerse o
-> günün değeri hiç yazılmaz — ertesi sabah artık daha yeni bir satır olduğu için
-> sağlayıcı onu alır ve seride o güne ait değer eksik kalır. Kalıcı çözüm
-> pencereyi büyütmek değil, sağlayıcının gördüğü 14 günlük pencerenin tamamını
-> yazmasıdır; motor şu an enstrüman başına tek quote taşıyor (ayrı bir iş).
+> THF 07:00 · 07:00 · 07:00 — DFI 09:00 · 08:00 — TLY 10:00 · 08:00 · 07:00. Gün boyu
+> sorgulama, eski penceredeki "NAV 10:00'dan sonra gelirse o gün hiç yazılmaz" sınırını
+> da ortadan kaldırıyor.
+
+### Bayatlık ayrı bir eksen
+
+`interval_minutes` "ne kadar sık **soruyoruz**", `stale_after_minutes` "fiyatın kendisi
+ne kadar sıklıkla **değişiyor**" sorusunu cevaplar — ikisi aynı şey değil (TEFAS'a saat
+başı sorsak da NAV günde bir değişir). Bir fiyat, grubun **açık geçen** dakikaları
+eşiği aşınca taşınmış sayılır (`schedule_open_minutes`): BIST cuma 18:30'da kapanıp
+pazartesi 10:00'da açtığında aradaki hafta sonu fiyatı yaşlandırmaz. Eşikler:
+fon 30 sa · döviz/kripto/altın/endeks 3 sa · hisse ve ETF 6 sa · gayrimenkul hiç.
+
+Arayüzde bu, sembolün yanındaki gri noktadır; açıklaması pencerenin o an açık olup
+olmadığına göre değişir ("penceresi kapalı" ≠ "pencere açık ama veri gelmedi").
 
 **EOD kesimi 02:00 TR'de** çalışır ve bir önceki işlem günü etiketlenir.
 Sebep: NYSE kapanışı yazın 23:00 TR, **kışın 00:00 TR (ertesi takvim günü)**. 02:00 her iki
@@ -97,8 +138,8 @@ npm run probe             # kaynak sağlığı (buluttan çalıştırmak esas)
 npm run typecheck
 ```
 
-Şema: `supabase/migrations/0001_init.sql` → `0002_ownership_watchlist.sql` → `0003_location.sql` →
-`0004_tax_rate.sql` → ardından `supabase/seed.sql`.
+Şema: `supabase/migrations/0001_init.sql` → … → `0016_group_schedules.sql` (sırayla) →
+ardından `supabase/seed.sql`.
 Migration'lar sıralı ve idempotent'e yakındır (`add column if not exists`); mevcut kurulumda
 yalnız yeni olanı çalıştırmak yeterli.
 

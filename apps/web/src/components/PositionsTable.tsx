@@ -1,7 +1,8 @@
 'use client';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { money, conv, num, numInt, numPrice, pct, dateStr, dateTimeStr, curSymbol, type Cur } from '@/lib/format';
-import type { AssetClass, DayChange, Position, TxRow, WatchItem } from '@/lib/data';
+import { byCode, scheduleLabel, tzLabel } from '@/lib/schedule';
+import type { AssetClass, Calendar, DayChange, Position, TxRow, WatchItem } from '@/lib/data';
 import EditInstrument from './EditInstrument';
 import EditTransaction from './EditTransaction';
 
@@ -42,6 +43,22 @@ const pnlColor = (v: number | null) => (v == null ? 'var(--faint)' : v >= 0 ? 'v
 const dayColor = (d: { pct: number | null } | null) => pnlColor(d?.pct ?? null);
 
 /**
+ * Fiyat hücresinin açıklaması: değer + gözlem zamanı + son çekim denemesi +
+ * grubun planı. Plan buraya kod olarak değil veritabanından gelen takvimden
+ * yazılır (bkz. lib/schedule.ts).
+ */
+function priceTitle(p: Position, cal: Calendar | undefined): string {
+  const lines = [
+    p.price != null ? `Fiyat ${num(p.price, 4)}` : 'Fiyat henüz yok',
+    p.price_ts ? `Son gözlem ${dateTimeStr(p.price_ts)}` : null,
+    p.last_fetch_at ? `Son deneme ${dateTimeStr(p.last_fetch_at)}` : null,
+    `Güncelleme ${scheduleLabel(cal)}${tzLabel(cal)}`,
+    cal?.interval_minutes != null ? (p.is_closed ? 'Pencere şu an kapalı' : 'Pencere şu an açık') : null,
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
+/**
  * Kur riski göstergesi: TL fiyatlı varlık kur karşısında açık pozisyondur
  * (kırmızı), dolar fiyatlı olan korunaklıdır (yeşil). Renk tek başına anlam
  * taşımasın diye kod hem title'da hem ekran okuyucu etiketinde duruyor.
@@ -63,12 +80,12 @@ function CurrencyDot({ currency }: { currency: string }) {
  * durur; ayrımı soluk ton ile Adet sütunundaki "izleniyor" taşır. Adet olmadığı
  * için değer, K/Z ve ağırlık hesaplanmaz — ve hiçbir toplama girmez.
  */
-function WatchRow({ wi, d, className, classes, locations }: {
+function WatchRow({ wi, d, className, classes, locations, cal }: {
   wi: WatchItem; d: DayChange | null; className: string;
-  classes: AssetClass[]; locations: string[];
+  classes: AssetClass[]; locations: string[]; cal: Calendar | undefined;
 }) {
   return (
-    <tr title={`${wi.symbol} — yalnız izleniyor, hesaba katılmaz`}>
+    <tr title={`${wi.symbol} — yalnız izleniyor, hesaba katılmaz · güncelleme ${scheduleLabel(cal)}${tzLabel(cal)}`}>
       <td className="px-4 sm:px-5 py-3 w-[1%]">
         <div className="font-medium flex items-center gap-2 whitespace-nowrap" style={{ color: 'var(--muted)' }}>
           {wi.symbol}
@@ -122,12 +139,15 @@ function FunnelIcon() {
 }
 
 export default function PositionsTable({
-  rows, own, cur, transactions, locations, classes, dayChanges, watchlist, rate,
+  rows, own, cur, transactions, locations, classes, dayChanges, watchlist, rate, calendars,
 }: {
   rows: Position[]; own: boolean; cur: Cur; transactions: Record<string, TxRow[]>;
   locations: string[]; classes: AssetClass[];
   dayChanges: Record<string, DayChange>; watchlist: WatchItem[]; rate: number;
+  /** Grup güncelleme planları — hangi satırın ne zaman yenilendiğini açıklar. */
+  calendars: Calendar[];
 }) {
+  const cals = byCode(calendars);
   const [openId, setOpenId] = useState<string | null>(null);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<ColKey | null>(null);
@@ -494,7 +514,8 @@ export default function PositionsTable({
             )}
             {displayRows.map((it) => {
               if (it.kind === 'watch') return <WatchRow key={it.id} wi={it.w} d={dayChanges[it.id] ?? null}
-                className={classNameOf(it.w.class_code)} classes={classes} locations={locations} />;
+                className={classNameOf(it.w.class_code)} classes={classes} locations={locations}
+                cal={cals[it.w.calendar_code]} />;
               const p = it.p;
               const isOpen = openId === p.instrument_id;
               const isClosing = closingId === p.instrument_id;
@@ -512,8 +533,19 @@ export default function PositionsTable({
                     <td className="px-4 sm:px-5 py-3 w-[1%]">
                       <div className="font-medium flex items-center gap-2 whitespace-nowrap">
                         {p.symbol}
-                        {p.pending && <span title="Fiyat bekleniyor — bir sonraki turda gelir" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--c3)' }} />}
-                        {!p.pending && p.is_stale && <span title="Taşınmış fiyat (piyasa kapalı)" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--faint)' }} />}
+                        {p.pending && <span title="Fiyat bekleniyor — ilk planlı güncellemede gelir" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--c3)' }} />}
+                        {/* Bayatlık ölçüsü grubun KENDİ takvimi: kapalı geçen
+                            saatler fiyatı yaşlandırmaz (bkz. lib/data.ts).
+                            Nokta aynı, açıklaması iki türlü — pencere kapalıysa
+                            beklenen bir donukluk, açıksa gelmeyen veri. */}
+                        {!p.pending && p.is_stale && (
+                          <span
+                            title={p.is_closed
+                              ? `Taşınmış fiyat — grubun güncelleme penceresi şu an kapalı (${scheduleLabel(cals[p.calendar_code])})`
+                              : `Taşınmış fiyat — pencere açık ama yeni gözlem gelmedi (${scheduleLabel(cals[p.calendar_code])})`}
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ background: 'var(--faint)' }} />
+                        )}
                         <EditInstrument
                           id={p.instrument_id} symbol={p.symbol} displayName={p.display_name}
                           classCode={p.class_code} currency={p.currency} price={p.price}
@@ -528,8 +560,12 @@ export default function PositionsTable({
                           yazmak satırı gereksiz yükseltiyordu. */}
                       <div className="t-label truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
                     </td>
+                    {/* Fiyat hücresinin title'ı "bu sayı ne kadar taze"
+                        sorusunun tam cevabı: gözlemin kendi zamanı, motorun
+                        son deneme anı ve grubun planı. Üçü bir aradayken
+                        kımıldamayan bir fiyat açıklanabilir oluyor. */}
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap"
-                        title={p.price != null ? num(p.price, 4) : undefined}>
+                        title={priceTitle(p, cals[p.calendar_code])}>
                       {p.price != null
                         ? `${numPrice(p.price)} ${p.price_currency === 'USD' ? '$' : '₺'}`
                         : <span style={{ color: 'var(--faint)' }}>bekliyor</span>}

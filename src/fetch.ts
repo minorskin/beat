@@ -5,7 +5,7 @@
  */
 import './core/env.js';
 import { loadCandidates, loadLatestFx, startRun, finishRun,
-         writePrices, writeFxRates, logHealth, pool } from './core/db.js';
+         writePrices, writeFxRates, logHealth, markFetched, pool } from './core/db.js';
 import { runFetch } from './core/runner.js';
 import type { Quote } from './core/types.js';
 
@@ -15,12 +15,17 @@ async function main() {
   const { plan, skipped } = await loadCandidates();
   const fxSeed = await loadLatestFx();
   console.log(`\nBeat fetch · kind=${kind} · ${plan.size} enstrüman · seed FX: ${[...fxSeed].map(([b, r]) => `${b}=${r}`).join(' ') || 'yok'}`);
-  // Takvim kapısı: günde tek NAV yayınlayan fonlar, o günün NAV'ı alındıktan
-  // sonra tekrar sorgulanmaz (bkz. loadCandidates). Atlananları yazıyoruz ki
-  // "fon neden çekilmedi" sorusu log'dan cevaplanabilsin.
+  // Takvim kapısı: her grup kendi gün/aralık/sıklık planına göre çekilir
+  // (bkz. loadCandidates). Atlananları yazıyoruz ki "bu varlık neden
+  // çekilmedi" sorusu log'dan cevaplanabilsin.
   if (skipped.size) console.log(`atlandı (takvim): ${[...skipped.values()].join(', ')}`);
 
   const out = await runFetch(plan, fxSeed);
+
+  // Çekim damgası: planlanan HER enstrüman, sonucu ne olursa olsun. Sıklık
+  // kapısı buna bakıyor — başarısızı damgasız bırakmak bir sonraki turda
+  // (10 dk) yeniden sorduracağı için belgedeki sıklığı bozardı.
+  await markFetched([...plan.keys()]);
 
   // prices
   const priceRows = [...out.quotes].map(([instrumentId, q]) => ({ instrumentId, q }));

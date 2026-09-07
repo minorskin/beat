@@ -2,9 +2,10 @@ import {
   getLatestSnapshot, getPositions, getHistory, getInstruments,
   getLastFetch, getAssetClasses, getPeriodChanges, getPeriodMovers,
   getTransactionsByInstrument, getLocations, getUsdTry, getAnnualClosings,
-  getProjectionScenarios, getDayChanges, getWatchlist,
+  getProjectionScenarios, getDayChanges, getWatchlist, getCalendars,
   type Change, type Position, type SeriesPoint, type PeriodKey,
 } from '@/lib/data';
+import { scheduleLabel } from '@/lib/schedule';
 import { money, conv, num, pct, timeAgoShort, dateTimeStr, type Cur } from '@/lib/format';
 import { concLevel, CONC_HIGH, CONC_MID } from '@/lib/risk';
 import PortfolioChart from '@/components/PortfolioChart';
@@ -34,12 +35,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // ?cur=USD → tüm sayfa dolar üzerinden değerlendirilir.
   const cur: Cur = sp.cur === 'USD' ? 'USD' : 'TRY';
 
-  const [snap, positions, history, instruments, lastFetch, classes, changes, movers, transactions, locations, rate, closings, scenarios, dayChanges, watchlist] =
+  const [snap, positions, history, instruments, lastFetch, classes, changes, movers, transactions, locations, rate, closings, scenarios, dayChanges, watchlist, calendars] =
     await Promise.all([
       getLatestSnapshot(), getPositions(), getHistory(range), getInstruments(),
       getLastFetch(), getAssetClasses(), getPeriodChanges(), getPeriodMovers(),
       getTransactionsByInstrument(), getLocations(), getUsdTry(), getAnnualClosings(),
-      getProjectionScenarios(), getDayChanges(), getWatchlist(),
+      getProjectionScenarios(), getDayChanges(), getWatchlist(), getCalendars(),
     ]);
   // İzleme listesi = kataloğa eklenmiş ama pozisyonu olmayan enstrüman
   // (v_watchlist). Hesaba KATILMAZ: portföy büyüklüğü, dağılım, grafik ve
@@ -73,7 +74,21 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const valOf = (p: (typeof positions)[number]) =>
     (cur === 'USD' ? (own ? p.own_value_usd : p.value_usd) : (own ? p.own_value_try : p.value_try)) ?? 0;
 
-  const staleCount = rows.filter((p) => p.is_stale).length;
+  // Bayatlık artık her grubun KENDİ takviminden ölçülüyor (gün + aralık +
+  // sıklık, bkz. migration 0016): kapalı geçen saatler fiyatı yaşlandırmıyor.
+  // İki durum ayrı sayılıyor çünkü ayrı şeyler: penceresi kapalı bir varlığın
+  // fiyatının kımıldamaması beklenen davranış, penceresi AÇIKKEN kımıldamaması
+  // ise gelmeyen veridir.
+  const staleClosed = rows.filter((p) => p.is_stale && p.is_closed).length;
+  const staleLate = rows.filter((p) => p.is_stale && !p.is_closed).length;
+  const staleCount = staleClosed + staleLate;
+  // Şu an güncelleme penceresi açık olan gruplar — özet kartındaki güncelleme
+  // yaşının hangi zemine oturduğunu söyler. Takvim kodu ("DOVIZ") kullanıcıya
+  // bir şey anlatmadığı için sınıfın kendi adıyla yazılıyor.
+  const groupName = new Map(rows.map((p) => [p.calendar_code, p.class_name]));
+  const calByCode = new Map(calendars.map((c) => [c.code, c]));
+  const openGroups = [...new Set(rows.filter((p) => !p.is_closed).map((p) => p.calendar_code))]
+    .map((code) => `${groupName.get(code) ?? code} (${scheduleLabel(calByCode.get(code))})`);
 
   // Piyasa kartı — izlediğin referanslar + USD/TRY. Oran `pct_native`:
   // enstrümanın kendi para birimindeki günlük değişim (bkz. DayChange).
@@ -222,7 +237,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                     className="t-label tnum leading-none"
                     style={{ color: 'var(--faint)' }}
                     title={lastFetch
-                      ? `Son güncelleme ${dateTimeStr(lastFetch.finished_at)} · ${lastFetch.status}`
+                      ? `Son güncelleme ${dateTimeStr(lastFetch.finished_at)} · ${lastFetch.status}\n`
+                        + (openGroups.length
+                          ? `Güncelleme penceresi şu an açık: ${openGroups.join(' · ')}`
+                          : 'Şu an hiçbir grubun güncelleme penceresi açık değil')
                       : 'Henüz veri yok'}
                     suppressHydrationWarning
                   >
@@ -263,7 +281,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                     <Chip tone="tone-warn" n={concMid}  title={`${concMid} varlığın payı %${CONC_MID}–${CONC_HIGH} arasında — izlenmeli`} />
                     <Chip tone="tone-flat" n={rows.length}
                       title={staleCount
-                        ? `Toplam ${rows.length} varlık · ${staleCount} tanesinin fiyatı bayat`
+                        ? [`Toplam ${rows.length} varlık · ${staleCount} tanesinin fiyatı taşınmış`,
+                           staleClosed ? `${staleClosed} tanesi grubunun güncelleme penceresi kapalı olduğu için` : '',
+                           staleLate ? `${staleLate} tanesinde pencere açık ama yeni gözlem gelmedi` : ''].filter(Boolean).join(' · ')
                         : `Toplam ${rows.length} varlık`} />
                   </span>
                 </div>
@@ -328,7 +348,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
               sayısı ve toplam da tablonun kendi Toplam satırında duruyor. */}
           <div className="mb-3 sm:mb-4 flex items-end justify-end gap-3">
             <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
-              <AddInstrument classes={classes} />
+              <AddInstrument classes={classes} calendars={calendars} />
               <AddTransaction instruments={instruments} locations={locations} />
             </div>
           </div>
@@ -356,7 +376,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
             <PositionsTable
               rows={rows} own={own} cur={cur} transactions={transactions}
               locations={locations} classes={classes}
-              dayChanges={dayChanges} watchlist={watchlist} rate={rate} />
+              dayChanges={dayChanges} watchlist={watchlist} rate={rate}
+              calendars={calendars} />
           )}
           </TabPanel>
 

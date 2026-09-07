@@ -25,79 +25,89 @@ export interface Candidate {
   symbol: string;
   classCode: AssetClass;
   currency: string;
-  cadence: string;
+  calendarCode: string;
   providerId: string;
   providerSymbol: string;
   priority: number;
 }
 
 /**
- * TEFAS tarama penceresi (Europe/Istanbul) — hafta içi [06:00, 10:00).
- *
- * Alt sınır tahmin değil ölçüm: saatlik position_snapshots'ta fonların
- * `price_ts` alanı iki gün üst üste 06:00 ile 07:00 arasında yeni NAV'a atladı,
- * sonra ertesi sabaha kadar hiç kıpırdamadı. 06:00 bir saat erken açar — veri
- * kaybettirmez, yalnız ilk sorguyu boşa çıkarır.
- *
- * Üst sınır 10:00: NAV normalde ~07:00'de gelir, üç saat pay yeter. Tatilde
- * (hafta içi ama NAV yok) tarama böylece gün boyu sürmez, dört saatte biter.
- *
- * BİLİNEN SINIR: TEFAS bir gün 10:00'dan SONRA yayınlarsa o günün NAV'ı hiç
- * yazılmaz — ertesi sabah artık daha yeni bir satır olduğu için sağlayıcı onu
- * alır ve seride o güne ait değer eksik kalır. Pencereyi kullanıcı bilerek bu
- * aralığa çekti; bunu ortadan kaldırmanın yolu tek satır değil, sağlayıcının
- * gördüğü 14 günlük pencerenin tamamını yazmasıdır (motor şu an enstrüman
- * başına tek quote taşıyor, bu ayrı bir değişiklik).
- */
-const FUND_POLL_FROM_HOUR = 6;
-const FUND_POLL_TO_HOUR = 10;
-
-/**
  * Aktif enstrümanları failover adaylarıyla (priority sırasında) döndürür.
  *
- * `daily_close` ritmindeki enstrümanlar (TEFAS fonları) HER TURDA ÇEKİLMEZ.
- * Kaynak günde tek NAV yayınlıyor; 10 dakikada bir sormak günde 144 istekten
- * 143'ünü boşa harcıyor ve TEFAS'ın 6 istek/dk sınırına gereksiz yükleniyordu.
- * Kapı üç koşullu:
+ * ÇEKİM KAPISI ARTIK GRUBUN TAKVİMİ (market_calendars, bkz. migration 0016).
+ * Kullanıcının verdiği "enstrüman grubu güncelleme" tablosu dört şey söylüyor:
+ * hangi günler, hangi saat aralığı, hangi zaman dilimi, hangi sıklık. Dördü de
+ * takvim satırında duruyor ve kapı burada uygulanıyor:
  *
- *   1. Hafta içi mi?           (TEFAS hafta sonu NAV yayınlamaz)
- *   2. Tarama penceresinde mi? (06:00 <= saat < 10:00 TR)
- *   3. Bugünün NAV'ı elimizde YOK mu?
+ *   1. Bugün bu grubun güncelleme günü mü?   (weekdays)
+ *   2. Şu an çalışma aralığında mıyız?       (open_time–close_time, tz)
+ *   3. Bu SIKLIK DİLİMİNDE daha çekmedik mi? (interval_minutes)
  *
- * Üçü de sağlanıyorsa çekilir; NAV geldiği anda 3. koşul düşer ve fon o gün
- * bir daha sorgulanmaz. Günde ~144 istek yerine ~6 (NAV gecikirse pencere
- * dolduğunda en fazla ~24).
+ * Üçüncü koşul neden slot: tetikleyiciler tam :00/:30'a oturmuyor (Worker 30
+ * dk'da bir, GH Actions ayrıca 10 dk'da bir denemeye çalışıyor). "Son çekimden
+ * beri N dakika geçti mi" kuralı bu kaymayı biriktirip sıklığı kaydırırdı;
+ * duvar saatini interval_minutes'lik dilimlere bölüp "bu dilimde bir kez"
+ * demek, tetikleyici ne zaman gelirse gelsin belgedeki sıklığı verir.
  *
- * FAIL-OPEN: hiç fiyatı olmayan enstrüman (yeni eklenmiş fon) pencereye ve
- * güne bakılmaksızın her turda çekilir. Aksi halde cumartesi eklenen bir fon
- * pazartesi sabahına kadar fiyatsız kalırdı — oysa cuma NAV'ı hazır duruyor.
+ * Neden prices değil last_fetch_at: prices.ts sağlayıcının KOTASYON zamanıdır.
+ * Piyasa kapalıyken hiç ilerlemez, aynı tick tekrar gelirse yeni satır da
+ * yazılmaz — yani "bu dilimde çekildi mi" sorusunu cevaplayamaz. Damga
+ * denemenin kendisine ait (bkz. markFetched).
+ *
+ * İKİ İSTİSNA:
+ *
+ * FAIL-OPEN — hiç fiyatı olmayan enstrüman (yeni eklenmiş) gün/pencere/dilim
+ * demeden her turda çekilir. Aksi halde cuma akşamı eklenen bir BIST hissesi
+ * pazartesi 10:00'a kadar fiyatsız kalırdı.
+ *
+ * PLANSIZ GRUP (gayrimenkul) — belgede yedi gün de "hayır": zamanlanmış çekim
+ * yok. Ama fiyatı sabit sağlayıcıdan gelen bir DEĞERLEME ve kullanıcı onu
+ * arayüzden değiştirebiliyor. Beyan edilen değer son yazılan fiyattan farklıysa
+ * bir kereliğine çekilir; değer oturduğu anda koşul düşer ve enstrüman bir daha
+ * sorgulanmaz. Böylece "hiç güncellenmez" kuralı bozulmadan değerleme
+ * değişikliği tabloya yansır.
  *
  * `now` yalnız test için: verilmezse veritabanının kendi saati kullanılır.
  */
 export async function loadCandidates(now?: Date): Promise<CandidatePlan> {
   const { rows } = await pool.query<Candidate & { due: boolean }>(`
-    with n as (select coalesce($1::timestamptz, now()) at time zone 'Europe/Istanbul' as tr)
+    with n as (select coalesce($1::timestamptz, now()) as at)
     select i.id as "instrumentId", i.symbol, i.class_code as "classCode",
-           i.currency, i.cadence,
+           i.currency, i.calendar_code as "calendarCode",
            s.provider_id as "providerId", s.provider_symbol as "providerSymbol",
            s.priority,
            (
-             i.cadence <> 'daily_close'
              -- hiç gözlem yok → koşulsuz çek (yeni enstrüman)
-             or not exists (select 1 from prices p where p.instrument_id = i.id)
+             not exists (select 1 from prices p where p.instrument_id = i.id)
+             -- planlı grup: gün + pencere + sıklık dilimi
              or (
-               extract(isodow from n.tr) <= 5
-               and extract(hour from n.tr) >= ${FUND_POLL_FROM_HOUR}
-               and extract(hour from n.tr) < ${FUND_POLL_TO_HOUR}
-               and not exists (
-                 select 1 from prices p
-                 where p.instrument_id = i.id
-                   and (p.ts at time zone 'Europe/Istanbul')::date = n.tr::date
+               c.interval_minutes is not null
+               and extract(isodow from (n.at at time zone c.tz))::int = any (c.weekdays)
+               and (n.at at time zone c.tz)::time >= coalesce(c.open_time,  time '00:00:00')
+               and (n.at at time zone c.tz)::time <= coalesce(c.close_time, time '23:59:59')
+               and (
+                 i.last_fetch_at is null
+                 or floor(extract(epoch from n.at)          / (c.interval_minutes * 60))
+                  > floor(extract(epoch from i.last_fetch_at) / (c.interval_minutes * 60))
+               )
+             )
+             -- plansız grup: yalnız beyan edilen sabit değer değiştiyse
+             or (
+               c.interval_minutes is null
+               and exists (
+                 select 1
+                 from instrument_sources cs
+                 join v_latest_price lp on lp.instrument_id = i.id
+                 where cs.instrument_id = i.id and cs.is_active
+                   and cs.provider_id = 'constant'
+                   and cs.provider_symbol ~ '^[0-9]+([.][0-9]+)?$'
+                   and cs.provider_symbol::numeric <> lp.price
                )
              )
            ) as due
     from instruments i
     join instrument_sources s on s.instrument_id = i.id and s.is_active
+    join market_calendars c on c.code = i.calendar_code
     cross join n
     where i.is_active
     order by i.id, s.priority`, [now ?? null]);
@@ -117,6 +127,22 @@ export async function loadCandidates(now?: Date): Promise<CandidatePlan> {
     }
   }
   return { plan, skipped };
+}
+
+/**
+ * Çekim damgası — planlanan her enstrüman için, sonuç ne olursa olsun.
+ *
+ * Neden başarısızlar da damgalanıyor: belgedeki sıklık "ne kadar sık SORARIZ"
+ * sözü. Hata alan enstrümanı damgasız bırakmak onu bir sonraki turda (10 dk
+ * sonra) yeniden sorduruyordu — yani kaynak bozulduğunda tam da en çok
+ * yüklenmemesi gereken anda sıklık kendiliğinden artıyordu. Damga denemenin
+ * kendisine ait; hata bir sonraki dilimde tekrar denenir.
+ */
+export async function markFetched(instrumentIds: string[], now?: Date): Promise<void> {
+  if (!instrumentIds.length) return;
+  await pool.query(
+    `update instruments set last_fetch_at = coalesce($2::timestamptz, now()) where id = any($1::uuid[])`,
+    [instrumentIds, now ?? null]);
 }
 
 /** Snapshot ve goldapi türetmesi için son bilinen USD/EUR -> TRY kurları. */

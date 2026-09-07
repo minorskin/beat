@@ -3,24 +3,18 @@ import { useState, useTransition } from 'react';
 import { addInstrument } from '@/app/actions';
 import { CLASS_DEFAULTS, defaultsFor, symbolFromName } from '@/lib/catalog';
 import { GOLD_OPTIONS, INDEX_OPTIONS } from '@/lib/resolve';
-import type { AssetClass } from '@/lib/data';
+import { byCode, scheduleLabel, tzLabel } from '@/lib/schedule';
+import type { AssetClass, Calendar } from '@/lib/data';
 
 /**
  * Henüz sahip olunmayan bir enstrümanı kataloğa ekler.
  * Kullanıcı yalnız varlık sınıfı + sembol girer (altında sabit bir listeden
  * seçer) — görünen ad ve kaynak kodu sunucu tarafında otomatik çözülür.
  */
-// Teknik kodlar kullanıcıya bir şey anlatmıyor: "CRYPTO_24_7" gayrimenkulde
-// düpedüz kafa karıştırıcı. Aynı bilgiyi insan diliyle yazıyoruz.
-const CAL_LABEL: Record<string, string> = {
-  CRYPTO_24_7: '7/24', FX_24_5: 'hafta içi 7/24', BIST: 'BIST seansı',
-  NYSE: 'NYSE seansı', TEFAS_DAILY: 'TEFAS kapanışı',
-};
-const CADENCE_LABEL: Record<string, string> = {
-  hourly: 'saatlik', market_hours: 'seans içi saatlik', daily_close: 'günlük',
-};
+// Takvim kodu ("HISSE_TR") kullanıcıya bir şey anlatmaz; planın kendisi anlatır.
+// Gün/aralık/sıklık veritabanından okunup insan diline çevriliyor (lib/schedule).
 
-export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
+export default function AddInstrument({ classes, calendars }: { classes: AssetClass[]; calendars: Calendar[] }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState('');
@@ -28,6 +22,7 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
   const [symbol, setSymbol] = useState('');
   const [name, setName] = useState('');
 
+  const cals = byCode(calendars);
   const def = CLASS_DEFAULTS[cls];
   const isGold = cls === 'gold';
   const isIndex = cls === 'index';
@@ -165,8 +160,7 @@ export default function AddInstrument({ classes }: { classes: AssetClass[] }) {
 
             {eff && !isGold && (
               <div className="col-span-2 t-label" style={{ color: 'var(--faint)' }}>
-                <span className="tnum">{eff.currency}</span> · fiyat {CADENCE_LABEL[eff.cadence] ?? eff.cadence}
-                {' · '}{CAL_LABEL[eff.calendar] ?? eff.calendar}
+                <span className="tnum">{eff.currency}</span> · güncelleme {scheduleLabel(cals[eff.calendar])}{tzLabel(cals[eff.calendar])}
                 {eff.sources[0]?.provider === 'constant' && ' · sabit değer (kaynak yok)'}
               </div>
             )}
