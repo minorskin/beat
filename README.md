@@ -81,9 +81,11 @@ kaynak bozulduğunda sorgu sıklığı kendiliğinden artmasın diye).
 
 **İki istisna:**
 
-- **Fail-open** — hiç fiyatı olmayan enstrüman gün/pencere/dilim demeden her turda
-  çekilir; yoksa cuma akşamı eklenen bir BIST hissesi pazartesi 10:00'a kadar fiyatsız
-  kalırdı.
+- **Fail-open** — hiç fiyatı olmayan enstrüman **gün ve pencere** kapısına takılmaz;
+  yoksa cuma akşamı eklenen bir BIST hissesi pazartesi 10:00'a kadar fiyatsız kalırdı.
+  Sıklık kapısına yine uyar: sınırsız bırakılınca hiçbir kaynağın veremediği bir sembol
+  sonsuza dek 10 dk'da bir sorulur ve başka kimsenin sırası gelmediği turları tek başına
+  "hepsi başarısız"a çevirirdi.
 - **Gayrimenkul** — zamanlanmış çekimi yok. Fiyatı `constant` sağlayıcıdan gelen bir
   değerleme; kullanıcı arayüzden değiştirdiğinde motor beyan edilen değerin son yazılan
   fiyattan farklı olduğunu görür ve **tek seferlik** çeker.
@@ -111,6 +113,12 @@ fon 30 sa · döviz/kripto/altın/endeks 3 sa · hisse ve ETF 6 sa · gayrimenku
 
 Arayüzde bu, sembolün yanındaki gri noktadır; açıklaması pencerenin o an açık olup
 olmadığına göre değişir ("penceresi kapalı" ≠ "pencere açık ama veri gelmedi").
+
+**Boş tur hata değildir.** Tetikleyici 10 dk'da bir denerken gruplar 30/60 dk'da bir
+güncellendiği için saatin :10 ve :20'sinde hiçbir enstrümanın sırası gelmez; motor bu
+turlarda sıfır adayla çıkar ve başarıyla biter. Hata ancak *denendi ve hiçbiri alınamadı*
+ise vardır. Özet kartındaki güncelleme rozeti de "en son biten tur"a değil **fiyatın
+gerçekten geldiği son tura** (`ok_count > 0`) bakar.
 
 **EOD kesimi 02:00 TR'de** çalışır ve bir önceki işlem günü etiketlenir.
 Sebep: NYSE kapanışı yazın 23:00 TR, **kışın 00:00 TR (ertesi takvim günü)**. 02:00 her iki

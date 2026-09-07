@@ -56,9 +56,12 @@ export interface Candidate {
  *
  * İKİ İSTİSNA:
  *
- * FAIL-OPEN — hiç fiyatı olmayan enstrüman (yeni eklenmiş) gün/pencere/dilim
- * demeden her turda çekilir. Aksi halde cuma akşamı eklenen bir BIST hissesi
- * pazartesi 10:00'a kadar fiyatsız kalırdı.
+ * FAIL-OPEN — hiç fiyatı olmayan enstrüman (yeni eklenmiş) GÜN ve PENCERE
+ * kapısına takılmaz; cuma akşamı eklenen bir BIST hissesi pazartesi 10:00'a
+ * kadar fiyatsız kalmasın diye. Sıklık kapısına yine uyar: sınırsız fail-open,
+ * hiçbir kaynağın veremediği bir sembolü sonsuza dek 10 dk'da bir sordurur ve
+ * başka kimsenin sırası gelmediği turları tek başına "hepsi başarısız"a
+ * çevirirdi.
  *
  * PLANSIZ GRUP (gayrimenkul) — belgede yedi gün de "hayır": zamanlanmış çekim
  * yok. Ama fiyatı sabit sağlayıcıdan gelen bir DEĞERLEME ve kullanıcı onu
@@ -77,8 +80,21 @@ export async function loadCandidates(now?: Date): Promise<CandidatePlan> {
            s.provider_id as "providerId", s.provider_symbol as "providerSymbol",
            s.priority,
            (
-             -- hiç gözlem yok → koşulsuz çek (yeni enstrüman)
-             not exists (select 1 from prices p where p.instrument_id = i.id)
+             -- FAIL-OPEN: hiç gözlem yok → gün/pencere kapısına takılmaz.
+             -- Sıklık kapısına YİNE UYAR. Sınırsız bırakılınca hiç fiyat
+             -- alınamayan bir enstrüman (kaynağı olmayan bir sembol) her turda,
+             -- yani 10 dk'da bir sorgulanıyor ve başka kimsenin sırası gelmediği
+             -- turları tek başına doldurup "hepsi başarısız" gösteriyordu.
+             (
+               not exists (select 1 from prices p where p.instrument_id = i.id)
+               and (
+                 -- plansız grupta (gayrimenkul) sıklık yok: ilk fiyat için koşulsuz
+                 c.interval_minutes is null
+                 or i.last_fetch_at is null
+                 or floor(extract(epoch from n.at)            / (c.interval_minutes * 60))
+                  > floor(extract(epoch from i.last_fetch_at) / (c.interval_minutes * 60))
+               )
+             )
              -- planlı grup: gün + pencere + sıklık dilimi
              or (
                c.interval_minutes is not null
