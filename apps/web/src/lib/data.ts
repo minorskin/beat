@@ -454,9 +454,19 @@ export async function getAssetClasses(): Promise<AssetClass[]> {
   return q<AssetClass>(`select code, name, ui_group from asset_classes order by sort_order`);
 }
 
+/**
+ * "Son güncelleme" = fiyatın GERÇEKTEN geldiği son tur (ok_count > 0).
+ *
+ * Takvim kapısından beri turların bir kısmı hiç aday bulmuyor (saatin :10 ve
+ * :20'sinde hiçbir grubun sırası gelmiyor). Sadece "en son biten tur"a bakmak
+ * rozette "0 dk önce" yazdırırken fiyatlar 30 dk eski olabiliyordu — çalışmış
+ * bir tur ile veri getirmiş bir tur ayrı şeyler.
+ */
 export async function getLastFetch(): Promise<{ kind: string; status: string; finished_at: string } | null> {
   const r = await q<{ kind: string; status: string; finished_at: string }>(
-    `select kind, status, finished_at from fetch_runs where finished_at is not null order by started_at desc limit 1`);
+    `select kind, status, finished_at from fetch_runs
+     where finished_at is not null and ok_count > 0
+     order by started_at desc limit 1`);
   return r[0] ?? null;
 }
 

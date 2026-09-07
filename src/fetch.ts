@@ -68,7 +68,12 @@ async function main() {
   console.log(`prices +${pricesWritten} · fx_rates +${fxWritten} · başarı ${ok}/${plan.size} · hata ${fail}\n`);
 
   await pool.end();
-  if (ok === 0) process.exit(1);
+  // BOŞ TUR HATA DEĞİLDİR. Takvim kapısı devreye girdiğinden beri turların bir
+  // kısmı hiç aday bulmuyor: tetikleyici 10 dk'da bir denerken gruplar 30/60
+  // dk'da bir güncelleniyor, yani saatin :10 ve :20'sinde kimsenin sırası
+  // gelmiyor. Koşulsuz exit(1) bu turları kırmızı gösterip "motor bozuk"
+  // yanılgısı üretirdi. Hata ancak DENENDİ VE HİÇBİRİ ALINAMADI ise vardır.
+  if (plan.size > 0 && ok === 0) process.exit(1);
 }
 
 main().catch(async (e) => { console.error(e); try { await pool.end(); } catch {} process.exit(1); });
