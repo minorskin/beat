@@ -14,6 +14,7 @@ export async function addTransaction(formData: FormData): Promise<Result> {
   const executed_at = String(formData.get('executed_at') || '') || new Date().toISOString();
   const external = Number(formData.get('external_quantity') || 0) || 0;
   const location = String(formData.get('location') || '').trim() || null;
+  const note = String(formData.get('note') || '').trim() || null;
 
   if (!instrument_id) return { ok: false, error: 'Enstrüman zorunlu' };
 
@@ -24,8 +25,8 @@ export async function addTransaction(formData: FormData): Promise<Result> {
     if (!external) return { ok: false, error: 'Emanet adedi değişmiyor' };
     await q(
       `insert into transactions (instrument_id, type, quantity, external_quantity, currency, executed_at, note)
-       values ($1,'transfer',0,$2,$3,$4,'emanet düzeltmesi')`,
-      [instrument_id, external, currency, executed_at]);
+       values ($1,'transfer',0,$2,$3,$4,$5)`,
+      [instrument_id, external, currency, executed_at, note ?? 'emanet düzeltmesi']);
     revalidatePath('/');
     return { ok: true };
   }
@@ -40,9 +41,9 @@ export async function addTransaction(formData: FormData): Promise<Result> {
   if (ext > Math.abs(quantity)) return { ok: false, error: 'Emanet adedi işlem adedini aşamaz' };
 
   await q(
-    `insert into transactions (instrument_id, type, quantity, external_quantity, unit_price, currency, executed_at, location)
-     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-    [instrument_id, type, quantity, ext, unit_price, currency, executed_at, location]);
+    `insert into transactions (instrument_id, type, quantity, external_quantity, unit_price, currency, executed_at, location, note)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [instrument_id, type, quantity, ext, unit_price, currency, executed_at, location, note]);
   revalidatePath('/');
   return { ok: true };
 }
@@ -153,12 +154,13 @@ export async function updateTransaction(formData: FormData): Promise<Result> {
   const executed_at = String(formData.get('executed_at') || '') || new Date().toISOString();
   const external = Number(formData.get('external_quantity') || 0) || 0;
   const location = String(formData.get('location') || '').trim() || null;
+  const note = String(formData.get('note') || '').trim() || null;
 
   if (type === 'transfer') {
     await q(
-      `update transactions set type='transfer', quantity=0, external_quantity=$2, currency=$3, executed_at=$4, location=$5
+      `update transactions set type='transfer', quantity=0, external_quantity=$2, currency=$3, executed_at=$4, location=$5, note=$6
        where id=$1`,
-      [id, external, currency, executed_at, location]);
+      [id, external, currency, executed_at, location, note]);
     revalidatePath('/');
     return { ok: true };
   }
@@ -172,9 +174,9 @@ export async function updateTransaction(formData: FormData): Promise<Result> {
   if (ext > Math.abs(quantity)) return { ok: false, error: 'Emanet adedi işlem adedini aşamaz' };
 
   await q(
-    `update transactions set type=$2, quantity=$3, external_quantity=$4, unit_price=$5, currency=$6, executed_at=$7, location=$8
+    `update transactions set type=$2, quantity=$3, external_quantity=$4, unit_price=$5, currency=$6, executed_at=$7, location=$8, note=$9
      where id=$1`,
-    [id, type, quantity, ext, unit_price, currency, executed_at, location]);
+    [id, type, quantity, ext, unit_price, currency, executed_at, location, note]);
   revalidatePath('/');
   return { ok: true };
 }

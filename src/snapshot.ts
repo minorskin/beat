@@ -44,7 +44,10 @@ async function main() {
     join instruments i on i.id = h.instrument_id
     join market_calendars c on c.code = i.calendar_code
     left join v_latest_price lp on lp.instrument_id = h.instrument_id
-    where h.quantity <> 0
+    -- own_quantity de bakılır: tamamı borç verilmiş bir varlıkta adet 0'a iner
+    -- ama servet duruyor (bkz. migration 0019). Yalnız adede bakan koşul o
+    -- satırı geçmiş grafiğin own_* serisinden de silerdi.
+    where h.quantity <> 0 or h.own_quantity <> 0
     order by h.class_code, h.symbol`);
 
   const positions: {

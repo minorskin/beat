@@ -18,10 +18,22 @@ export default function AddTransaction({ instruments, locations }: { instruments
 
   const sel = instruments.find((i) => i.id === insId);
   const isTransfer = type === 'transfer';
+  // Harcama/borç: adedi kımıldatan ama alım-satım olmayan tipler. Borçta
+  // sahiplik payı adetten TÜRETİLİR (bkz. migration 0019), o yüzden "bana ait
+  // olmayan kısım" alanı bu tiplerde çıkmaz — kullanıcı iki kez girmemeli.
+  const isDebt = type === 'borrow' || type === 'lend';
   // Gayrimenkulde adet = 1 (mülkün kendisi) ve "birim fiyat" aslında ALIŞ
   // BEDELİ. Güncel değerleme varlığın kendisinde durur; ikisi farklı sayılar
   // ve kâr/zarar aradaki farktır — form bunu açıkça söylemeli.
   const isRealty = sel?.class_code === 'realty';
+  // "Birim Fiyat" etiketi FİYATIN para birimini yazar, `cur`u değil. `cur` =
+  // instruments.currency ve o alan 0006'dan beri para birimi değil KUR RİSKİ
+  // etiketi: HAS GRAM 'USD' işaretli ama TL kote, USDTRY de öyle. Maliyeti
+  // TL'ye çeviren kod fiyatın kendi birimine bakıyor (getPositions ve
+  // src/snapshot.ts aynı kural), yani etiket 'USD' derken hesap TL bekliyordu
+  // — etikete uyup altını dolar/gram girmek maliyeti ~48 kat küçük yazardı.
+  // Fiyat henüz çekilmemişse (yeni enstrüman) `cur`a düşülür.
+  const priceCur = sel?.price_currency ?? cur;
   // Emanet düzeltmesinde kullanıcı YENİ TOPLAMI girer; sunucuya delta gider.
   const extDelta = isTransfer ? (Number(extTarget) || 0) - (sel?.external_quantity ?? 0) : 0;
 
@@ -80,6 +92,8 @@ export default function AddTransaction({ instruments, locations }: { instruments
                 onChange={(e) => { setType(e.target.value); setShowExt(false); }}
               >
                 <option value="buy">Alım</option><option value="sell">Satım</option>
+                <option value="expense">Harcama</option>
+                <option value="borrow">Borç Alma</option><option value="lend">Borç Verme</option>
                 <option value="adjustment">Adet Düzelt</option><option value="dividend">Temettü</option>
                 <option value="transfer">Emanet Düzelt</option>
               </select>
@@ -115,9 +129,19 @@ export default function AddTransaction({ instruments, locations }: { instruments
                 </label>
 
                 <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
-                  {isRealty ? `Alış Bedeli (${cur})` : `Birim Fiyat (${cur})`}
+                  {isRealty ? `Alış Bedeli (${priceCur})` : `Birim Fiyat (${priceCur})`}
                   <input name="unit_price" type="number" step="any" inputMode="decimal" className="field mt-1 tnum" />
                 </label>
+
+                {(type === 'expense' || isDebt) && (
+                  <p className="col-span-2 t-label -mt-1" style={{ color: 'var(--faint)' }}>
+                    {type === 'expense' && 'Portföyden çıkan ve geri gelmeyen para: hem toplamdan hem “bana ait”ten düşer.'}
+                    {type === 'borrow' && 'Elinde ama senin değil: toplam artar, “bana ait” değişmez.'}
+                    {type === 'lend' && 'Elinden çıktı ama hâlâ senin: toplam azalır, “bana ait” değişmez.'}
+                    {isDebt && <> Geri ödeme/tahsil için <b style={{ color: 'var(--muted)' }}>eksi adet</b> gir.</>}
+                    {' '}Birim fiyat boş bırakılırsa ortalama maliyet olduğu gibi kalır.
+                  </p>
+                )}
 
                 {isRealty && (
                   <p className="col-span-2 t-label -mt-1" style={{ color: 'var(--faint)' }}>
@@ -166,6 +190,14 @@ export default function AddTransaction({ instruments, locations }: { instruments
                 )}
               </>
             )}
+
+            <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+              Not <span style={{ color: 'var(--faint)' }}>(isteğe bağlı)</span>
+              <textarea
+                name="note" rows={2} className="field mt-1"
+                placeholder="ör. Ahmet'e verilen borç"
+              />
+            </label>
 
             <input type="hidden" name="currency" value={cur} />
 

@@ -67,6 +67,8 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
                 onChange={(e) => setType(e.target.value)}
               >
                 <option value="buy">Alım</option><option value="sell">Satım</option>
+                <option value="expense">Harcama</option>
+                <option value="borrow">Borç Alma</option><option value="lend">Borç Verme</option>
                 <option value="adjustment">Adet Düzelt</option><option value="dividend">Temettü</option>
                 <option value="transfer">Emanet Düzelt</option>
               </select>
@@ -91,7 +93,9 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
                 </label>
 
                 <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
-                  Birim Fiyat ({tx.currency})
+                  {/* Etiket FİYATIN para biriminden — tx.currency kur riski
+                      etiketidir, hesap onu kullanmaz (bkz. AddTransaction). */}
+                  Birim Fiyat ({tx.price_currency ?? tx.currency})
                   <input
                     name="unit_price" type="number" step="any" inputMode="decimal"
                     defaultValue={tx.unit_price ?? ''} className="field mt-1 tnum"
@@ -129,6 +133,14 @@ export default function EditTransaction({ tx, locations }: { tx: TxRow; location
                 )}
               </>
             )}
+
+            <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+              Not <span style={{ color: 'var(--faint)' }}>(isteğe bağlı)</span>
+              <textarea
+                name="note" rows={2} defaultValue={tx.note ?? ''} className="field mt-1"
+                placeholder="ör. Ahmet'e verilen borç"
+              />
+            </label>
 
             <div className="col-span-2 flex items-center gap-3 mt-1">
               <button type="submit" disabled={pending} className="btn btn-primary flex-1 sm:flex-none">

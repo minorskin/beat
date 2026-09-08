@@ -36,6 +36,14 @@ export interface TxRow {
   id: string; instrument_id: string; type: string;
   quantity: number; unit_price: number | null; currency: string;
   executed_at: string; location: string | null; external_quantity: number;
+  // Serbest not — işlem satırının altında gösterilir. Harcama/borç kayıtlarında
+  // "kime, ne için" bilgisini tutan tek alan bu.
+  note: string | null;
+  // Birim fiyatın hangi cinsten OKUNACAĞI. `currency` bunu söylemez: o alan
+  // 0006'dan beri kur riski etiketi (HAS GRAM 'USD' ama fiyatı TL). Maliyeti
+  // TL'ye çeviren kod fiyatın para birimine bakıyor (bkz. getPositions,
+  // src/snapshot.ts), form da aynı birimi yazmalı.
+  price_currency: string | null;
 }
 /**
  * Bir gözlemde bir sembolün durumu:
@@ -92,12 +100,15 @@ export async function getLatestSnapshot(): Promise<Snapshot | null> {
 export async function getPositions(): Promise<Position[]> {
   return q<Position>(`
     with fx as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1),
-         -- Güncel lot'un açılış/kapanış tarihi + konumları: buy/sell'i imzalı adet
-         -- olarak biriktirip, adet sıfıra her indiğinde yeni bir "segment" başlat.
+         -- Güncel lot'un açılış/kapanış tarihi + konumları: adedi kımıldatan her
+         -- tipi (alım/borç alma giriş, satım/harcama/borç verme çıkış) imzalı
+         -- biriktirip, adet sıfıra her indiğinde yeni bir "segment" başlat.
          -- Bir enstrümanın en güncel segmenti = o an açık (ya da en son kapanan) pozisyon.
          ledger as (
            select instrument_id, id, executed_at, location,
-                  case when type='buy' then quantity when type='sell' then -quantity else 0 end as signed_qty
+                  case when type in ('buy','borrow')          then quantity
+                       when type in ('sell','expense','lend') then -quantity
+                       else 0 end as signed_qty
            from transactions
          ),
          running as (
@@ -144,7 +155,10 @@ export async function getPositions(): Promise<Position[]> {
            from v_holdings h
            join instruments i on i.id = h.instrument_id
            left join v_latest_price lp on lp.instrument_id = h.instrument_id
-           where h.quantity <> 0
+           -- own_quantity de bakılır: tamamı borç verilmiş bir varlıkta adet
+           -- 0'a iner ama servet duruyor (bkz. migration 0019). Yalnız adede
+           -- bakan koşul o satırı tablodan da "Bana Ait" toplamından da silerdi.
+           where h.quantity <> 0 or h.own_quantity <> 0
          ),
          valued as (
            select b.*,
@@ -198,9 +212,12 @@ export async function getPositions(): Promise<Position[]> {
 /** Bir enstrümana ait tüm işlemler, en yeniden eskiye — akordiyon paneli için. */
 export async function getTransactionsByInstrument(): Promise<Record<string, TxRow[]>> {
   const rows = await q<TxRow>(`
-    select instrument_id, id, type, quantity, unit_price, currency, executed_at, location, external_quantity
-    from transactions
-    order by instrument_id, executed_at desc, id desc`);
+    select t.instrument_id, t.id, t.type, t.quantity, t.unit_price, t.currency,
+           t.executed_at, t.location, t.external_quantity, t.note,
+           lp.currency as price_currency
+    from transactions t
+    left join v_latest_price lp on lp.instrument_id = t.instrument_id
+    order by t.instrument_id, t.executed_at desc, t.id desc`);
   const byInstrument: Record<string, TxRow[]> = {};
   for (const r of rows) (byInstrument[r.instrument_id] ??= []).push(r);
   return byInstrument;

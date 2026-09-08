@@ -9,7 +9,11 @@ import EditTransaction from './EditTransaction';
 const TX_LABEL: Record<string, string> = {
   buy: 'Alış', sell: 'Satış', dividend: 'Temettü', fee: 'Ücret',
   adjustment: 'Adet Düzelt', transfer: 'Emanet Düzelt',
+  expense: 'Harcama', borrow: 'Borç Alma', lend: 'Borç Verme',
 };
+
+// Adedin ELDEN ÇIKTIĞI tipler: satırdaki tarih "Kapanış" sütununa yazılır.
+const TX_OUTFLOW = new Set(['sell', 'expense', 'lend']);
 
 const ANIM_MS = 160;
 const NO_LOC = '__konumsuz__'; // "konumu girilmemiş" için sentinel — gerçek konum adıyla çakışmaz
@@ -651,7 +655,7 @@ export default function PositionsTable({
                     // Ana satırla AYNI sütunlar, aynı hizada — ayrı başlıklı bir mini
                     // tablo yerine tarih, alış/satış tarihi olarak Açılış/Kapanış
                     // sütununa yerleşir (diğer tipler Açılış'ta gösterilir).
-                    const dateInOpen = t.type !== 'sell';
+                    const dateInOpen = !TX_OUTFLOW.has(t.type);
                     return (
                       <tr key={t.id} className={`tx-row ${isClosing ? 'tx-row-out' : ''}`}>
                         <td className="px-4 sm:px-5 py-2 t-body font-medium">
@@ -659,6 +663,11 @@ export default function PositionsTable({
                             {TX_LABEL[t.type] ?? t.type}
                             <EditTransaction tx={t} locations={locations} />
                           </div>
+                          {t.note && t.note !== 'emanet düzeltmesi' && (
+                            <div className="t-label mt-0.5 whitespace-normal" style={{ color: 'var(--faint)' }}>
+                              {t.note}
+                            </div>
+                          )}
                         </td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
