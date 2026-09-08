@@ -326,14 +326,26 @@ export default function PositionsTable({
     let value = 0, weight = 0, pnl = 0, cost = 0, noCost = 0;
     // Günlük: tutarlar toplanabilir. Oran da tutardan TÜRETİLİR — satır
     // oranlarının ortalaması değil: gün başındaki büyüklük = bugünkü değer
-    // eksi bugünkü kazanç, oran da ikisinin bölümü. Yalnız günlük ölçüsü olan
-    // satırlar paydaya girer, yoksa payda şişer ve oran olduğundan küçük çıkar.
-    let dayAbs = 0, dayBase = 0;
+    // eksi bugünkü kazanç, oran da ikisinin bölümü.
+    //
+    // PAYDA BÜTÜN PORTFÖY. Eskiden yalnız günlük ölçüsü olan satırlar paydaya
+    // giriyordu ("payda şişmesin" diye) ama bu, Toplam satırında portföyün
+    // değerinin yanına portföye ait OLMAYAN bir oran yazmak demekti: fonların
+    // NAV'ı günde bir yayınlandığı ve gayrimenkul hiç çekilmediği için ölçülen
+    // alt küme portföyün ~beşte biriydi; tablo +%0,53 derken portföy +%0,10
+    // artmıştı. Bugün NAV'ı gelmemiş bir fon "ölçülemez" değil, gün içinde
+    // portföyü büyütmemiş bir kalemdir — paydada durur, paya sıfır katar.
+    // Ölçünün ne kadarını kapsadığı `dayCovered` ile başlığa yazılıyor.
+    let dayAbs = 0, dayBase = 0, dayMeasured = 0;
     for (const { p } of posRows) {
-      value += valOf(p) ?? 0;
+      const v = valOf(p) ?? 0;
+      value += v;
       weight += wOf(p) ?? 0;
       const d = dayOf(p);
-      if (d) { const a = dayAmt(d); dayAbs += a; dayBase += (valOf(p) ?? 0) - a; }
+      const a = d ? dayAmt(d) : 0;
+      if (d) dayMeasured += v;
+      dayAbs += a;
+      dayBase += v - a;
       // Maliyet SATIRIN KENDİ maliyetinden okunur (cost_try), "değer − K/Z"
       // farkından değil: alış fiyatı girilmemiş satırda K/Z null olduğu için o
       // fark satırın TÜM değerini maliyet sanıyordu — payda şişiyor, oran
@@ -350,6 +362,8 @@ export default function PositionsTable({
     return {
       value, weight, pnl, noCost, dayAbs,
       dayPct: dayBase > 0 ? (dayAbs / dayBase) * 100 : null,
+      /** Portföyün yüzde kaçının bugün gerçekten ölçülebildiği. */
+      dayCovered: value > 0 ? (dayMeasured / value) * 100 : 0,
       pnlPct: noCost === 0 && cost > 0 ? (pnl / cost) * 100 : null,
     };
   })();
@@ -473,7 +487,9 @@ export default function PositionsTable({
                 <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
                 <td className="text-right px-3 py-2 tnum whitespace-nowrap"
                     style={{ color: totals.dayPct == null ? 'var(--faint)' : totals.dayPct >= 0 ? 'var(--up)' : 'var(--down)' }}
-                    title="Bugün 00:00'dan (TR) bu yana — toplam kazanç ÷ gün başı büyüklük">
+                    title={`Bugün 00:00'dan (TR) bu yana — toplam kazanç ÷ gün başı büyüklük.`
+                      + ` Payda bütün portföy; bugün fiyatı yenilenen kısım %${num(totals.dayCovered, 0)}`
+                      + ` (kalanı gün içinde değişmedi: NAV'ı henüz yayınlanmamış fon, gayrimenkul, nakit).`}>
                   {totals.dayPct != null ? (
                     <>
                       <div className="t-body">{pct(totals.dayPct)}</div>

@@ -128,6 +128,11 @@ async function resolveCoinGecko(symbol: string): Promise<ResolveResult> {
   }
 }
 
+/** Değerli maden / dolar paritesi mi (XAUUSD…)? lib/catalog.ts ile aynı liste. */
+const isMetalUsdPair = (symbol: string) =>
+  symbol.length === 6 && ['XAU', 'XAG', 'XPT', 'XPD'].includes(symbol.slice(0, 3))
+  && symbol.slice(3) === 'USD';
+
 function resolveFx(symbol: string): ResolveResult {
   const base = symbol.slice(0, 3).toUpperCase();
   const quote = symbol.slice(3, 6).toUpperCase();
@@ -135,8 +140,24 @@ function resolveFx(symbol: string): ResolveResult {
   // TRYTRY gibi kendi kendine eşit çift = nakit. "Türk Lirası / Türk Lirası"
   // saçma görünür; kaynak kodu da sabit fiyatın kendisidir.
   if (base === quote) return { display_name: `${baseName} (nakit)`, provider_symbol: '1' };
-  const quoteName = quote === 'TRY' ? 'TL' : (CCY_NAMES[quote] ?? quote);
-  return { display_name: `${baseName} / ${quoteName}`, provider_symbol: base };
+  // Döviz zincirinin İKİ kaynağı da (truncgil, tcmb) her şeyi TL karşılığı
+  // kote ediyor ve baz para birimini bekliyor (GBPTRY -> GBP, bkz.
+  // lib/catalog.ts). Kotasyon TL değilse `base` yine gönderiliyor ve kaynak
+  // BAŞKA BİR ÇİFTİN fiyatını dönüyordu: USDEUR eklenince truncgil 'USD'
+  // sorusuna USD/TRY (48,47) cevabını veriyor, o da USDEUR'ün fiyatı diye
+  // kaydediliyordu — piyasa kartı aylarca yanlış bir sayı gösterdi. Sessizce
+  // yanlış fiyat üretmektense enstrümanı hiç kurmamak doğrusu.
+  if (quote !== 'TRY' && !isMetalUsdPair(base + quote)) {
+    const cross = `${quote}${base}`;
+    const known = INDEX_OPTIONS.find((o) => o.symbol === cross);
+    return {
+      error: `${symbol}: döviz kaynakları yalnız TL kotasyonu veriyor`
+        + (known
+            ? ` — bu pariteyi "Endeks" sınıfından ${known.display_name} (${cross}) olarak ekle.`
+            : ` — TL karşılığı bir çift (${base}TRY) ya da "Endeks" sınıfındaki hazır pariteler kullanılmalı.`),
+    };
+  }
+  return { display_name: `${baseName} / ${quote === 'TRY' ? 'TL' : (CCY_NAMES[quote] ?? quote)}`, provider_symbol: base };
 }
 
 /** class_code + kanonik sembolden görünen adı ve kaynak kodunu çözer. Kullanıcıya hiçbirini sormaz. */

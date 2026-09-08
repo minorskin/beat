@@ -66,8 +66,20 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // portföyün tamamı kâr görünür.
   const costTry = sum((p) => (own ? p.own_cost_try : p.cost_try));
   const pnlTry = sum((p) => (own ? p.own_pnl_try : p.pnl_try));
-  const pnl = conv(pnlTry, cur, rate);
-  const pnlPct = costTry > 0 ? (pnlTry / costTry) * 100 : 0;
+  // Maliyeti MEÇHUL bir pozisyon varsa portföy düzeyinde K/Z diye bir sayı
+  // yoktur: pay da payda da eksik. Varlık tablosu bunu zaten böyle yapıyordu
+  // (PositionsTable → noCost === 0), Özet kartı yapmıyordu; sonuç, alış
+  // fiyatlarının çoğu girilmemişken "TÜM" seçilince ₺0 / +%0,00 yazmasıydı —
+  // portföy 22,3M'den 22,9M'ye çıkmışken. Aynı soruya iki sayfa aynı cevabı
+  // versin diye kural buraya da taşındı.
+  const noCostCount = positions.filter((p) => {
+    const v = own ? p.own_value_try : p.value_try;
+    const c = own ? p.own_cost_try : p.cost_try;
+    return (v ?? 0) > 0 && (c == null || c <= 0);
+  }).length;
+  const pnlKnown = noCostCount === 0 && costTry > 0;
+  const pnl = pnlKnown ? conv(pnlTry, cur, rate) : null;
+  const pnlPct = pnlKnown ? (pnlTry / costTry) * 100 : null;
 
   // "Bana ait" görünümünde payı sıfırlanmış pozisyonlar listede yer tutmasın.
   const rows = own ? positions.filter((p) => p.own_quantity !== 0) : positions;
@@ -263,7 +275,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                   label="Değişim Tutar"
                   note={range}
                   title={isAll
-                    ? 'Alış fiyatına göre gerçekleşmemiş kâr/zarar — pozisyon açıldığından beri.'
+                    ? (pnlKnown
+                        ? 'Alış fiyatına göre gerçekleşmemiş kâr/zarar — pozisyon açıldığından beri.'
+                        : `${noCostCount} pozisyonda alış fiyatı girilmemiş — toplam kâr/zarar hesaplanamıyor.`)
                     : `Değişim tutarı · ${rangeLong}. Dönem başındaki sepetin fiyat hareketi; araya giren para giriş/çıkışı sayılmaz.${sinceNote}`}
                   value={chgAbs == null ? '—' : `${chgUp ? '+' : ''}${money(chgAbs, cur)}`}
                   color={chgColor}
@@ -272,7 +286,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                   label="Değişim Oran"
                   note={range}
                   title={isAll
-                    ? 'Kâr/zarar ÷ maliyet. Yalnız alış fiyatı girilmiş pozisyonlar sayılır.'
+                    ? (pnlKnown
+                        ? 'Kâr/zarar ÷ maliyet.'
+                        : `${noCostCount} pozisyonda alış fiyatı girilmemiş — toplam oran hesaplanamıyor.`)
                     : `Değişim oranı · ${rangeLong}. Dönem başındaki sepetin fiyat hareketi.${sinceNote}`}
                   value={chgPct == null ? '—' : pct(chgPct)}
                   color={chgColor}

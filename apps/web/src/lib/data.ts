@@ -54,6 +54,8 @@ export interface HistoryBundle { points: SeriesPoint[]; symbols: string[] }
 export interface Instrument {
   id: string; symbol: string; display_name: string; class_code: string; currency: string;
   quantity: number; external_quantity: number;
+  /** Fiyatın kote edildiği birim — işlem formundaki "Birim Fiyat" etiketi bunu yazar. */
+  price_currency: string | null;
 }
 export interface WatchItem {
   instrument_id: string; symbol: string; display_name: string; class_code: string;
@@ -405,9 +407,11 @@ export async function getInstruments(): Promise<Instrument[]> {
   return q<Instrument>(`
     select i.id, i.symbol, i.display_name, i.class_code, i.currency,
            coalesce(h.quantity, 0)     as quantity,
-           coalesce(h.external_qty, 0) as external_quantity
+           coalesce(h.external_qty, 0) as external_quantity,
+           lp.currency as price_currency
     from instruments i
     left join v_holdings h on h.instrument_id = i.id
+    left join v_latest_price lp on lp.instrument_id = i.id
     where i.is_active
     order by i.class_code, i.symbol`);
 }
