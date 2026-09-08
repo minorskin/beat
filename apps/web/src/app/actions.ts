@@ -7,6 +7,22 @@ import { revalidatePath } from 'next/cache';
 
 type Result = { ok: boolean; error?: string };
 
+/**
+ * Yüzde alanı okur: boş → null ("girilmedi"), dolu → 0-100 arası sayı.
+ *
+ * Alan type=number DEĞİL metin (bkz. formlar): tarayıcı yerel ayarı İngilizce
+ * olduğunda "12,5" geçersiz sayılıp alan sessizce boşalıyordu. Virgül burada
+ * noktaya çevriliyor. Boş ile 0 ayrı iki cevap — biri bilgi eksikliği, diğeri
+ * bilginin kendisi (bkz. migration 0004 ve 0020).
+ */
+function parseRate(raw: FormDataEntryValue | null, label: string): { value: number | null } | { error: string } {
+  const t = String(raw || '').trim().replace(',', '.');
+  if (!t) return { value: null };
+  const n = Number(t);
+  if (!Number.isFinite(n) || n < 0 || n > 100) return { error: `${label} 0 ile 100 arasında olmalı` };
+  return { value: n };
+}
+
 export async function addTransaction(formData: FormData): Promise<Result> {
   const instrument_id = String(formData.get('instrument_id') || '');
   const type = String(formData.get('type') || 'buy');
@@ -97,15 +113,13 @@ export async function addInstrument(formData: FormData): Promise<Result> {
     provider_symbol = resolved.provider_symbol;
   }
 
-  // Kâr vergisi oranı isteğe bağlı: boş bırakılırsa NULL ("girilmedi") yazılır.
-  // 0 girmek ayrı bir bilgi ("vergi yok"), bu yüzden boş ≠ 0.
-  const taxRaw = String(formData.get('tax_rate') || '').trim().replace(',', '.');
-  let tax_rate: number | null = null;
-  if (taxRaw) {
-    const n = Number(taxRaw);
-    if (!Number.isFinite(n) || n < 0 || n > 100) return { ok: false, error: 'Vergi oranı 0 ile 100 arasında olmalı' };
-    tax_rate = n;
-  }
+  // Oranlar isteğe bağlı: boş bırakılırsa NULL ("girilmedi") yazılır. 0 girmek
+  // ayrı bir bilgi ("kesinti yok"), bu yüzden boş ≠ 0.
+  const tax = parseRate(formData.get('tax_rate'), 'Vergi oranı');
+  if ('error' in tax) return { ok: false, error: tax.error };
+  const fee = parseRate(formData.get('mgmt_fee_rate'), 'Yönetim ücreti oranı');
+  if ('error' in fee) return { ok: false, error: fee.error };
+  const tax_rate = tax.value, mgmt_fee_rate = fee.value;
 
   const dup = await q<{ symbol: string }>(`select symbol from instruments where symbol=$1`, [symbol]);
   if (dup.length) return { ok: false, error: `${symbol} zaten kayıtlı` };
@@ -123,9 +137,9 @@ export async function addInstrument(formData: FormData): Promise<Result> {
   try {
     await client.query('begin');
     const ins = await client.query<{ id: string }>(
-      `insert into instruments (class_code, symbol, display_name, currency, calendar_code, tax_rate)
-       values ($1,$2,$3,$4,$5,$6) returning id`,
-      [class_code, symbol, display_name, currency, d.calendar, tax_rate]);
+      `insert into instruments (class_code, symbol, display_name, currency, calendar_code, tax_rate, mgmt_fee_rate)
+       values ($1,$2,$3,$4,$5,$6,$7) returning id`,
+      [class_code, symbol, display_name, currency, d.calendar, tax_rate, mgmt_fee_rate]);
     const id = ins.rows[0].id;
     for (const s of sources) {
       await client.query(
@@ -223,27 +237,27 @@ export async function updateInstrument(formData: FormData): Promise<Result> {
   const currency = String(formData.get('currency') || '').trim().toUpperCase();
   if (currency !== 'TRY' && currency !== 'USD') return { ok: false, error: 'Para birimi TRY veya USD olmalı' };
 
-  // Vergi oranı: boş = "girilmedi" (NULL). 0 ayrı bir bilgi ("vergi yok").
-  const taxRaw = String(formData.get('tax_rate') || '').trim().replace(',', '.');
-  let tax_rate: number | null = null;
-  if (taxRaw) {
-    const n = Number(taxRaw);
-    if (!Number.isFinite(n) || n < 0 || n > 100) return { ok: false, error: 'Vergi oranı 0 ile 100 arasında olmalı' };
-    tax_rate = n;
-  }
+  // Boş = "girilmedi" (NULL). 0 ayrı bir bilgi ("kesinti yok").
+  const tax = parseRate(formData.get('tax_rate'), 'Vergi oranı');
+  if ('error' in tax) return { ok: false, error: tax.error };
+  const fee = parseRate(formData.get('mgmt_fee_rate'), 'Yönetim ücreti oranı');
+  if ('error' in fee) return { ok: false, error: fee.error };
+  const tax_rate = tax.value, mgmt_fee_rate = fee.value;
 
   const client = await pool.connect();
   try {
     await client.query('begin');
     if (def) {
       await client.query(
-        `update instruments set display_name=$2, class_code=$3, currency=$4, calendar_code=$5, tax_rate=$6
+        `update instruments set display_name=$2, class_code=$3, currency=$4, calendar_code=$5,
+                tax_rate=$6, mgmt_fee_rate=$7
          where id=$1`,
-        [instrument_id, display_name, class_code, currency, def.calendar, tax_rate]);
+        [instrument_id, display_name, class_code, currency, def.calendar, tax_rate, mgmt_fee_rate]);
     } else {
       await client.query(
-        `update instruments set display_name=$2, class_code=$3, currency=$4, tax_rate=$5 where id=$1`,
-        [instrument_id, display_name, class_code, currency, tax_rate]);
+        `update instruments set display_name=$2, class_code=$3, currency=$4, tax_rate=$5, mgmt_fee_rate=$6
+         where id=$1`,
+        [instrument_id, display_name, class_code, currency, tax_rate, mgmt_fee_rate]);
     }
     if (location !== orig_location) {
       await client.query(

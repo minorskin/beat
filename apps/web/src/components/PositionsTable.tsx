@@ -3,6 +3,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } f
 import { money, conv, num, numInt, numPrice, pct, dateStr, dateTimeStr, curSymbol, type Cur } from '@/lib/format';
 import { byCode, scheduleLabel, tzLabel } from '@/lib/schedule';
 import type { AssetClass, Calendar, DayChange, Position, TxRow, WatchItem } from '@/lib/data';
+import { cutNote } from '@/lib/net';
 import EditInstrument from './EditInstrument';
 import EditTransaction from './EditTransaction';
 
@@ -97,7 +98,7 @@ function WatchRow({ wi, d, className, classes, locations, cal }: {
           <EditInstrument
             id={wi.instrument_id} symbol={wi.symbol} displayName={wi.display_name}
             classCode={wi.class_code} currency={wi.currency} price={wi.price}
-            taxRate={null} txCount={0} positionLocations={[]}
+            taxRate={null} feeRate={null} txCount={0} positionLocations={[]}
             classes={classes} locations={locations}
           />
         </div>
@@ -143,13 +144,15 @@ function FunnelIcon() {
 }
 
 export default function PositionsTable({
-  rows, own, cur, transactions, locations, classes, dayChanges, watchlist, rate, calendars,
+  rows, own, cur, transactions, locations, classes, dayChanges, watchlist, rate, calendars, net,
 }: {
   rows: Position[]; own: boolean; cur: Cur; transactions: Record<string, TxRow[]>;
   locations: string[]; classes: AssetClass[];
   dayChanges: Record<string, DayChange>; watchlist: WatchItem[]; rate: number;
   /** Grup güncelleme planları — hangi satırın ne zaman yenilendiğini açıklar. */
   calendars: Calendar[];
+  /** Değerler kesintili mi geldi — sütun başlığı ve ipuçları bunu söyler. */
+  net: boolean;
 }) {
   const cals = byCode(calendars);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -213,6 +216,12 @@ export default function PositionsTable({
     }
   };
 
+  // Net modda satırdan ne kesildiği. Kesinti TL üzerinde hesaplandı (çevrimden
+  // ÖNCE — yoksa aynı sayı iki yerde farklı yuvarlanır); burada yalnız
+  // görüntüleme birimine çevriliyor.
+  const cutTitle = (p: Position) =>
+    cutNote(own ? p.cut?.own : p.cut?.total, (n) => money(conv(n, cur, rate), cur)) ?? undefined;
+
   const qtyOf = (p: Position) => (own ? p.own_quantity : p.quantity);
   // Değer sorguda iki para biriminde birden hesaplanıyor — burada çevirmiyoruz,
   // üst bardaki seçime karşılık gelen kolonu okuyoruz.
@@ -254,7 +263,7 @@ export default function PositionsTable({
     // yan yana okunsun. İkisi de fiyatın kendi para biriminde (avg_cost,
     // v_holdings'te işlemlerin birim fiyatından türer; girilmemişse 0 → "—").
     { key: 'avgCost', label: 'Ort. Maliyet', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.avg_cost : null) ?? -Infinity },
-    { key: 'value', label: `Değer (${curSymbol(cur)})`, align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? valOf(it.p) : null) ?? -Infinity },
+    { key: 'value', label: `Değer (${curSymbol(cur)})${net ? ' · net' : ''}`, align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? valOf(it.p) : null) ?? -Infinity },
     { key: 'pnl', label: 'Kar/Zarar', align: 'right', cls: 'px-3', sortVal: (it) => (it.kind === 'pos' ? it.p.pnl_pct : null) ?? -Infinity },
     { key: 'weight', label: 'Ağırlık', align: 'right', cls: 'px-3', filter: 'weight', sortVal: (it) => (it.kind === 'pos' ? wOf(it.p) : null) ?? -Infinity },
     // İzlenen satırda "açılış" = izlemeye alındığı tarih; ikisi de bir başlangıç.
@@ -569,7 +578,7 @@ export default function PositionsTable({
                         <EditInstrument
                           id={p.instrument_id} symbol={p.symbol} displayName={p.display_name}
                           classCode={p.class_code} currency={p.currency} price={p.price}
-                          taxRate={p.tax_rate}
+                          taxRate={p.tax_rate} feeRate={p.mgmt_fee_rate}
                           txCount={(transactions[p.instrument_id] ?? []).length}
                           positionLocations={p.locations}
                           classes={classes} locations={locations}
@@ -632,7 +641,12 @@ export default function PositionsTable({
                     {/* Günlük: üstte oran, altında daha küçük puntoyla tutar.
                         Ölçülecek yeni gözlem yoksa (piyasa kapalı, fon NAV'ı
                         gelmemiş) sayı uydurulmaz — "—". */}
-                    <td className="text-right px-3 py-3 tnum whitespace-nowrap">{valOf(p) != null ? money(valOf(p)!, cur) : '—'}</td>
+                    {/* Net modda Değer artık fiyat × adet DEĞİL: kesinti düşülmüş
+                        hâli. Fark sessiz kalmasın diye ipucu brütü ve iki
+                        kalemi tek satırda açıyor. */}
+                    <td className="text-right px-3 py-3 tnum whitespace-nowrap" title={cutTitle(p)}>
+                      {valOf(p) != null ? money(valOf(p)!, cur) : '—'}
+                    </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: pnlColor(p.pnl_pct) }}>
                       {p.pnl_pct != null ? pct(p.pnl_pct) : '—'}
                     </td>

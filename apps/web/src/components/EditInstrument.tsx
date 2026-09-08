@@ -14,11 +14,11 @@ import type { AssetClass } from '@/lib/data';
  * boş açılır ve yalnız kullanıcı gerçekten değiştirirse güncelleme yapılır.
  */
 export default function EditInstrument({
-  id, symbol, displayName, classCode, currency, price, taxRate, txCount,
+  id, symbol, displayName, classCode, currency, price, taxRate, feeRate, txCount,
   positionLocations, classes, locations,
 }: {
   id: string; symbol: string; displayName: string; classCode: string; currency: string;
-  price: number | null; taxRate: number | null;
+  price: number | null; taxRate: number | null; feeRate: number | null;
   txCount: number; positionLocations: string[];
   classes: AssetClass[]; locations: string[];
 }) {
@@ -107,8 +107,11 @@ export default function EditInstrument({
               </select>
             </label>
 
+            {/* Net görünümün iki kesintisi yan yana: aynı biçimde girilirler ama
+                matrahları ayrı — biri kârdan, diğeri tutardan. Ortak açıklama
+                ikisinin altında duruyor. */}
             <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
-              Kâr Vergisi (%) <span style={{ color: 'var(--faint)' }}>— boş: girilmedi</span>
+              Kâr Vergisi (%)
               <input
                 name="tax_rate" type="text" inputMode="decimal"
                 pattern="[0-9]{1,3}([.,][0-9]{1,3})?"
@@ -117,6 +120,23 @@ export default function EditInstrument({
                 className="field mt-1 tnum"
               />
             </label>
+
+            <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
+              Yönetim Ücreti (%)
+              <input
+                name="mgmt_fee_rate" type="text" inputMode="decimal"
+                pattern="[0-9]{1,3}([.,][0-9]{1,3})?"
+                defaultValue={feeRate != null ? String(feeRate) : ''}
+                placeholder="ör. 2" title="0 ile 100 arası bir oran (ör. 2 veya 1,5)"
+                className="field mt-1 tnum"
+              />
+            </label>
+
+            <p className="col-span-2 t-label -mt-1" style={{ color: 'var(--faint)' }}>
+              İkisi de yalnız <b style={{ color: 'var(--muted)' }}>Net</b> görünümde kesilir: vergi
+              kârdan, yönetim ücreti varlığın güncel tutarından. Biri, ikisi ya da hiçbiri
+              olabilir; boş bırakmak “girilmedi” demektir.
+            </p>
 
             <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
               Konum

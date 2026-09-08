@@ -131,7 +131,11 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
               </label>
             )}
 
-            <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
+            {/* Tam genişlik: altındaki açıklama iki satıra sığmıyordu ve yarım
+                sütunda kaldığında bir sonraki satıra taşarak Kâr Vergisi ile
+                Yönetim Ücreti'ni birbirinden ayırıyordu — o ikisi yan yana
+                dursun diye bu alan kendi satırını alıyor. */}
+            <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
               Kur Riski
               {/* Değer TRY/USD kalıyor (şema para birimi bekliyor); etiket
                   kullanıcının sorduğu soruyu soruyor: TL dışı bir para birimine
@@ -145,8 +149,11 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
               </span>
             </label>
 
+            {/* Net görünümün iki kesintisi. Aynı biçimde girilirler ama matrahları
+                ayrı: vergi KÂRDAN, yönetim ücreti GÜNCEL TUTARDAN kesilir — bu
+                yüzden yan yana duruyorlar ve açıklamaları ortak. */}
             <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
-              Kâr Vergisi (%) <span style={{ color: 'var(--faint)' }}>— isteğe bağlı</span>
+              Kâr Vergisi (%)
               {/* type=number DEĞİL: tarayıcı yerel ayarı İngilizce olduğunda
                   "12,5" geçersiz sayılıp alan sessizce boşalıyor. Metin olarak
                   alınıp sunucuda virgül noktaya çevriliyor. */}
@@ -156,10 +163,23 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
                 title="0 ile 100 arası bir oran (ör. 10 veya 12,5)"
                 className="field mt-1 tnum"
               />
-              <span className="block mt-1" style={{ color: 'var(--faint)' }}>
-                Kâr üzerinden kesilecek vergi oranı. Bilmiyorsan boş bırak.
-              </span>
             </label>
+
+            <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
+              Yönetim Ücreti (%)
+              <input
+                name="mgmt_fee_rate" type="text" inputMode="decimal"
+                pattern="[0-9]{1,3}([.,][0-9]{1,3})?" placeholder="ör. 2"
+                title="0 ile 100 arası bir oran (ör. 2 veya 1,5)"
+                className="field mt-1 tnum"
+              />
+            </label>
+
+            <p className="col-span-2 t-label -mt-1" style={{ color: 'var(--faint)' }}>
+              İkisi de yalnız <b style={{ color: 'var(--muted)' }}>Net</b> görünümde kesilir: vergi
+              kârdan, yönetim ücreti varlığın güncel tutarından. Biri, ikisi ya da hiçbiri
+              olabilir; bilmiyorsan boş bırak.
+            </p>
 
             {eff && !isGold && (
               <div className="col-span-2 t-label" style={{ color: 'var(--faint)' }}>

@@ -1,10 +1,14 @@
 import {
   getLatestSnapshot, getPositions, getHistory, getInstruments,
-  getLastFetch, getAssetClasses, getPeriodChanges, getPeriodMovers,
+  getLastFetch, getAssetClasses, getPeriodLegs, getMoverLegs,
   getTransactionsByInstrument, getLocations, getUsdTry, getAnnualClosings,
   getProjectionScenarios, getDayChanges, getWatchlist, getCalendars, livePoint,
   type Change, type Position, type SeriesPoint, type PeriodKey,
 } from '@/lib/data';
+import {
+  buildBook, bySymbol, foldChanges, foldMovers, netDayChanges, netHistory,
+  netPositions, portfolioKeep,
+} from '@/lib/netview';
 import { scheduleLabel } from '@/lib/schedule';
 import { money, conv, num, pct, timeAgoShort, dateTimeStr, type Cur } from '@/lib/format';
 import { concLevel, CONC_HIGH, CONC_MID } from '@/lib/risk';
@@ -26,7 +30,7 @@ import { logout } from './actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ range?: string; own?: string; cur?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ range?: string; own?: string; cur?: string; net?: string }> }) {
   const sp = await searchParams;
   const range = sp.range ?? 'A';
   // ?own=0 → emanet (başkası adına tutulan) pay dahil toplam büyüklük.
@@ -34,14 +38,33 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const own = sp.own !== '0';
   // ?cur=USD → tüm sayfa dolar üzerinden değerlendirilir.
   const cur: Cur = sp.cur === 'USD' ? 'USD' : 'TRY';
+  // ?net=0 → brüt (kesintisiz piyasa değeri). VARSAYILAN net: vergi ve yönetim
+  // ücreti düşülmüş, yani "bugün çıksam elimde ne kalır". Oranı girilmemiş
+  // varlıkta ikisi aynı sayı olduğu için varsayılan kimseyi şaşırtmıyor.
+  const net = sp.net !== '0';
 
-  const [snap, positions, history, instruments, lastFetch, classes, changes, movers, transactions, locations, rate, closings, scenarios, dayChanges, watchlist, calendars] =
+  const [snap, grossPositions, grossHistory, instruments, lastFetch, classes, periodLegs, moverLegs, transactions, locations, rate, closings, scenarios, grossDayChanges, watchlist, calendars] =
     await Promise.all([
       getLatestSnapshot(), getPositions(), getHistory(range), getInstruments(),
-      getLastFetch(), getAssetClasses(), getPeriodChanges(), getPeriodMovers(),
+      getLastFetch(), getAssetClasses(), getPeriodLegs(), getMoverLegs(),
       getTransactionsByInstrument(), getLocations(), getUsdTry(), getAnnualClosings(),
       getProjectionScenarios(), getDayChanges(), getWatchlist(), getCalendars(),
     ]);
+
+  // ── Net / brüt tek noktada uygulanır ────────────────────────────────────
+  // Aşağıdaki her hesap `positions`, `changes`, `movers`, `dayChanges` ve
+  // `history` üzerinden gidiyor; kesinti bu beşine burada girince KPI kartları,
+  // dağılım, grafik, tablo ve projeksiyon kendiliğinden aynı dili konuşuyor.
+  // Defter boşsa (hiçbir varlığa oran girilmemişse) netPositions ve arkadaşları
+  // nesneyi olduğu gibi geçirir — net mod bedava.
+  const book = net ? buildBook(grossPositions, rate) : null;
+  const positions = book ? netPositions(grossPositions, book) : grossPositions;
+  const changes = foldChanges(periodLegs, book);
+  const movers = foldMovers(moverLegs, book);
+  const dayChanges = book ? netDayChanges(grossDayChanges, book) : grossDayChanges;
+  const history = book
+    ? { ...grossHistory, points: netHistory(grossHistory.points, bySymbol(grossPositions, book)) }
+    : grossHistory;
   // İzleme listesi = kataloğa eklenmiş ama pozisyonu olmayan enstrüman
   // (v_watchlist). Hesaba KATILMAZ: portföy büyüklüğü, dağılım, grafik ve
   // dönemsel kartların hepsi `positions`tan besleniyor, bu dizi oraya hiç
@@ -153,9 +176,16 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // "TÜM" aralığı: motor öncesi yıl kapanışları + bugünkü değer. Bu seride
   // varlık kırılımı YOK (kullanıcı o yılları yalnız toplam olarak biliyor),
   // bu yüzden sembol serileri boş geçilir ve grafik tek çizgi çizer.
+  //
+  // Net modda kapanışlar da aynı zemine çekilir. Bu satırlar elle girilmiş
+  // TOPLAMLAR: ne varlık kırılımı ne maliyeti var, yani gerçek kesinti
+  // hesaplanamaz — bugünkü efektif oran geçmişe uygulanıyor. Varsayım olduğu
+  // açık, ama alternatifi kapanışları brüt bırakıp canlı son noktayı net
+  // çizmekti: grafiğin sağ ucunda hiç yaşanmamış bir düşüş görünürdü.
+  const closingKeep = book ? portfolioKeep(grossPositions, positions, own) : 1;
   const yearly: SeriesPoint[] = closings.map((c) => {
-    const t = c.total_value_try;
-    const u = c.total_value_usd ?? (rate > 0 ? t / rate : 0);
+    const t = c.total_value_try * closingKeep;
+    const u = (c.total_value_usd ?? (rate > 0 ? c.total_value_try / rate : 0)) * closingKeep;
     return { ts: `${c.year}-12-31T20:59:59.000Z`, try: t, usd: u, own_try: t, own_usd: u, s: {} };
   });
   // Serinin son noktası da canlı toplam olmalı — yıl kapanışlarının yanına
@@ -227,7 +257,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
         <div className="w-full px-3 sm:px-5 lg:px-8 py-2 sm:py-0 sm:h-14 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <SectionNav />
           <div className="shrink-0 ms-auto">
-            <SettingsMenu cur={cur} own={own} closings={closings} logoutAction={logout} />
+            <SettingsMenu cur={cur} own={own} net={net} closings={closings} logoutAction={logout} />
           </div>
           <RangeSwitcher range={range} />
         </div>
@@ -414,7 +444,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
               rows={rows} own={own} cur={cur} transactions={transactions}
               locations={locations} classes={classes}
               dayChanges={dayChanges} watchlist={watchlist} rate={rate}
-              calendars={calendars} />
+              calendars={calendars} net={net} />
           )}
           </TabPanel>
 

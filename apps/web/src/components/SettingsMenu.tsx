@@ -7,14 +7,14 @@ import type { Cur } from '@/lib/format';
 import type { AnnualClosing } from '@/lib/data';
 
 /**
- * Üst bardaki İngiliz anahtarı. Barda yalnız sürekli dokunulan iki şey kalır
- * (sekmeler ve dönem); görünümü belirleyen ama gün içinde nadiren değişen her
- * şey burada toplanır: büyüklük görünümü, para birimi, yıl kapanışları, çıkış.
+ * Üst bardaki dişli. Barda yalnız sürekli dokunulan iki şey kalır (sekmeler ve
+ * dönem); görünümü belirleyen ama gün içinde nadiren değişen her şey burada
+ * toplanır: büyüklük, net/brüt, para birimi, yıl kapanışları, çıkış.
  */
 export default function SettingsMenu({
-  cur, own, closings, logoutAction,
+  cur, own, net, closings, logoutAction,
 }: {
-  cur: Cur; own: boolean; closings: AnnualClosing[]; logoutAction: () => Promise<void>;
+  cur: Cur; own: boolean; net: boolean; closings: AnnualClosing[]; logoutAction: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [ask, setAsk] = useState(false);
@@ -48,9 +48,25 @@ export default function SettingsMenu({
         aria-label="Ayarlar"
         className={`navlink inline-flex items-center px-2 ${open ? 'navlink-on' : ''}`}
       >
-        <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor"
-          strokeWidth="1.25" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true">
-          <path d="M11.6 1.9a3.6 3.6 0 0 0-4.5 4.5l-4.7 4.7a1.5 1.5 0 0 0 2.1 2.1l4.7-4.7a3.6 3.6 0 0 0 4.5-4.5l-2 2-1.6-.4-.4-1.6 1.9-2.1z" />
+        {/* Dolu dişli. Önceki ikon ince çizgili bir İngiliz anahtarıydı: hem
+            "ayar" demiyordu (tamir/onarım çağrışımı) hem de 15 pikselde tek
+            piksellik konturuyla bardaki diğer öğelerin yanında siliniyordu.
+            Dolu gövde aynı boyutta çok daha fazla mürekkep bırakıyor; dişler
+            merkez etrafında 45°'lik adımlarla dönen aynı dikdörtgen, delik ise
+            evenodd ile deliniyor (ikinci bir renk gerekmesin diye). */}
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <g>
+          <rect x="6.9" y="0.9" width="2.2" height="3.1" rx="0.7" transform="rotate(0 8 8)" />
+          <rect x="6.9" y="0.9" width="2.2" height="3.1" rx="0.7" transform="rotate(45 8 8)" />
+          <rect x="6.9" y="0.9" width="2.2" height="3.1" rx="0.7" transform="rotate(90 8 8)" />
+          <rect x="6.9" y="0.9" width="2.2" height="3.1" rx="0.7" transform="rotate(135 8 8)" />
+          <rect x="6.9" y="0.9" width="2.2" height="3.1" rx="0.7" transform="rotate(180 8 8)" />
+          <rect x="6.9" y="0.9" width="2.2" height="3.1" rx="0.7" transform="rotate(225 8 8)" />
+          <rect x="6.9" y="0.9" width="2.2" height="3.1" rx="0.7" transform="rotate(270 8 8)" />
+          <rect x="6.9" y="0.9" width="2.2" height="3.1" rx="0.7" transform="rotate(315 8 8)" />
+          </g>
+          <path fillRule="evenodd" clipRule="evenodd"
+            d="M8 2.9a5.1 5.1 0 1 0 0 10.2 5.1 5.1 0 0 0 0-10.2zm0 3.05a2.05 2.05 0 1 1 0 4.1 2.05 2.05 0 0 1 0-4.1z" />
         </svg>
       </button>
 
@@ -59,6 +75,16 @@ export default function SettingsMenu({
           <MenuGroup label="Büyüklük">
             <Seg on={own} onClick={() => setParam('own', null)} title="Emanet pay düşülmüş">Bana Ait</Seg>
             <Seg on={!own} onClick={() => setParam('own', '0')}>Toplam</Seg>
+          </MenuGroup>
+
+          {/* Net varsayılan: "elimde ne kalır" günlük kullanımda sorulan soru.
+              Kesinti oranı girilmemiş varlıkta net ile brüt aynı sayıdır, yani
+              varsayılan hiçbir şeyi bozmadan doğru tarafta duruyor. */}
+          <MenuGroup label="Tutar">
+            <Seg on={net} onClick={() => setParam('net', null)}
+              title="Net — vergi ve yönetim ücreti düşülmüş">Net</Seg>
+            <Seg on={!net} onClick={() => setParam('net', '0')}
+              title="Brüt — kesintisiz piyasa değeri">Brüt</Seg>
           </MenuGroup>
 
           <MenuGroup label="Para Birimi">

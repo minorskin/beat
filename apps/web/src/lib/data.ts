@@ -1,4 +1,5 @@
 import { q } from './db';
+import type { Cut } from './net';
 
 export interface Snapshot {
   ts: string; total_value_try: number; total_value_usd: number;
@@ -22,6 +23,16 @@ export interface Position {
   opened_at: string | null; closed_at: string | null; locations: string[];
   // Kâr üzerinden kesilecek vergi oranı (%) — girilmemişse null.
   tax_rate: number | null;
+  // Güncel tutar üzerinden alınan yönetim ücreti oranı (%) — girilmemişse null.
+  // Vergiden ayrı bir kolon çünkü matrahı ayrı: biri kârdan, biri tutardan
+  // kesilir (bkz. migration 0020, lib/net.ts).
+  mgmt_fee_rate: number | null;
+  /**
+   * Net görünümde bu satırdan düşülenler (TL, brüt tutarla birlikte) — ipucu
+   * metni "neden bu sayı" sorusunu buradan cevaplıyor. Brüt görünümde null.
+   * getPositions doldurmaz; lib/netview ekler.
+   */
+  cut?: { total: Cut; own: Cut } | null;
   // Fiyatın kote edildiği birim (prices.currency). currency alanı artık kur
   // riski etiketi olduğu için para birimi bilgisi buradan okunur.
   price_currency: string | null;
@@ -174,7 +185,7 @@ export async function getPositions(): Promise<Position[]> {
     -- v_holdings tahrik eder: elde tutulan HER şey listelenir, motor fiyatı henüz
     -- çekmemiş olsa bile (fiyat/değer/ağırlık null → arayüzde "—"/"bekliyor").
     select i.id as instrument_id, i.symbol, i.display_name, i.class_code, ac.name as class_name, ac.ui_group,
-           i.tax_rate, v.price_currency,
+           i.tax_rate, i.mgmt_fee_rate, v.price_currency,
            v.quantity, v.price, i.currency, v.price_ts,
            i.calendar_code, i.last_fetch_at,
            -- Bayatlık da CANLI: motor durursa fiyat yaşlanır ama snapshot'taki
@@ -379,6 +390,14 @@ export interface DayChange {
    */
   pct_native: number | null;
   abs_try: number; own_abs_try: number; since: string;
+  /**
+   * Ölçünün iki ucu — TL cinsinden BİRİM değer — ve adetler. Net görünüm oranı
+   * ve tutarı yeniden hesaplamak zorunda: kesinti tutarla birlikte değiştiği
+   * için brüt farkı tek bir katsayıyla ölçeklemek doğru sonucu vermez (vergi
+   * yalnız kârdan kesiliyor, ücret tutarın tamamından). Bkz. lib/netview.
+   */
+  unit_base_try: number; unit_now_try: number;
+  quantity: number; own_quantity: number;
 }
 
 export async function getDayChanges(): Promise<Record<string, DayChange>> {
@@ -445,6 +464,8 @@ export async function getDayChanges(): Promise<Record<string, DayChange>> {
       abs_try: d * r.quantity,
       own_abs_try: d * r.own_quantity,
       since: r.base_ts,
+      unit_base_try: r.base_try, unit_now_try: r.now_try,
+      quantity: r.quantity, own_quantity: r.own_quantity,
     };
   }
   return out;
@@ -526,12 +547,29 @@ export async function getLastFetch(): Promise<{ kind: string; status: string; fi
 // Hem toplam hem own_* için; own görünümünde payda da own alınır (yoksa yanlış oran).
 // since = değişimin ÖLÇÜLDÜĞÜ baz gözlemin zamanı. Dönemin tamamına yetecek
 // geçmiş yoksa bu, dönem başı değil elimizdeki EN ESKİ gözlemdir; sayı yine
-// üretilir, hangi tarihten beri ölçüldüğü buradan okunur (bkz. getPeriodChanges).
+// üretilir, hangi tarihten beri ölçüldüğü buradan okunur (bkz. getPeriodLegs).
 export interface Change { abs: number; pct: number | null; since: string | null }
 export type PeriodKey = 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
 export type PeriodChanges = Record<PeriodKey, { total: Change | null; own: Change | null }>;
 
-export async function getPeriodChanges(): Promise<PeriodChanges> {
+/**
+ * Dönemsel değişimin HAM bacakları — enstrüman × dönem.
+ *
+ * Toplama SQL'de değil TypeScript'te yapılıyor (bkz. lib/netview → foldChanges).
+ * Sebep net görünüm: kesinti enstrümanın kendi vergi/ücret oranıyla ve kendi
+ * maliyetiyle hesaplanır, yani toplamı önceden alınmış bir sayıya sonradan
+ * uygulanamaz. Brüt görünüm de aynı yoldan geçiyor — tek kod yolu, iki mod.
+ */
+export interface PeriodLeg {
+  period: PeriodKey; instrument_id: string; base_ts: string;
+  /** Dönem başındaki sepetin O GÜNKÜ ve BUGÜNKÜ değeri (TL). Adet dönem başında sabitlenir. */
+  base_try: number; now_try: number;
+  base_own_try: number; now_own_try: number;
+  /** Dönem başındaki adetler — maliyet matrahı bunlarla kurulur. */
+  quantity: number; own_quantity: number;
+}
+
+export async function getPeriodLegs(): Promise<PeriodLeg[]> {
   // Dönemsel değişim = O DÖNEMİN BAŞINDA elde olan sepetin bugünkü fiyatlarla
   // değeri − o günkü değeri. İki snapshot'ın toplamını çıkarmak yanlıştı:
   // aradaki para yatırma/çekme de "kazanç" görünüyordu (116.000 TL nakde
@@ -546,11 +584,7 @@ export async function getPeriodChanges(): Promise<PeriodChanges> {
   // gözleme düşülür ve sayı oradan üretilir (piyasa uygulamalarının standardı
   // bu — 3 aylık bir hisseye "1 yıl" dendiğinde 3 aylık grafik gelir). Hangi
   // tarihten ölçüldüğü `since` ile taşınır, arayüzde ipucu olarak görünür.
-  const rows = await q<{
-    period: PeriodKey; base_ts: string | null;
-    base_try: number | null; now_try: number | null;
-    base_own: number | null; now_own: number | null;
-  }>(`
+  return q<PeriodLeg>(`
     with fx as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1),
     first_snap as (
       select id, ts from portfolio_snapshots where granularity='hourly' order by ts limit 1
@@ -588,32 +622,16 @@ export async function getPeriodChanges(): Promise<PeriodChanges> {
       from v_latest_price lp
       where lp.price is not null and lp.currency in ('TRY','USD')
     )
-    select b.k as period, max(b.base_ts) as base_ts,
-           sum(bp.value_try)                as base_try,
-           sum(bp.quantity * n.unit_try)    as now_try,
-           sum(bp.own_value_try)            as base_own,
-           sum(bp.own_quantity * n.unit_try) as now_own
+    select b.k as period, bp.instrument_id, b.base_ts,
+           bp.value_try                as base_try,
+           bp.quantity * n.unit_try    as now_try,
+           bp.own_value_try            as base_own_try,
+           bp.own_quantity * n.unit_try as now_own_try,
+           bp.quantity, bp.own_quantity
     from bases b
     join position_snapshots bp on bp.snapshot_id = b.base_id
     join now_unit n on n.instrument_id = bp.instrument_id
-    where n.unit_try is not null
-    group by b.k`);
-
-  const mk = (now: number | null, base: number | null, since: string | null): Change | null =>
-    now == null || base == null
-      ? null
-      : { abs: now - base, pct: base ? ((now - base) / base) * 100 : null, since };
-  const empty = { total: null, own: null };
-  const out: PeriodChanges = {
-    hour: empty, day: empty, week: empty, month: empty, quarter: empty, year: empty,
-  };
-  for (const r of rows) {
-    out[r.period] = {
-      total: mk(r.now_try, r.base_try, r.base_ts),
-      own: mk(r.now_own, r.base_own, r.base_ts),
-    };
-  }
-  return out;
+    where n.unit_try is not null`);
 }
 
 // ── Dönem bazında varlık kâr/zararı (öne çıkanlar kartları) ────────────────
@@ -627,12 +645,22 @@ export async function getPeriodChanges(): Promise<PeriodChanges> {
 export interface MoverRow { symbol: string; pct: number; abs: number; own_abs: number }
 export type PeriodMovers = Record<PeriodKey, MoverRow[]>;
 
-export async function getPeriodMovers(): Promise<PeriodMovers> {
-  const rows = await q<{
-    period: PeriodKey; symbol: string;
-    quantity: number; own_quantity: number;
-    now_unit: number; base_unit: number | null;
-  }>(`
+/**
+ * Öne çıkanların HAM bacakları. PeriodLeg ile aynı gerekçe: oran ve tutar
+ * TypeScript'te üretilir (bkz. lib/netview → foldMovers), çünkü net görünümde
+ * ikisi de enstrümanın kendi kesintisinden geçer.
+ *
+ * Ölçü birim değer: adet farkı (dönem içi alım/satım) oranı bozmasın diye.
+ */
+export interface MoverLeg {
+  period: PeriodKey; instrument_id: string; symbol: string;
+  /** GÜNCEL adetler — tutar bunlarla çarpılır. */
+  quantity: number; own_quantity: number;
+  now_unit: number; base_unit: number | null;
+}
+
+export async function getMoverLegs(): Promise<MoverLeg[]> {
+  return q<MoverLeg>(`
     with fx as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1),
     first_snap as (
       select id, ts from portfolio_snapshots where granularity='hourly' order by ts limit 1
@@ -642,7 +670,7 @@ export async function getPeriodMovers(): Promise<PeriodMovers> {
              ('month', interval '30 days'), ('quarter', interval '90 days'), ('year', interval '365 days')
     ),
     bases as (
-      -- getPeriodChanges ile AYNI geriye düşüş ve AYNI zemin (now()): dönem
+      -- getPeriodLegs ile AYNI geriye düşüş ve AYNI zemin (now()): dönem
       -- başı yoksa en eski gözlem. İki kart aynı dönemi gösteriyor, ölçüleri
       -- de ayrışmamalı.
       select p.k, coalesce(b.id, f.id) as base_id
@@ -668,26 +696,13 @@ export async function getPeriodMovers(): Promise<PeriodMovers> {
       join v_latest_price lp on lp.instrument_id = i.id
       where lp.price is not null and lp.currency in ('TRY','USD')
     )
-    select b.k as period, n.symbol, n.quantity, n.own_quantity,
+    select b.k as period, n.instrument_id, n.symbol, n.quantity, n.own_quantity,
            n.unit_try as now_unit,
            bp.value_try / nullif(bp.quantity, 0) as base_unit
     from bases b
     join position_snapshots bp on bp.snapshot_id = b.base_id
     join now_pos n on n.instrument_id = bp.instrument_id
     where n.unit_try is not null`);
-
-  const out = { hour: [], day: [], week: [], month: [], quarter: [], year: [] } as PeriodMovers;
-  for (const r of rows) {
-    if (r.base_unit == null || r.base_unit === 0) continue;
-    const delta = r.now_unit - r.base_unit;
-    out[r.period].push({
-      symbol: r.symbol,
-      pct: (delta / r.base_unit) * 100,
-      abs: delta * r.quantity,
-      own_abs: delta * r.own_quantity,
-    });
-  }
-  return out;
 }
 
 /**
