@@ -6,8 +6,7 @@ import {
   type Change, type Position, type SeriesPoint, type PeriodKey,
 } from '@/lib/data';
 import {
-  buildBook, bySymbol, foldChanges, foldMovers, netDayChanges, netHistory,
-  netPositions, portfolioKeep,
+  buildBook, bySymbol, foldChanges, foldMovers, netDayChanges, netHistory, netPositions,
 } from '@/lib/netview';
 import { scheduleLabel } from '@/lib/schedule';
 import { money, conv, num, pct, timeAgoShort, dateTimeStr, type Cur } from '@/lib/format';
@@ -177,15 +176,16 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // varlık kırılımı YOK (kullanıcı o yılları yalnız toplam olarak biliyor),
   // bu yüzden sembol serileri boş geçilir ve grafik tek çizgi çizer.
   //
-  // Net modda kapanışlar da aynı zemine çekilir. Bu satırlar elle girilmiş
-  // TOPLAMLAR: ne varlık kırılımı ne maliyeti var, yani gerçek kesinti
-  // hesaplanamaz — bugünkü efektif oran geçmişe uygulanıyor. Varsayım olduğu
-  // açık, ama alternatifi kapanışları brüt bırakıp canlı son noktayı net
-  // çizmekti: grafiğin sağ ucunda hiç yaşanmamış bir düşüş görünürdü.
-  const closingKeep = book ? portfolioKeep(grossPositions, positions, own) : 1;
+  // Kapanışlar NET MODDA DA BRÜT kalır. Bu satırlar elle girilmiş toplamlar:
+  // ne varlık kırılımı ne maliyeti var, yani o yılların gerçek kesintisi
+  // hesaplanamaz. Bugünkü efektif oranı geçmişe uygulamak sayıyı sürekli
+  // gösterirdi ama uydurma olurdu — girilmemiş bir veriyi varsayımla doldurmak
+  // yerine kullanıcının girdiği sayı olduğu gibi duruyor. Son nokta ise canlı
+  // pozisyonlardan geldiği için net; net modda serinin sağ ucundaki kırılma
+  // bir çizim hatası değil, tam da kesintinin kendisi.
   const yearly: SeriesPoint[] = closings.map((c) => {
-    const t = c.total_value_try * closingKeep;
-    const u = (c.total_value_usd ?? (rate > 0 ? c.total_value_try / rate : 0)) * closingKeep;
+    const t = c.total_value_try;
+    const u = c.total_value_usd ?? (rate > 0 ? t / rate : 0);
     return { ts: `${c.year}-12-31T20:59:59.000Z`, try: t, usd: u, own_try: t, own_usd: u, s: {} };
   });
   // Serinin son noktası da canlı toplam olmalı — yıl kapanışlarının yanına

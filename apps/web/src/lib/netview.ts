@@ -245,17 +245,3 @@ export function netDayChanges(
   return out;
 }
 
-/**
- * Portföyün bütününde kesintiden sonra kalan oran.
- *
- * Yalnız YIL KAPANIŞLARI için: o satırlar elle girilmiş toplamlar, ne kırılımı
- * ne maliyeti var — varlık bazında kesinti hesaplanamaz. Bugünkü efektif oranı
- * geçmişe uygulamak bir VARSAYIM; alternatifi, net modda "TÜM" grafiğinin son
- * noktasında sahte bir düşüş çizmesiydi (kapanışlar brüt, canlı nokta net).
- */
-export function portfolioKeep(gross: Position[], net: Position[], own: boolean): number {
-  const sum = (list: Position[]) =>
-    list.reduce((a, p) => a + ((own ? p.own_value_try : p.value_try) ?? 0), 0);
-  const g = sum(gross);
-  return g > 0 ? sum(net) / g : 1;
-}
