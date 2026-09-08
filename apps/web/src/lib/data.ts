@@ -328,6 +328,37 @@ export async function getHistory(range: string): Promise<HistoryBundle> {
   return { points: [...byTs.values()], symbols: [...symbols].sort() };
 }
 
+/**
+ * Pozisyonlardan üretilen CANLI seri noktası — grafiğin sağ ucu.
+ *
+ * Geçmiş yalnız snapshot'tan gelebilir (saat başı yazılır) ama SON nokta
+ * beklemek zorunda değil: kartlar ve Varlık tablosu canlı okuduğu için
+ * grafiğin sağ ucu snapshot'tan çizildiğinde aynı sayfa iki farklı toplam
+ * gösteriyordu — bir işlem girildikten sonra tablo yeni adedi, grafik eski
+ * adedi anlatıyordu. "TÜM" aralığı bunu zaten yapıyordu (yıl kapanışları +
+ * bugün); buradaki yardımcı aynı noktayı varlık kırılımıyla birlikte üretir.
+ *
+ * Fiyatı bekleyen pozisyonun değeri 0 yazılır — grafik birim değeri 0 olan
+ * sembolü zaten atlar (bkz. PortfolioChart → unitOf), sahte bir düşüş çizmez.
+ */
+export function livePoint(positions: Position[]): SeriesPoint {
+  const sum = (f: (p: Position) => number | null) =>
+    positions.reduce((a, p) => a + (f(p) ?? 0), 0);
+  const s: Record<string, SymPoint> = {};
+  for (const p of positions) {
+    s[p.symbol] = [
+      p.value_try ?? 0, p.value_usd ?? 0, p.own_value_try ?? 0, p.own_value_usd ?? 0,
+      p.quantity, p.own_quantity,
+    ];
+  }
+  return {
+    ts: new Date().toISOString(),
+    try: sum((p) => p.value_try), usd: sum((p) => p.value_usd),
+    own_try: sum((p) => p.own_value_try), own_usd: sum((p) => p.own_value_usd),
+    s,
+  };
+}
+
 // ── Günlük değişim (TR saatiyle bugün 00:00'dan bu yana) ─────────────────
 /**
  * Bir enstrümanın bugünkü hareketi. Ölçü TL cinsinden BİRİM DEĞER: dolar
@@ -520,9 +551,7 @@ export async function getPeriodChanges(): Promise<PeriodChanges> {
     base_try: number | null; now_try: number | null;
     base_own: number | null; now_own: number | null;
   }>(`
-    with cur as (
-      select id, ts from portfolio_snapshots where granularity='hourly' order by ts desc limit 1
-    ),
+    with fx as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1),
     first_snap as (
       select id, ts from portfolio_snapshots where granularity='hourly' order by ts limit 1
     ),
@@ -532,26 +561,32 @@ export async function getPeriodChanges(): Promise<PeriodChanges> {
     ),
     bases as (
       -- coalesce = geriye düşüş: dönem başına ait snapshot yoksa en eskisi.
-      -- Tek snapshot varken baz = güncel olurdu; o durumda satır elenir
-      -- (kendisiyle karşılaştırılan sıfır bir ölçü değil, gürültüdür).
+      -- Ölçünün "şimdi" ucu artık canlı fiyat olduğu için dönem başı da
+      -- son snapshot'a değil now()'a göre aranıyor; ikisi ayrı zeminde
+      -- olsaydı "son 1 saat" aslında "son snapshot'tan bir saat önce"yi
+      -- ölçerdi.
       select p.k,
              coalesce(b.id, f.id) as base_id,
              coalesce(b.ts, f.ts) as base_ts
       from periods p
-      cross join cur c
       cross join first_snap f
       left join lateral (
         select ps.id, ps.ts from portfolio_snapshots ps
-        where ps.granularity='hourly' and ps.ts <= c.ts - p.iv
+        where ps.granularity='hourly' and ps.ts <= now() - p.iv
         order by ps.ts desc limit 1
       ) b on true
-      where coalesce(b.id, f.id) <> c.id
     ),
     -- Bugünkü BİRİM değer (TL cinsinden fiyat). Adet değil fiyat taşınır.
+    --
+    -- Kaynak SNAPSHOT DEĞİL canlı fiyat: snapshot saat başı yazılıyor, o
+    -- yüzden bu kartlar Varlık tablosundan bir saate kadar geride
+    -- kalabiliyordu. Çevrim kuralı getPositions ile birebir aynı — fiyatın
+    -- kendi para birimi esas, TRY/USD dışı kotasyon fiyatsız sayılır.
     now_unit as (
-      select pos.instrument_id, pos.value_try / nullif(pos.quantity, 0) as unit_try
-      from position_snapshots pos join cur c on c.id = pos.snapshot_id
-      where pos.quantity <> 0
+      select lp.instrument_id,
+             lp.price * (case when lp.currency='USD' then (select rate from fx) else 1 end) as unit_try
+      from v_latest_price lp
+      where lp.price is not null and lp.currency in ('TRY','USD')
     )
     select b.k as period, max(b.base_ts) as base_ts,
            sum(bp.value_try)                as base_try,
@@ -598,9 +633,7 @@ export async function getPeriodMovers(): Promise<PeriodMovers> {
     quantity: number; own_quantity: number;
     now_unit: number; base_unit: number | null;
   }>(`
-    with cur as (
-      select id, ts from portfolio_snapshots where granularity='hourly' order by ts desc limit 1
-    ),
+    with fx as (select rate from fx_rates where base='USD' and quote='TRY' order by ts desc limit 1),
     first_snap as (
       select id, ts from portfolio_snapshots where granularity='hourly' order by ts limit 1
     ),
@@ -609,32 +642,31 @@ export async function getPeriodMovers(): Promise<PeriodMovers> {
              ('month', interval '30 days'), ('quarter', interval '90 days'), ('year', interval '365 days')
     ),
     bases as (
-      -- getPeriodChanges ile AYNI geriye düşüş: dönem başı yoksa en eski
-      -- gözlem. İki kart aynı dönemi gösteriyor, ölçüleri de ayrışmamalı.
+      -- getPeriodChanges ile AYNI geriye düşüş ve AYNI zemin (now()): dönem
+      -- başı yoksa en eski gözlem. İki kart aynı dönemi gösteriyor, ölçüleri
+      -- de ayrışmamalı.
       select p.k, coalesce(b.id, f.id) as base_id
       from periods p
-      cross join cur c
       cross join first_snap f
       left join lateral (
         select ps.id from portfolio_snapshots ps
-        where ps.granularity='hourly' and ps.ts <= c.ts - p.iv
+        where ps.granularity='hourly' and ps.ts <= now() - p.iv
         order by ps.ts desc limit 1
       ) b on true
-      where coalesce(b.id, f.id) <> c.id
     ),
     now_pos as (
-      -- Birim değer snapshot'tan (dönem başıyla aynı ölçü), ADET ise
-      -- v_holdings'ten canlı: tutar "bugün elimde olan adetle bu dönemde ne
-      -- kazandım" demek. Snapshot adedi saat başı yazıldığı için az önce
-      -- girilen bir işlemi görmüyordu.
-      select pos.instrument_id, i.symbol,
-             coalesce(h.quantity, pos.quantity)         as quantity,
-             coalesce(h.own_quantity, pos.own_quantity) as own_quantity,
-             pos.value_try / nullif(pos.quantity, 0) as unit_try
-      from position_snapshots pos
-      join cur c on c.id = pos.snapshot_id
-      join instruments i on i.id = pos.instrument_id
-      left join v_holdings h on h.instrument_id = pos.instrument_id
+      -- Birim değer de adet de CANLI (v_latest_price + v_holdings). İkisi de
+      -- saat başı snapshot'tan okunurken az önce girilen bir işlem bu karta
+      -- bir sonraki tura kadar hiç girmiyordu; Varlık tablosu canlı olduğu
+      -- için iki sayfa farklı şey söylüyordu.
+      select i.id as instrument_id, i.symbol,
+             coalesce(h.quantity, 0)     as quantity,
+             coalesce(h.own_quantity, 0) as own_quantity,
+             lp.price * (case when lp.currency='USD' then (select rate from fx) else 1 end) as unit_try
+      from instruments i
+      left join v_holdings h on h.instrument_id = i.id
+      join v_latest_price lp on lp.instrument_id = i.id
+      where lp.price is not null and lp.currency in ('TRY','USD')
     )
     select b.k as period, n.symbol, n.quantity, n.own_quantity,
            n.unit_try as now_unit,

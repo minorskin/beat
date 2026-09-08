@@ -2,7 +2,7 @@ import {
   getLatestSnapshot, getPositions, getHistory, getInstruments,
   getLastFetch, getAssetClasses, getPeriodChanges, getPeriodMovers,
   getTransactionsByInstrument, getLocations, getUsdTry, getAnnualClosings,
-  getProjectionScenarios, getDayChanges, getWatchlist, getCalendars,
+  getProjectionScenarios, getDayChanges, getWatchlist, getCalendars, livePoint,
   type Change, type Position, type SeriesPoint, type PeriodKey,
 } from '@/lib/data';
 import { scheduleLabel } from '@/lib/schedule';
@@ -167,6 +167,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     });
   }
   const isAll = range === 'TÜM';
+
+  // Geçmiş serinin sağ ucuna CANLI nokta eklenir. Snapshot saat başı yazılıyor;
+  // arada bir işlem girildiğinde ya da fiyat güncellendiğinde grafik bir saate
+  // kadar geride kalıyor, kartlar ile Varlık tablosu ise çoktan yeni sayıyı
+  // gösteriyordu — aynı sayfa iki farklı toplam anlatıyordu. Nokta `positions`
+  // ile ÜRETİLİR, yani birinci karttaki büyüklükle birebir aynı sayıdır.
+  // Yeni eklenmiş bir varlık henüz hiçbir snapshot'ta yok; sembol listesi de
+  // bu yüzden canlı noktayla birleştiriliyor, yoksa çizgisi hiç çizilmezdi.
+  const live = positions.length ? livePoint(positions) : null;
+  const points = live ? [...history.points, live] : history.points;
+  const chartSymbols = live
+    ? [...new Set([...history.symbols, ...Object.keys(live.s)])].sort()
+    : history.symbols;
 
   // Birinci karttaki değişim satırları da üst bardaki DÖNEM anahtarına bağlı —
   // sayfanın tek zaman ekseni o. Daha önce bu iki satır "pozisyon açıldığından
@@ -354,8 +367,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-3 sm:mb-4">
             <div className="lg:col-span-2 min-w-0">
               <PortfolioChart
-                data={isAll ? yearly : history.points}
-                symbols={isAll ? [] : history.symbols}
+                data={isAll ? yearly : points}
+                symbols={isAll ? [] : chartSymbols}
                 yearly={isAll}
                 symbolCurrency={symbolCurrency}
                 currency={cur} own={own} />
