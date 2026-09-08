@@ -101,9 +101,9 @@ export default function EditInstrument({
 
             <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
               Kur Riski
-              <select name="currency" defaultValue={currency} className="field mt-1 tnum">
-                <option value="TRY">TRY</option>
-                <option value="USD">USD</option>
+              <select name="currency" defaultValue={currency} className="field mt-1">
+                <option value="TRY">Yok</option>
+                <option value="USD">Var</option>
               </select>
             </label>
 

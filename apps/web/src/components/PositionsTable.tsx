@@ -81,7 +81,7 @@ function CurrencyDot({ currency }: { currency: string }) {
 
 /**
  * İzlenen enstrüman satırı. Pozisyonlarla AYNI listede ve aynı sütun düzeninde
- * durur; ayrımı soluk ton ile Adet sütunundaki "izleniyor" taşır. Adet olmadığı
+ * durur; ayrımı soluk ton ile Adet sütunundaki "İzleme" taşır. Adet olmadığı
  * için değer, K/Z ve ağırlık hesaplanmaz — ve hiçbir toplama girmez.
  */
 function WatchRow({ wi, d, className, classes, locations, cal }: {
@@ -120,7 +120,7 @@ function WatchRow({ wi, d, className, classes, locations, cal }: {
       {/* Adet yerine ne olduğunu söyleyen tek kelime: boş satır bozuk veri gibi durur. */}
       <td className="px-3 py-3 text-center"><CurrencyDot currency={wi.currency} /></td>
       <td className="px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>izleniyor</td>
+      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>İzleme</td>
       <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
       {/* Günlük oran var (fiyatı çekiliyor); tutar yok, elde adet yok. */}
       <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
@@ -226,7 +226,7 @@ export default function PositionsTable({
   // Pozisyonlar ve izlenen enstrümanlar TEK liste. Ayrı bölüm yok: sıralama ve
   // filtre ikisini birlikte gezdiriyor, izlenen satır da kendi fiyatına ya da
   // günlük değişimine göre listenin ortasına oturabiliyor. Ayrımı taşıyan tek
-  // şey satırın kendi görünümü (soluk ton + Adet sütununda "izleniyor").
+  // şey satırın kendi görünümü (soluk ton + Adet sütununda "İzleme").
   const classNameOf = (code: string) => classes.find((c) => c.code === code)?.name ?? code;
   const items: Item[] = [
     ...rows.map((p): Item => ({ kind: 'pos', id: p.instrument_id, p })),

@@ -14,10 +14,10 @@ export const metadata: Metadata = {
     // adresin de değişmesi gerekir. İkon her değiştiğinde bu sayı artırılmalı
     // (manifest.webmanifest'teki değerlerle AYNI kalsın).
     icon: [
-      { url: '/icon.svg?v=3', type: 'image/svg+xml' },
-      { url: '/icon-192.png?v=3', sizes: '192x192', type: 'image/png' },
+      { url: '/icon.svg?v=4', type: 'image/svg+xml' },
+      { url: '/icon-192.png?v=4', sizes: '192x192', type: 'image/png' },
     ],
-    apple: '/apple-touch-icon.png?v=3',
+    apple: '/apple-touch-icon.png?v=4',
   },
 };
 export const viewport: Viewport = {

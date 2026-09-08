@@ -133,12 +133,15 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
 
             <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
               Kur Riski
-              <select name="currency" key={eff?.currency ?? 'x'} defaultValue={eff?.currency ?? 'TRY'} className="field mt-1 tnum">
-                <option value="TRY">TRY</option>
-                <option value="USD">USD</option>
+              {/* Değer TRY/USD kalıyor (şema para birimi bekliyor); etiket
+                  kullanıcının sorduğu soruyu soruyor: TL dışı bir para birimine
+                  bağlı mı, değil mi. */}
+              <select name="currency" key={eff?.currency ?? 'x'} defaultValue={eff?.currency ?? 'TRY'} className="field mt-1">
+                <option value="TRY">Yok</option>
+                <option value="USD">Var</option>
               </select>
               <span className="block mt-1" style={{ color: 'var(--faint)' }}>
-                Varlığın hangi para birimine bağlı olduğu. Gruba göre seçili gelir, gerekirse değiştir.
+                Varlık TL dışı bir para birimine bağlıysa “Var”. Gruba göre seçili gelir, gerekirse değiştir.
               </span>
             </label>
 
