@@ -7,18 +7,26 @@
  *   yönetim ücreti — GÜNCEL TUTAR üzerinden (matrah = varlığın bugünkü değeri)
  *   vergi          — KÂR üzerinden          (matrah = değer − maliyet)
  *
- * ── Sıra neden bu ────────────────────────────────────────────────────────
- * Ücret önce, vergi sonra. Yönetim ücreti yönetilen varlığın büyüklüğünden
- * alınır; verginin olup olmaması onu ilgilendirmez, o yüzden matrahı brüt
- * değerdir ("vergi hariç"). Vergi ise kazancın üzerinden alınır ve yönetim
- * ücreti kazancı azaltan bir GİDERDİR — ücret ödendikten sonra geriye kalan
- * kadar kâr etmişsindir. Ters sırada (önce vergi) aynı paradan iki kez kesinti
- * yapılır, yani gerçekte olmayan bir yük çıkar.
+ * ── İkisi PARALEL, ardışık değil ─────────────────────────────────────────
+ * Vergi matrahı ÜCRET DÜŞÜLMEDEN önceki kârdır. İlk yazımda ücreti kârı azaltan
+ * bir gider sayıp vergiyi ondan sonra hesaplıyordum; banka ekranıyla
+ * karşılaştırınca yanlış olduğu görüldü (TLY'de 32.494 ₺, DFI'de 8.345 ₺ eksik
+ * stopaj).
+ *
+ * Sebep TEFAS fonlarının mekaniğinde: yönetim ücreti yatırımcıdan ayrıca
+ * alınmaz, fon varlığından HER GÜN yıllık oranın 1/365'i kadar kesilir ve fiyat
+ * bu kesintiden SONRA oluşur. Yani ücret zaten birim pay değerinin içindedir;
+ * stopajın matrahı da sadece "satış bedeli − alış bedeli" olur, ücret ikinci kez
+ * indirim konusu edilmez.
  *
  *   ücret = değer × ücret_oranı
- *   kâr   = (değer − ücret) − maliyet
+ *   kâr   = değer − maliyet          ← ücret BURADA düşülmez
  *   vergi = kâr > 0 ? kâr × vergi_oranı : 0
  *   net   = değer − ücret − vergi
+ *
+ * NOT: ücret fiyatın içinde olduğu için onu bir kez daha düşmek, TEFAS fonları
+ * söz konusu olduğunda ikinci kez saymak demektir. Alan yine de kullanıcının
+ * isteğiyle duruyor — girilmezse (null) hiçbir şey kesilmez.
  *
  * ── Zarardan vergi kesilmez ──────────────────────────────────────────────
  * Kâr negatifse vergi 0. Negatif vergiyi (iade) yazmak, portföyü olduğundan
@@ -68,9 +76,10 @@ export function cutOf(value: number, cost: number | null, l: Levy): Cut {
   if (!Number.isFinite(value) || value <= 0 || !hasLevy(l)) return none;
 
   const fee = value * ((l.fee ?? 0) / 100);
-  const afterFee = value - fee;
   const known = cost != null && cost > 0;
-  const gain = known ? afterFee - cost : null;
+  // Matrah brüt kâr: ücret fiyatın içinde zaten kesilmiş durumda (yukarı bkz.),
+  // burada bir kez daha düşülürse stopaj olduğundan küçük çıkar.
+  const gain = known ? value - cost : null;
   const tax = gain != null && gain > 0 ? gain * ((l.tax ?? 0) / 100) : 0;
   return {
     gross: value,
