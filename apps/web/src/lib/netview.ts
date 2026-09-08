@@ -6,27 +6,27 @@
  * tablosu aynı sayıyı iki farklı yerde hesaplarsa er geç ayrışırlar.
  *
  * ── Kesinti neden burada, SQL'de değil ───────────────────────────────────
- * Vergi kârdan, yönetim ücreti tutardan kesilir (bkz. lib/net.ts). İkisi de
- * enstrümanın KENDİ oranına ve KENDİ maliyetine bağlı, yani "önce topla sonra
- * kes" yanlış sonuç verir: vergisi olan bir varlığın kârı, vergisi olmayan bir
- * varlığın zararıyla toplandığında matrah kaybolur. Bu yüzden toplama işi
- * SQL'den alınıp buraya taşındı; sorgular enstrüman × dönem ham bacak döndürür.
+ * Stopaj enstrümanın KENDİ oranına ve KENDİ maliyetine bağlı, yani "önce topla
+ * sonra kes" yanlış sonuç verir: vergisi olan bir varlığın kârı, vergisi
+ * olmayan bir varlığın zararıyla toplandığında matrah kaybolur. Bu yüzden
+ * toplama işi SQL'den alınıp buraya taşındı; sorgular enstrüman × dönem ham
+ * bacak döndürür.
  *
  * ── Geçmişte maliyet yok ─────────────────────────────────────────────────
  * position_snapshots adet ve değer tutar, maliyet TUTMAZ. Geçmiş bir noktanın
  * vergisi için matrah gerektiğinden BUGÜNKÜ ortalama birim maliyet kullanılır
  * (unitCostTry × o günkü adet). Yaklaşık bir sayıdır: araya giren alımlar
- * ortalama maliyeti kaydırmış olabilir. Yönetim ücreti tarafında yaklaşıklık
- * yok — matrahı zaten o günkü değerin kendisi.
+ * ortalama maliyeti kaydırmış olabilir.
  */
-import { cutOf, hasLevy, keepRatio, type Levy } from './net';
+import { cutOf, hasTax, keepRatio } from './net';
 import type {
   Change, DayChange, MoverLeg, MoverRow, PeriodChanges, PeriodKey, PeriodLeg,
   PeriodMovers, Position, SeriesPoint, SymPoint,
 } from './data';
 
 export interface BookEntry {
-  levy: Levy;
+  /** Kâr üzerinden kesilecek stopaj oranı (%). */
+  taxRate: number | null;
   /** Ortalama maliyet, TL/birim. Alış fiyatı girilmemişse null (meçhul). */
   unitCostTry: number | null;
 }
@@ -44,11 +44,12 @@ const EMPTY_PERIODS = (): PeriodKey[] => ['hour', 'day', 'week', 'month', 'quart
 export function buildBook(positions: Position[], rate: number): Book {
   const book: Book = new Map();
   for (const p of positions) {
-    const levy: Levy = { tax: p.tax_rate, fee: p.mgmt_fee_rate };
-    if (!hasLevy(levy)) continue; // oranı olmayan varlık defterde yer tutmaz
+    // Yönetim ücreti defterde YOK: fon fiyatına zaten yansımış bir kalem,
+    // kesinti üretmez (bkz. lib/net.ts). Yalnız stopaj oranı hesaba girer.
+    if (!hasTax(p.tax_rate)) continue; // oranı olmayan varlık defterde yer tutmaz
     const fx = p.price_currency === 'USD' ? rate : 1;
     book.set(p.instrument_id, {
-      levy,
+      taxRate: p.tax_rate,
       unitCostTry: p.avg_cost != null && p.avg_cost > 0 ? p.avg_cost * fx : null,
     });
   }
@@ -71,15 +72,15 @@ export function bySymbol(positions: Position[], book: Book): Map<string, BookEnt
  * Fiyat ve ortalama maliyet DOKUNULMADAN kalır: ikisi de fiyat, değer değil —
  * "bir gram altın kaç lira" sorusunun cevabı vergiye göre değişmez. Değer
  * sütununun artık fiyat × adet'e eşit olmaması bunun sonucu; satırın ipucu
- * metni farkı brüt/ücret/vergi olarak açıyor (bkz. Position.cut).
+ * metni farkı brüt/vergi olarak açıyor (bkz. Position.cut).
  */
 export function netPositions(positions: Position[], book: Book): Position[] {
   const out = positions.map((p) => {
     const e = book.get(p.instrument_id);
     if (!e) return p;
 
-    const t = cutOf(p.value_try ?? 0, p.cost_try, e.levy);
-    const o = cutOf(p.own_value_try ?? 0, p.own_cost_try, e.levy);
+    const t = cutOf(p.value_try ?? 0, p.cost_try, e.taxRate);
+    const o = cutOf(p.own_value_try ?? 0, p.own_cost_try, e.taxRate);
     const kt = keepRatio(t), ko = keepRatio(o);
     // Oran, adetten bağımsız: değer de maliyet de adetle ölçeklenir, kesinti de.
     // Bu yüzden hangi boyutun payı varsa oradan okunur (tamamı borç verilmiş
@@ -132,8 +133,8 @@ export function netHistory(points: SeriesPoint[], book: Map<string, BookEntry>):
       const e = book.get(sym);
       if (!e) { s[sym] = v; continue; }
       const [vt, vu, ot, ou, qty, oqty] = v;
-      const ct = cutOf(vt, e.unitCostTry != null ? e.unitCostTry * qty : null, e.levy);
-      const co = cutOf(ot, e.unitCostTry != null ? e.unitCostTry * oqty : null, e.levy);
+      const ct = cutOf(vt, e.unitCostTry != null ? e.unitCostTry * qty : null, e.taxRate);
+      const co = cutOf(ot, e.unitCostTry != null ? e.unitCostTry * oqty : null, e.taxRate);
       const kt = keepRatio(ct), ko = keepRatio(co);
       s[sym] = [ct.net, vu * kt, co.net, ou * ko, qty, oqty];
       dTry += vt - ct.net; dUsd += vu * (1 - kt);
@@ -166,10 +167,10 @@ export function foldChanges(legs: PeriodLeg[], book: Book | null): PeriodChanges
     } else {
       const c = e.unitCostTry != null ? e.unitCostTry * l.quantity : null;
       const co = e.unitCostTry != null ? e.unitCostTry * l.own_quantity : null;
-      a.base += cutOf(l.base_try, c, e.levy).net;
-      a.now += cutOf(l.now_try, c, e.levy).net;
-      a.baseOwn += cutOf(l.base_own_try, co, e.levy).net;
-      a.nowOwn += cutOf(l.now_own_try, co, e.levy).net;
+      a.base += cutOf(l.base_try, c, e.taxRate).net;
+      a.now += cutOf(l.now_try, c, e.taxRate).net;
+      a.baseOwn += cutOf(l.base_own_try, co, e.taxRate).net;
+      a.nowOwn += cutOf(l.now_own_try, co, e.taxRate).net;
     }
     acc.set(l.period, a);
   }
@@ -206,7 +207,7 @@ export function foldMovers(legs: MoverLeg[], book: Book | null): PeriodMovers {
       };
     } else {
       const netAt = (unit: number, qty: number) =>
-        cutOf(unit * qty, e.unitCostTry != null ? e.unitCostTry * qty : null, e.levy).net;
+        cutOf(unit * qty, e.unitCostTry != null ? e.unitCostTry * qty : null, e.taxRate).net;
       const ub = netAt(l.base_unit, 1), un = netAt(l.now_unit, 1);
       row = {
         symbol: l.symbol,
@@ -233,7 +234,7 @@ export function netDayChanges(
     const e = book.get(id);
     if (!e) { out[id] = d; continue; }
     const netAt = (unit: number, qty: number) =>
-      cutOf(unit * qty, e.unitCostTry != null ? e.unitCostTry * qty : null, e.levy).net;
+      cutOf(unit * qty, e.unitCostTry != null ? e.unitCostTry * qty : null, e.taxRate).net;
     const ub = netAt(d.unit_base_try, 1), un = netAt(d.unit_now_try, 1);
     out[id] = {
       ...d,

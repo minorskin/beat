@@ -149,9 +149,10 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
               </span>
             </label>
 
-            {/* Net görünümün iki kesintisi. Aynı biçimde girilirler ama matrahları
-                ayrı: vergi KÂRDAN, yönetim ücreti GÜNCEL TUTARDAN kesilir — bu
-                yüzden yan yana duruyorlar ve açıklamaları ortak. */}
+            {/* İkisi de yüzde ama işlevleri ayrı: vergi net görünümde kârdan
+                kesilir, yönetim ücreti hiçbir şey kesmez — fon fiyatına zaten
+                günlük yansıdığı için künye bilgisidir. Yan yana duruyorlar,
+                farkı altlarındaki ortak açıklama söylüyor. */}
             <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
               Kâr Vergisi (%)
               {/* type=number DEĞİL: tarayıcı yerel ayarı İngilizce olduğunda
@@ -176,9 +177,10 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
             </label>
 
             <p className="col-span-2 t-label -mt-1" style={{ color: 'var(--faint)' }}>
-              İkisi de yalnız <b style={{ color: 'var(--muted)' }}>Net</b> görünümde kesilir: vergi
-              kârdan, yönetim ücreti varlığın güncel tutarından. Biri, ikisi ya da hiçbiri
-              olabilir; bilmiyorsan boş bırak.
+              <b style={{ color: 'var(--muted)' }}>Vergi</b> yalnız Net görünümde, kârdan kesilir.
+              <b style={{ color: 'var(--muted)' }}> Yönetim ücreti</b> hiçbir yerden kesilmez: fon
+              varlığından her gün kesilip fiyata yansıdığı için çekilen fiyat ondan zaten
+              arınmıştır — burada yalnız künye bilgisi olarak durur. İkisi de isteğe bağlı.
             </p>
 
             {eff && !isGold && (

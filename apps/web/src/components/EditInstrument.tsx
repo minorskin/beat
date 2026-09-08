@@ -107,9 +107,9 @@ export default function EditInstrument({
               </select>
             </label>
 
-            {/* Net görünümün iki kesintisi yan yana: aynı biçimde girilirler ama
-                matrahları ayrı — biri kârdan, diğeri tutardan. Ortak açıklama
-                ikisinin altında duruyor. */}
+            {/* İkisi de yüzde ama işlevleri ayrı: vergi net görünümde kârdan
+                kesilir, yönetim ücreti hiçbir şey kesmez (fiyata zaten dahil).
+                Farkı altlarındaki ortak açıklama söylüyor. */}
             <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
               Kâr Vergisi (%)
               <input
@@ -133,9 +133,10 @@ export default function EditInstrument({
             </label>
 
             <p className="col-span-2 t-label -mt-1" style={{ color: 'var(--faint)' }}>
-              İkisi de yalnız <b style={{ color: 'var(--muted)' }}>Net</b> görünümde kesilir: vergi
-              kârdan, yönetim ücreti varlığın güncel tutarından. Biri, ikisi ya da hiçbiri
-              olabilir; boş bırakmak “girilmedi” demektir.
+              <b style={{ color: 'var(--muted)' }}>Vergi</b> yalnız Net görünümde, kârdan kesilir.
+              <b style={{ color: 'var(--muted)' }}> Yönetim ücreti</b> hiçbir yerden kesilmez: fon
+              varlığından her gün kesilip fiyata yansıdığı için çekilen fiyat ondan zaten
+              arınmıştır — künye bilgisi olarak durur. Boş bırakmak “girilmedi” demektir.
             </p>
 
             <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>

@@ -23,9 +23,10 @@ export interface Position {
   opened_at: string | null; closed_at: string | null; locations: string[];
   // Kâr üzerinden kesilecek vergi oranı (%) — girilmemişse null.
   tax_rate: number | null;
-  // Güncel tutar üzerinden alınan yönetim ücreti oranı (%) — girilmemişse null.
-  // Vergiden ayrı bir kolon çünkü matrahı ayrı: biri kârdan, biri tutardan
-  // kesilir (bkz. migration 0020, lib/net.ts).
+  // Fonun yıllık yönetim ücreti oranı (%) — girilmemişse null. HESABA GİRMEZ:
+  // ücret fon varlığından günlük kesilip birim pay değerine yansıdığı için
+  // çekilen fiyat zaten ondan arınmıştır. Künye bilgisi olarak saklanır ve
+  // arayüzde "fiyata dahil" notuyla gösterilir (bkz. lib/net.ts → feeNote).
   mgmt_fee_rate: number | null;
   /**
    * Net görünümde bu satırdan düşülenler (TL, brüt tutarla birlikte) — ipucu
@@ -394,7 +395,7 @@ export interface DayChange {
    * Ölçünün iki ucu — TL cinsinden BİRİM değer — ve adetler. Net görünüm oranı
    * ve tutarı yeniden hesaplamak zorunda: kesinti tutarla birlikte değiştiği
    * için brüt farkı tek bir katsayıyla ölçeklemek doğru sonucu vermez (vergi
-   * yalnız kârdan kesiliyor, ücret tutarın tamamından). Bkz. lib/netview.
+   * yalnız kârdan kesiliyor). Bkz. lib/netview.
    */
   unit_base_try: number; unit_now_try: number;
   quantity: number; own_quantity: number;
@@ -556,7 +557,7 @@ export type PeriodChanges = Record<PeriodKey, { total: Change | null; own: Chang
  * Dönemsel değişimin HAM bacakları — enstrüman × dönem.
  *
  * Toplama SQL'de değil TypeScript'te yapılıyor (bkz. lib/netview → foldChanges).
- * Sebep net görünüm: kesinti enstrümanın kendi vergi/ücret oranıyla ve kendi
+ * Sebep net görünüm: kesinti enstrümanın kendi vergi oranıyla ve kendi
  * maliyetiyle hesaplanır, yani toplamı önceden alınmış bir sayıya sonradan
  * uygulanamaz. Brüt görünüm de aynı yoldan geçiyor — tek kod yolu, iki mod.
  */

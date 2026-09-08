@@ -3,7 +3,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } f
 import { money, conv, num, numInt, numPrice, pct, dateStr, dateTimeStr, curSymbol, type Cur } from '@/lib/format';
 import { byCode, scheduleLabel, tzLabel } from '@/lib/schedule';
 import type { AssetClass, Calendar, DayChange, Position, TxRow, WatchItem } from '@/lib/data';
-import { cutNote } from '@/lib/net';
+import { cutNote, feeNote } from '@/lib/net';
 import EditInstrument from './EditInstrument';
 import EditTransaction from './EditTransaction';
 
@@ -216,11 +216,18 @@ export default function PositionsTable({
     }
   };
 
-  // Net modda satırdan ne kesildiği. Kesinti TL üzerinde hesaplandı (çevrimden
-  // ÖNCE — yoksa aynı sayı iki yerde farklı yuvarlanır); burada yalnız
-  // görüntüleme birimine çevriliyor.
-  const cutTitle = (p: Position) =>
-    cutNote(own ? p.cut?.own : p.cut?.total, (n) => money(conv(n, cur, rate), cur)) ?? undefined;
+  // Değer hücresinin ipucu iki şey söyleyebilir:
+  //   · stopaj — net modda gerçekten düşülen kalem (TL üzerinde hesaplandı,
+  //     çevrimden ÖNCE; yoksa aynı sayı iki yerde farklı yuvarlanır)
+  //   · yönetim ücreti — kesinti DEĞİL künye bilgisi; fiyata zaten yansımış
+  //     olduğu için hem net hem brüt görünümde aynı şekilde doğru
+  const cutTitle = (p: Position) => {
+    const lines = [
+      cutNote(own ? p.cut?.own : p.cut?.total, (n) => money(conv(n, cur, rate), cur)),
+      feeNote(p.mgmt_fee_rate, (r) => `%${num(r, 2)}`),
+    ].filter(Boolean);
+    return lines.length ? lines.join('\n') : undefined;
+  };
 
   const qtyOf = (p: Position) => (own ? p.own_quantity : p.quantity);
   // Değer sorguda iki para biriminde birden hesaplanıyor — burada çevirmiyoruz,
@@ -641,9 +648,9 @@ export default function PositionsTable({
                     {/* Günlük: üstte oran, altında daha küçük puntoyla tutar.
                         Ölçülecek yeni gözlem yoksa (piyasa kapalı, fon NAV'ı
                         gelmemiş) sayı uydurulmaz — "—". */}
-                    {/* Net modda Değer artık fiyat × adet DEĞİL: kesinti düşülmüş
-                        hâli. Fark sessiz kalmasın diye ipucu brütü ve iki
-                        kalemi tek satırda açıyor. */}
+                    {/* Net modda Değer artık fiyat × adet DEĞİL: stopaj düşülmüş
+                        hâli. Fark sessiz kalmasın diye ipucu brütü ve kesintiyi
+                        yazıyor; yönetim ücreti varsa "fiyata dahil" notu da. */}
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap" title={cutTitle(p)}>
                       {valOf(p) != null ? money(valOf(p)!, cur) : '—'}
                     </td>
