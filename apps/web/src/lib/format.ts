@@ -64,6 +64,40 @@ const dtfDateTime = new Intl.DateTimeFormat('tr-TR', {
   hour: '2-digit', minute: '2-digit',
 });
 export const dateTimeStr = (iso: string) => dtfDateTime.format(new Date(iso));
+
+// ── datetime-local alanının iki ucu ────────────────────────────────────────
+/**
+ * Form alanı (type=datetime-local) dilimsiz bir duvar saati taşır: "2026-09-09T16:53".
+ * Tarayıcı bu değeri KENDİ yerel diliminde okur, sunucu ve veritabanı ise
+ * UTC'de çalışır. Araya çeviri konmazsa dizge olduğu gibi UTC sayılır: ekranda
+ * 16:53 yazan işlem veritabanına 16:53Z = TR 19:53 olarak düşer — her
+ * kaydetmede +3 saat, üstelik birikerek. Sayfanın geri kalanı (dateStr,
+ * dateTimeStr) zaten Europe/Istanbul'a sabitli; giriş de aynı yere sabitlendi,
+ * böylece kullanıcının yazdığı saat okuduğu saatle aynı şeyi anlatıyor.
+ *
+ * Türkiye 2016'dan beri yaz saati uygulamıyor — sabit +03:00 doğru.
+ */
+const TR_OFFSET = '+03:00';
+const dtfInput = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+/** Kayıttaki an → forma basılacak TR duvar saati. */
+export const toLocalInput = (iso: string) => {
+  const p: Record<string, string> = {};
+  for (const x of dtfInput.formatToParts(new Date(iso))) p[x.type] = x.value;
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+};
+/** Formdaki TR duvar saati → gerçek an (ISO). Alan boşsa "şimdi". */
+export const fromLocalInput = (raw: string) => {
+  const t = (raw || '').trim();
+  if (!t) return new Date().toISOString();
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(:\d{2})?$/.exec(t);
+  if (m) return `${m[1]}T${m[2]}${m[3] ?? ':00'}${TR_OFFSET}`;
+  // Zaten dilim taşıyan bir değer (ör. eski çağrılar) olduğu gibi geçer.
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+};
 export const timeAgo = (iso: string) => {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60) return `${s}sn önce`;

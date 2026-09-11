@@ -1,7 +1,7 @@
 'use server';
 import { q, pool } from '@/lib/db';
 import { CLASS_DEFAULTS, SYMBOL_RE, defaultsFor, symbolFromName } from '@/lib/catalog';
-import { parseAmount } from '@/lib/format';
+import { parseAmount, fromLocalInput } from '@/lib/format';
 import { resolveInstrumentMeta, GOLD_OPTIONS, INDEX_OPTIONS } from '@/lib/resolve';
 import { revalidatePath } from 'next/cache';
 
@@ -23,11 +23,40 @@ function parseRate(raw: FormDataEntryValue | null, label: string): { value: numb
   return { value: n };
 }
 
+/**
+ * Defter değişti → o andan sonraki GEÇMİŞ de düzelsin.
+ *
+ * Snapshot'lar saat başı yazılan tarihsel kayıtlar; motor her turda "şu an
+ * elimde ne var" diye bakar. Bu yüzden geçmişe dönük bir işlem (ya da tarihi
+ * geriye çekilen bir işlem) canlı sayıları anında düzeltirken grafik ve
+ * dönemsel kartlar işlemi hâlâ deftere GİRDİĞİ anda gösteriyordu. Hesap
+ * veritabanında (bkz. migration 0022): kayıtlı fiyatlara dokunmadan yalnız
+ * adetleri ve onlardan türeyen tutarları yeniden hizalar, hiçbir şey
+ * değişmemişse hiç yazmaz.
+ *
+ * Tarihi taşınan bir işlemde ESKİ tarih de verilir: iki uç arasındaki
+ * snapshot'lar da yanlış kalmıştı.
+ *
+ * Onarım kaydın kendisini bozamaz, o yüzden hatası işlemi geri almaz — yalnız
+ * loglanır; bir sonraki düzenleme (ya da `npm run rebuild`) tekrar dener.
+ */
+async function rebuildHistory(...instants: (string | null | undefined)[]) {
+  const times = instants.filter((x): x is string => !!x)
+    .map((x) => new Date(x)).filter((d) => !Number.isNaN(d.getTime()));
+  if (!times.length) return;
+  const from = new Date(Math.min(...times.map((d) => d.getTime())));
+  try {
+    await q(`select rebuild_snapshots($1)`, [from.toISOString()]);
+  } catch (e) {
+    console.error('rebuild_snapshots başarısız:', e);
+  }
+}
+
 export async function addTransaction(formData: FormData): Promise<Result> {
   const instrument_id = String(formData.get('instrument_id') || '');
   const type = String(formData.get('type') || 'buy');
   const currency = String(formData.get('currency') || 'TRY');
-  const executed_at = String(formData.get('executed_at') || '') || new Date().toISOString();
+  const executed_at = fromLocalInput(String(formData.get('executed_at') || ''));
   const external = Number(formData.get('external_quantity') || 0) || 0;
   const location = String(formData.get('location') || '').trim() || null;
   const note = String(formData.get('note') || '').trim() || null;
@@ -43,6 +72,7 @@ export async function addTransaction(formData: FormData): Promise<Result> {
       `insert into transactions (instrument_id, type, quantity, external_quantity, currency, executed_at, note)
        values ($1,'transfer',0,$2,$3,$4,$5)`,
       [instrument_id, external, currency, executed_at, note ?? 'emanet düzeltmesi']);
+    await rebuildHistory(executed_at);
     revalidatePath('/');
     return { ok: true };
   }
@@ -60,6 +90,7 @@ export async function addTransaction(formData: FormData): Promise<Result> {
     `insert into transactions (instrument_id, type, quantity, external_quantity, unit_price, currency, executed_at, location, note)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
     [instrument_id, type, quantity, ext, unit_price, currency, executed_at, location, note]);
+  await rebuildHistory(executed_at);
   revalidatePath('/');
   return { ok: true };
 }
@@ -163,9 +194,13 @@ export async function addInstrument(formData: FormData): Promise<Result> {
 export async function updateTransaction(formData: FormData): Promise<Result> {
   const id = String(formData.get('id') || '');
   if (!id) return { ok: false, error: 'Kayıt yok' };
+  // Tarih taşınmış olabilir: geçmiş onarımı iki ucun ESKİSİNDEN başlamalı.
+  const prev = await q<{ executed_at: string }>(
+    `select executed_at from transactions where id=$1`, [id]);
+  const prev_executed_at = prev[0]?.executed_at ?? null;
   const type = String(formData.get('type') || 'buy');
   const currency = String(formData.get('currency') || 'TRY');
-  const executed_at = String(formData.get('executed_at') || '') || new Date().toISOString();
+  const executed_at = fromLocalInput(String(formData.get('executed_at') || ''));
   const external = Number(formData.get('external_quantity') || 0) || 0;
   const location = String(formData.get('location') || '').trim() || null;
   const note = String(formData.get('note') || '').trim() || null;
@@ -175,6 +210,7 @@ export async function updateTransaction(formData: FormData): Promise<Result> {
       `update transactions set type='transfer', quantity=0, external_quantity=$2, currency=$3, executed_at=$4, location=$5, note=$6
        where id=$1`,
       [id, external, currency, executed_at, location, note]);
+    await rebuildHistory(executed_at, prev_executed_at);
     revalidatePath('/');
     return { ok: true };
   }
@@ -191,6 +227,7 @@ export async function updateTransaction(formData: FormData): Promise<Result> {
     `update transactions set type=$2, quantity=$3, external_quantity=$4, unit_price=$5, currency=$6, executed_at=$7, location=$8, note=$9
      where id=$1`,
     [id, type, quantity, ext, unit_price, currency, executed_at, location, note]);
+  await rebuildHistory(executed_at, prev_executed_at);
   revalidatePath('/');
   return { ok: true };
 }

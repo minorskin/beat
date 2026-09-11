@@ -3,12 +3,10 @@ import { useState, useTransition } from 'react';
 import { createPortal } from 'react-dom';
 import { updateTransaction } from '@/app/actions';
 import type { TxRow } from '@/lib/data';
-
-const toLocalInput = (iso: string) => {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
+// Tarih alanı TR duvar saati konuşur — tarayıcının kendi dilimi değil. Yerel
+// dilimle basılan değer sunucuda UTC sayılıp kaydı ileri kaydırıyordu
+// (bkz. lib/format → toLocalInput/fromLocalInput).
+import { toLocalInput } from '@/lib/format';
 
 /** Var olan bir işlem kaydını düzenler. Enstrüman sabit — yalnız işlemin kendi alanları değişir. */
 export default function EditTransaction({ tx, locations }: { tx: TxRow; locations: string[] }) {

@@ -10,7 +10,8 @@
     "probe": "tsx src/probe.ts",
     "typecheck": "tsc --noEmit",
     "fetch": "tsx src/fetch.ts",
-    "snapshot": "tsx src/snapshot.ts"
+    "snapshot": "tsx src/snapshot.ts",
+    "rebuild": "tsx src/rebuild.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

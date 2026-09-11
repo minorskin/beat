@@ -123,6 +123,24 @@ tanımlı olduğu görülür, değeri görmek için Vercel dashboard → proje �
 Settings → Environment Variables (orada değer maskeli gösterilir, "Reveal"
 ile açılır — bu ekran da public değil, sadece proje sahibine).
 
+## Geçmiş onarımı (10.09.2026)
+
+Geriye dönük girilen/tarihi taşınan işlemler artık **grafiğe de** yansıyor:
+`rebuild_snapshots(from_ts)` (migration `0022`) o andan sonraki snapshot'ları defterle
+hizalar — kayıtlı fiyatlara dokunmadan, yalnız adetler ve onlardan türeyen tutarlar.
+Arayüz işlem ekleme/düzenlemede otomatik çağırıyor; elle: `npm run rebuild -- <ISO>`
+(kuru çalıştırma) / `--apply`.
+
+**Taban:** `app_settings.ledger_epoch = 2026-09-08T14:43:31Z` (defterin toplu girildiği
+an). Öncesindeki snapshot'lar portföy parça parça girilirken alındı ve bugünkü defterle
+0,5–3,1 milyon TL ayrışıyor — onarım oraya **bilerek inmiyor**. İnmek gerekirse
+`npm run rebuild -- <ISO> --force`, ama o zaman 31.08–08.09 arası grafik eksik bir
+defterle yeniden yazılır.
+
+**Aynı oturumda düzeltilen yan hata:** `datetime-local` alanı dilimsiz değer taşıyor,
+sunucu/DB ise UTC — çeviri olmadığı için her kaydetmede tarih +3 saat kayıyordu
+(birikerek). Giriş artık `lib/format`'ta Europe/Istanbul'a sabitli.
+
 ## Detaylı proje hafızası
 
 Bu dosya bir özet/checkpoint'tir. Mimari kararlar, veri modeli, tam kaynak listesi ve

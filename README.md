@@ -24,6 +24,43 @@ Yerelde hiçbir bileşen çalışmaz. Mac kapalıyken de veri toplanır.
 > Portföyün TL değeri tüm piyasalar kapalıyken bile değişir — USDTRY 7/24 hareket eder.
 > Bu yüzden döviz katmanı hisse fiyatlarından bağımsız, kendi ritminde çekilir.
 
+## Geriye dönük işlem → geçmiş de düzelir
+
+Snapshot'lar saat başı yazılan **tarihsel** kayıtlardır; motor her turda "şu an elimde ne
+var" diye bakar. Bu yüzden geçmişe dönük bir işlem (ya da tarihi geriye çekilen bir işlem)
+canlı sayıları anında düzeltirken grafik ve dönemsel kartlar işlemi **deftere girdiği**
+anda göstermeye devam ediyordu.
+
+`rebuild_snapshots(from_ts)` (migration `0022`) o andan sonraki snapshot'ları defterle
+yeniden hizalar:
+
+- **Fiyata dokunmaz.** Her snapshot kendi kayıtlı fiyatını, `price_ts`'ini ve bayatlık
+  damgasını korur; yalnız adetler ve onlardan türeyen tutarlar (değer, maliyet, K/Z,
+  ağırlık) yeniden hesaplanır. "O gün fiyat neydi" bilgisi yeniden yazılmaz — yalnız
+  "o gün elimde ne vardı" düzelir.
+- **Yalnız gerçekten farklı olana dokunur**, yani tekrar tekrar çalıştırmak zararsızdır.
+- **Arayüz otomatik çağırır**: işlem eklenince/düzenlenince (`app/actions.ts`). Tarihi
+  taşınan bir işlemde eski ve yeni tarihin **eskisinden** başlar.
+- **Tabanı vardır**: `app_settings.ledger_epoch`. Portföy sisteme parça parça girildiği
+  için o tarihten önceki snapshot'lar bugünkü defterle örtüşmez (ölçüldü: 0,5–3,1 milyon
+  TL). Onarım oraya inmez; bilerek inmek için `--force`.
+
+```bash
+npm run rebuild -- 2026-09-09T13:00:00Z          # kuru çalıştırma, ne değişecek yazar
+npm run rebuild -- 2026-09-09T13:00:00Z --apply  # uygular
+```
+
+Defterin "o ana göre" hali `holdings_at(ts)` ile alınır; `v_holdings` artık aynı
+yürüyüşün (`v_holdings_walk`) son satırıdır — iki hesap ayrışamaz.
+
+### Tarih alanı TR duvar saati konuşur
+
+`datetime-local` dilimsiz bir değer taşır. Tarayıcı onu kendi diliminde okur, sunucu ve
+veritabanı ise UTC'de çalışır; araya çeviri konmazsa ekranda 16:53 yazan işlem veritabanına
+16:53Z = TR 19:53 olarak düşer — **her kaydetmede +3 saat, üstelik birikerek**. Giriş
+(`fromLocalInput`) ve forma basma (`toLocalInput`) `lib/format`'ta, sayfanın geri kalanıyla
+aynı dilime (Europe/Istanbul) sabitlendi.
+
 ## Kısmi sahiplik (emanet)
 
 Bir pozisyondaki adetin bir kısmı başkası adına tutulabiliyor. Aynı enstrümanı ikiye
@@ -146,7 +183,7 @@ npm run probe             # kaynak sağlığı (buluttan çalıştırmak esas)
 npm run typecheck
 ```
 
-Şema: `supabase/migrations/0001_init.sql` → … → `0020_mgmt_fee.sql` (sırayla) →
+Şema: `supabase/migrations/0001_init.sql` → … → `0022_backdated_history.sql` (sırayla) →
 ardından `supabase/seed.sql`.
 Migration'lar sıralı ve idempotent'e yakındır (`add column if not exists`); mevcut kurulumda
 yalnız yeni olanı çalıştırmak yeterli.
