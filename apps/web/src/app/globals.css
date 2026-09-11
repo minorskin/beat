@@ -156,6 +156,12 @@ textarea.field { font-family: inherit; line-height: 1.45; resize: vertical; }
 .seg-on:hover { background: var(--panel-3); }
 
 /* Tablo — çizgi yok, tüm ana satırlar aynı koyu ton + hover */
+/* border-collapse BİLEREK separate: Tailwind preflight tabloya "collapse"
+   veriyor, WebKit'te ise çakışık kenarlıklı tabloda sticky hücrenin ZEMİNİ
+   hücreyle birlikte kaymıyor — sabit sütun saydam görünüp altından kayan
+   içerik okunuyordu. Tabloda hiç kenarlık yok, o yüzden separate'in başka
+   bir görsel etkisi olmuyor; boşluk da sıfırlanıyor. */
+.tbl { border-collapse: separate; border-spacing: 0; }
 .tbl thead tr { background: var(--panel-2); }
 .tbl tbody tr { transition: background 0.12s ease; }
 .tbl tbody tr:hover { background: var(--panel-2); }
