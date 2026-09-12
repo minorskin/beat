@@ -54,12 +54,12 @@ export default function Movers({ data, range, own, cur, rate }: {
   return (
     <div className="panel p-3 sm:p-4 flex flex-col" title={`Öne çıkanlar · ${meta.long}`}>
       <div className="flex items-baseline justify-between gap-2 mb-2 min-w-0">
-        <div className="t-label truncate" style={{ color: 'var(--muted)' }}>Öne Çıkanlar</div>
+        <div className="t-body truncate" style={{ color: 'var(--muted)' }}>Öne Çıkanlar</div>
         <div className="t-micro shrink-0 tnum" style={{ color: 'var(--faint)' }}>{meta.long}</div>
       </div>
 
       {rows.length === 0 ? (
-        <div className="t-label flex-1 flex items-center" style={{ color: 'var(--faint)' }}>
+        <div className="t-body flex-1 flex items-center" style={{ color: 'var(--faint)' }}>
           Bu dönem için yeterli geçmiş yok.
         </div>
       ) : (
@@ -118,7 +118,7 @@ function GroupHead({ children, spaced, pad }: {
 /**
  * Punto burada bilerek bir kademe küçük (t-micro): kart iki yarıda İKİŞER
  * liste taşıyor ve her biri üçe kadar çıkabiliyor. "En çok kaybettiren"
- * tarafı dolduğunda t-label ile 4'lü grid'in hücre yüksekliğine sığmıyordu —
+ * tarafı dolduğunda t-body ile 4'lü grid'in hücre yüksekliğine sığmıyordu —
  * kartın kendi yüksekliği komşularına bağlı, tek başına uzayamıyor.
  */
 function List({ items, pad }: { items: Item[]; pad?: boolean }) {

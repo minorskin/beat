@@ -102,7 +102,7 @@ function WatchRow({ wi, d, className, classes, locations, cal }: {
             classes={classes} locations={locations}
           />
         </div>
-        <div className="t-label truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--faint)' }}>{wi.display_name}</div>
+        <div className="t-micro truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--faint)' }}>{wi.display_name}</div>
       </td>
       <td className="text-right px-3 py-3 tnum whitespace-nowrap" style={{ color: 'var(--muted)' }}
           title={wi.price != null ? num(wi.price, 4) : undefined}>
@@ -117,20 +117,20 @@ function WatchRow({ wi, d, className, classes, locations, cal }: {
           title={d ? `Ölçüm başlangıcı ${dateTimeStr(d.since)} · kendi para biriminde` : 'Bugün yeni fiyat gözlemi yok'}>
         {d?.pct_native != null ? pct(d.pct_native) : '—'}
       </td>
-      <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{className}</td>
+      <td className="px-3 py-3 t-body" style={{ color: 'var(--muted)' }}>{className}</td>
       {/* Adet yerine ne olduğunu söyleyen tek kelime: boş satır bozuk veri gibi durur. */}
       <td className="px-3 py-3 text-center"><CurrencyDot currency={wi.currency} /></td>
-      <td className="px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>İzleme</td>
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="px-3 py-3 t-body" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="text-right px-3 py-3 t-body" style={{ color: 'var(--faint)' }}>İzleme</td>
+      <td className="text-right px-3 py-3 t-body" style={{ color: 'var(--faint)' }}>—</td>
       {/* Günlük oran var (fiyatı çekiliyor); tutar yok, elde adet yok. */}
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-      <td className="text-right px-3 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
-      <td className="px-3 py-3 whitespace-nowrap t-label" style={{ color: 'var(--faint)' }} title="İzlemeye alındığı tarih">
+      <td className="text-right px-3 py-3 t-body" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="text-right px-3 py-3 t-body" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="text-right px-3 py-3 t-body" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="px-3 py-3 whitespace-nowrap t-body" style={{ color: 'var(--faint)' }} title="İzlemeye alındığı tarih">
         {dateStr(wi.created_at)}
       </td>
-      <td className="px-4 sm:px-5 py-3 t-label" style={{ color: 'var(--faint)' }}>—</td>
+      <td className="px-4 sm:px-5 py-3 t-body" style={{ color: 'var(--faint)' }}>—</td>
     </tr>
   );
 }
@@ -427,7 +427,7 @@ export default function PositionsTable({
     <>
     <div className="panel overflow-hidden">
       {activeCount > 0 && (
-        <div className="px-4 sm:px-5 pt-3 flex items-center gap-3 t-label" style={{ color: 'var(--muted)' }}>
+        <div className="px-4 sm:px-5 pt-3 flex items-center gap-3 t-body" style={{ color: 'var(--muted)' }}>
           <span>{posRows.length} / {rows.length} pozisyon</span>
           <button
             type="button"
@@ -449,9 +449,9 @@ export default function PositionsTable({
         {/* min-w 11 kolonun tamamını sığdırır: dar ekranda kolon GİZLEMEK
             yerine yatay kaydırma bırakıyoruz — mobilde de konum, açılış,
             kapanış gibi sütunlara erişilebilsin. */}
-        <table className="tbl w-full t-head min-w-[1260px]">
+        <table className="tbl w-full t-body min-w-[1260px]">
           <thead>
-            <tr style={{ color: 'var(--muted)' }} className="t-label uppercase tracking-wide">
+            <tr style={{ color: 'var(--muted)' }} className="t-micro uppercase tracking-wide">
               {columns.map((c) => {
                 const on = c.filter ? filters[c.filter].length > 0 : false;
                 return (
@@ -481,7 +481,7 @@ export default function PositionsTable({
                         className="inline-flex items-center gap-1 min-w-0"
                       >
                         <span className="truncate">{c.label}</span>
-                        <span className="tnum shrink-0 t-strong leading-none" style={{ opacity: sortKey === c.key ? 1 : 0.3 }}>
+                        <span className="tnum shrink-0 t-micro leading-none" style={{ opacity: sortKey === c.key ? 1 : 0.3 }}>
                           {sortKey === c.key ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
                         </span>
                       </button>
@@ -498,13 +498,13 @@ export default function PositionsTable({
                 K/Z oranı ağırlıklı: toplam K/Z ÷ toplam maliyet. */}
             {posRows.length > 0 && (
               <tr className="tbl-total">
-                <td className="px-4 sm:px-5 py-2 t-label font-medium">
+                <td className="px-4 sm:px-5 py-2 t-body font-medium">
                   Toplam
-                  <div className="t-label font-normal" style={{ color: 'var(--muted)' }}>
+                  <div className="t-micro font-normal" style={{ color: 'var(--muted)' }}>
                     {posRows.length} pozisyon
                   </div>
                 </td>
-                <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="text-right px-3 py-2 t-body" style={{ color: 'var(--faint)' }}>—</td>
                 <td className="text-right px-3 py-2 tnum whitespace-nowrap"
                     style={{ color: totals.dayPct == null ? 'var(--faint)' : totals.dayPct >= 0 ? 'var(--up)' : 'var(--down)' }}
                     title={`Bugün 00:00'dan (TR) bu yana — toplam kazanç ÷ gün başı büyüklük.`
@@ -513,15 +513,15 @@ export default function PositionsTable({
                   {totals.dayPct != null ? (
                     <>
                       <div className="t-body">{pct(totals.dayPct)}</div>
-                      <div className="t-label opacity-80">{totals.dayAbs >= 0 ? '+' : ''}{money(totals.dayAbs, cur)}</div>
+                      <div className="t-micro opacity-80">{totals.dayAbs >= 0 ? '+' : ''}{money(totals.dayAbs, cur)}</div>
                     </>
                   ) : '—'}
                 </td>
                 <td className="px-3 py-2" />
                 <td className="px-3 py-2" />
                 <td className="px-3 py-2" />
-                <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
-                <td className="text-right px-3 py-2 t-label" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="text-right px-3 py-2 t-body" style={{ color: 'var(--faint)' }}>—</td>
+                <td className="text-right px-3 py-2 t-body" style={{ color: 'var(--faint)' }}>—</td>
                 <td className="text-right px-3 py-2 tnum t-body font-medium whitespace-nowrap">
                   {money(totals.value, cur)}
                 </td>
@@ -543,7 +543,7 @@ export default function PositionsTable({
             )}
             {displayRows.length === 0 && (
               <tr>
-                <td colSpan={13} className="px-4 sm:px-5 py-6 text-center t-label" style={{ color: 'var(--faint)' }}>
+                <td colSpan={13} className="px-4 sm:px-5 py-6 text-center t-body" style={{ color: 'var(--faint)' }}>
                   Filtreye uyan kayıt yok.
                 </td>
               </tr>
@@ -594,7 +594,7 @@ export default function PositionsTable({
                       {/* Grup/kur ve K/Z'nin mobile özel kopyaları kaldırıldı:
                           o sütunlar artık her ekranda görünüyor, ikinci kez
                           yazmak satırı gereksiz yükseltiyordu. */}
-                      <div className="t-label truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
+                      <div className="t-micro truncate max-w-[84px] sm:max-w-[104px]" style={{ color: 'var(--muted)' }}>{p.display_name}</div>
                     </td>
                     {/* Fiyat hücresinin title'ı "bu sayı ne kadar taze"
                         sorusunun tam cevabı: gözlemin kendi zamanı, motorun
@@ -611,13 +611,13 @@ export default function PositionsTable({
                       {dayOf(p)?.pct != null ? (
                         <>
                           <div>{pct(dayOf(p)!.pct!)}</div>
-                          <div className="t-label opacity-80">
+                          <div className="t-micro opacity-80">
                             {dayAmt(dayOf(p)!) >= 0 ? '+' : ''}{money(dayAmt(dayOf(p)!), cur)}
                           </div>
                         </>
                       ) : '—'}
                     </td>
-                    <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>{p.class_name}</td>
+                    <td className="px-3 py-3 t-body" style={{ color: 'var(--muted)' }}>{p.class_name}</td>
                     {/* Adet ve fiyat TAM SAYI: kuruş basamağı sütunu uzatıyor,
                         okuyuşa bir şey katmıyordu. numInt yalnız 1'in altındaki
                         değerlerde (0,08 BTC) basamak bırakır; tamı title'da. */}
@@ -626,13 +626,13 @@ export default function PositionsTable({
                     </td>
                     {/* Alış fiyatı girilmemişse maliyet 0 DEĞİL meçhuldür — sayı
                         uydurmak yerine "—". Kullanıcı işlemi girdikçe dolar. */}
-                    <td className="px-3 py-3 t-label" style={{ color: 'var(--muted)' }}>
+                    <td className="px-3 py-3 t-body" style={{ color: 'var(--muted)' }}>
                       {p.locations.length ? p.locations.join(', ') : '—'}
                     </td>
                     <td className="text-right px-3 py-3 tnum whitespace-nowrap" title={num(qtyOf(p), 4)}>
                       {numInt(qtyOf(p))}
                       {p.external_quantity > 0 && (
-                        <div className="t-label" style={{ color: 'var(--faint)' }}>
+                        <div className="t-micro" style={{ color: 'var(--faint)' }}>
                           {own
                             ? `${numInt(p.quantity)} toplam`
                             : `${numInt(p.external_quantity)} emanet`}
@@ -669,7 +669,7 @@ export default function PositionsTable({
                   </tr>
                   {(isOpen || isClosing) && tx.length === 0 && (
                     <tr className={`tx-row ${isClosing ? 'tx-row-out' : ''}`}>
-                      <td colSpan={13} className="px-4 sm:px-5 py-3 t-label" style={{ color: 'var(--faint)' }}>İşlem kaydı yok.</td>
+                      <td colSpan={13} className="px-4 sm:px-5 py-3 t-body" style={{ color: 'var(--faint)' }}>İşlem kaydı yok.</td>
                     </tr>
                   )}
                   {(isOpen || isClosing) && tx.map((t) => {
@@ -685,18 +685,18 @@ export default function PositionsTable({
                             <EditTransaction tx={t} locations={locations} />
                           </div>
                           {t.note && t.note !== 'emanet düzeltmesi' && (
-                            <div className="t-label mt-0.5 whitespace-normal" style={{ color: 'var(--faint)' }}>
+                            <div className="t-micro mt-0.5 whitespace-normal" style={{ color: 'var(--faint)' }}>
                               {t.note}
                             </div>
                           )}
                         </td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" style={{ color: 'var(--muted)' }}>—</td>
-                        <td className="px-3 py-2 t-label" style={{ color: 'var(--muted)' }}>—</td>
+                        <td className="px-3 py-2 t-body" style={{ color: 'var(--muted)' }}>—</td>
                         <td className="px-3 py-2 text-center">
                           <CurrencyDot currency={t.currency} />
                         </td>
-                        <td className="px-3 py-2 t-label" style={{ color: 'var(--muted)' }}>{t.location ?? '—'}</td>
+                        <td className="px-3 py-2 t-body" style={{ color: 'var(--muted)' }}>{t.location ?? '—'}</td>
                         {/* İşlemin kendi fiyatı MALİYET sütununda: üstündeki
                             pozisyon satırının ortalaması tam da bu satırların
                             ağırlıklı ortalaması. Piyasa fiyatı sütunu işlem
@@ -704,7 +704,7 @@ export default function PositionsTable({
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body" title={num(t.quantity, 4)}>
                           {numInt(t.quantity)}
                           {t.external_quantity > 0 && (
-                            <div className="t-label" style={{ color: 'var(--faint)' }}>{numInt(t.external_quantity)} emanet</div>
+                            <div className="t-micro" style={{ color: 'var(--faint)' }}>{numInt(t.external_quantity)} emanet</div>
                           )}
                         </td>
                         <td className="text-right px-3 py-2 tnum whitespace-nowrap t-body"
@@ -739,7 +739,7 @@ export default function PositionsTable({
           style={{ left: pos.x, top: pos.y }}
         >
           {options[menu].length === 0 ? (
-            <div className="px-2 py-1.5 t-label" style={{ color: 'var(--faint)' }}>Seçenek yok</div>
+            <div className="px-2 py-1.5 t-body" style={{ color: 'var(--faint)' }}>Seçenek yok</div>
           ) : (
             <>
               {options[menu].map((o) => {
@@ -763,7 +763,7 @@ export default function PositionsTable({
                 <button
                   type="button"
                   onClick={() => setFilters((f) => ({ ...f, [menu]: [] }))}
-                  className="w-full text-left px-2 py-1.5 mt-1 t-label hover:opacity-80"
+                  className="w-full text-left px-2 py-1.5 mt-1 t-body hover:opacity-80"
                   style={{ color: 'var(--muted)' }}
                 >
                   Seçimi temizle

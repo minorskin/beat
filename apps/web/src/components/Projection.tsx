@@ -336,9 +336,9 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ left: 0, right: 6, top: 4, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="#232323" />
-            <XAxis dataKey="label" tick={{ fontSize: 12.5, fill: '#a8a8a8' }} minTickGap={30} axisLine={false} tickLine={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#a8a8a8' }} minTickGap={30} axisLine={false} tickLine={false} />
             <YAxis
-              tickFormatter={fmtC} tick={{ fontSize: 12.5, fill: '#a8a8a8' }} width={52}
+              tickFormatter={fmtC} tick={{ fontSize: 12, fill: '#a8a8a8' }} width={52}
               axisLine={false} tickLine={false}
               scale={logScale && canLog ? 'log' : 'auto'}
               domain={logScale && canLog ? ['auto', 'auto'] : undefined}
@@ -388,7 +388,7 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
           onClick={toggleAll}
           aria-pressed={allOn}
           title={allOn ? 'Hepsini gizle' : 'Hepsini göster'}
-          className="flex items-center gap-1.5 t-label leading-none py-0.5 cursor-pointer"
+          className="flex items-center gap-1.5 t-body leading-none py-0.5 cursor-pointer"
           style={{ color: allOn ? 'var(--text)' : 'var(--muted)' }}
         >
           <span
@@ -409,7 +409,7 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
               onClick={() => toggle(s.slot)}
               aria-pressed={on}
               title={on ? `${s.name} — gizle` : `${s.name} — göster`}
-              className="flex items-center gap-1.5 t-label leading-none py-0.5 cursor-pointer transition-opacity"
+              className="flex items-center gap-1.5 t-body leading-none py-0.5 cursor-pointer transition-opacity"
               style={{ opacity: on ? 1 : 0.35, color: on ? colorOf(s.slot) : 'var(--muted)' }}
             >
               <span
@@ -426,7 +426,7 @@ export default function Projection({ current, cur, rate: fx, scenarios }: {
       <div className="lg:col-span-2 lg:order-first min-w-0">
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center gap-2 sm:gap-3">
-          <span className="t-label shrink-0 w-[108px] sm:w-[104px]" style={{ color: 'var(--muted)' }}>Senaryo adı</span>
+          <span className="t-body shrink-0 w-[108px] sm:w-[104px]" style={{ color: 'var(--muted)' }}>Senaryo adı</span>
           <input
             value={cursel.name}
             maxLength={24}
@@ -497,7 +497,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone: 'tex
     : tone === 'muted' ? 'var(--muted)' : 'var(--text)';
   return (
     <div>
-      <div className="t-label mb-0.5 truncate" style={{ color: 'var(--muted)' }}>{label}</div>
+      <div className="t-body mb-0.5 truncate" style={{ color: 'var(--muted)' }}>{label}</div>
       <div className="t-head font-semibold tnum truncate" style={{ color: c }}>{value}</div>
     </div>
   );
@@ -517,7 +517,7 @@ function Slider({ label, value, min, max, step, v, set }: {
   return (
     <div className="flex items-center gap-2 sm:gap-3">
       <span
-        className="t-label shrink-0 truncate w-[108px] sm:w-[104px]"
+        className="t-body shrink-0 truncate w-[108px] sm:w-[104px]"
         style={{ color: 'var(--muted)' }}
         title={label}
       >
@@ -528,7 +528,7 @@ function Slider({ label, value, min, max, step, v, set }: {
         aria-label={label}
         className="flex-1 min-w-0" />
       <span
-        className="t-label tnum shrink-0 text-right w-[84px] sm:w-[88px] truncate"
+        className="t-body tnum shrink-0 text-right w-[84px] sm:w-[88px] truncate"
         style={{ color: 'var(--text)' }}
       >
         {value}
@@ -547,7 +547,7 @@ function ScenTooltip({ active, payload, label, fmt }:
     .sort((a, b) => Number(b.value) - Number(a.value));
   return (
     <div style={{
-      background: '#1c1c1c', borderRadius: 4, fontSize: 14.5, padding: '8px 10px',
+      background: '#1c1c1c', borderRadius: 4, fontSize: 'var(--t-body)', padding: '8px 10px',
       boxShadow: '0 4px 16px rgba(0,0,0,0.5)', minWidth: 150,
     }}>
       <div style={{ color: '#a8a8a8', marginBottom: 4 }}>{label}</div>

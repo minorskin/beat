@@ -39,7 +39,7 @@ export default function EditInstrument({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-        className="shrink-0 t-label leading-none opacity-50 hover:opacity-100"
+        className="shrink-0 t-body leading-none opacity-50 hover:opacity-100"
         style={{ color: 'var(--muted)' }}
         title="Varlığı düzenle"
         aria-label="Varlığı düzenle"
@@ -68,18 +68,18 @@ export default function EditInstrument({
           >
             <div className="col-span-2 flex items-center justify-between mb-1">
               <h2 className="t-head font-medium">{symbol} — Varlığı Düzenle</h2>
-              <button type="button" onClick={reset} className="seg t-icon leading-none" aria-label="Kapat">✕</button>
+              <button type="button" onClick={reset} className="seg t-head leading-none" aria-label="Kapat">✕</button>
             </div>
 
             <input type="hidden" name="instrument_id" value={id} />
 
-            <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 t-body" style={{ color: 'var(--muted)' }}>
               Görünen Ad
               <input name="display_name" required defaultValue={displayName} className="field mt-1" />
             </label>
 
             {isRealty && (
-              <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+              <label className="col-span-2 t-body" style={{ color: 'var(--muted)' }}>
                 Güncel Değer (₺)
                 <input
                   name="value" inputMode="decimal" className="field mt-1 tnum"
@@ -92,14 +92,14 @@ export default function EditInstrument({
               </label>
             )}
 
-            <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 sm:col-span-1 t-body" style={{ color: 'var(--muted)' }}>
               Grup
               <select name="class_code" defaultValue={classCode} className="field mt-1">
                 {classes.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
               </select>
             </label>
 
-            <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 sm:col-span-1 t-body" style={{ color: 'var(--muted)' }}>
               Kur Riski
               <select name="currency" defaultValue={currency} className="field mt-1">
                 <option value="TRY">Yok</option>
@@ -110,7 +110,7 @@ export default function EditInstrument({
             {/* İkisi de yüzde ama işlevleri ayrı: vergi net görünümde kârdan
                 kesilir, yönetim ücreti hiçbir şey kesmez (fiyata zaten dahil).
                 Farkı altlarındaki ortak açıklama söylüyor. */}
-            <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 sm:col-span-1 t-body" style={{ color: 'var(--muted)' }}>
               Kâr Vergisi (%)
               <input
                 name="tax_rate" type="text" inputMode="decimal"
@@ -121,7 +121,7 @@ export default function EditInstrument({
               />
             </label>
 
-            <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 sm:col-span-1 t-body" style={{ color: 'var(--muted)' }}>
               Yönetim Ücreti (%)
               <input
                 name="mgmt_fee_rate" type="text" inputMode="decimal"
@@ -132,14 +132,14 @@ export default function EditInstrument({
               />
             </label>
 
-            <p className="col-span-2 t-label -mt-1" style={{ color: 'var(--faint)' }}>
+            <p className="col-span-2 t-body -mt-1" style={{ color: 'var(--faint)' }}>
               <b style={{ color: 'var(--muted)' }}>Vergi</b> yalnız Net görünümde, kârdan kesilir.
               <b style={{ color: 'var(--muted)' }}> Yönetim ücreti</b> hiçbir yerden kesilmez: fon
               varlığından her gün kesilip fiyata yansıdığı için çekilen fiyat ondan zaten
               arınmıştır — künye bilgisi olarak durur. Boş bırakmak “girilmedi” demektir.
             </p>
 
-            <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 t-body" style={{ color: 'var(--muted)' }}>
               Konum
               <input
                 name="location" list={`ins-location-options-${id}`} autoComplete="off"
@@ -157,7 +157,7 @@ export default function EditInstrument({
               </span>
             </label>
 
-            <p className="col-span-2 t-label" style={{ color: 'var(--faint)' }}>
+            <p className="col-span-2 t-body" style={{ color: 'var(--faint)' }}>
               Kur riski: varlığın hangi para birimine bağlı olduğunu sen
               belirtirsin. Tabloda TRY kırmızı, USD yeşil nokta olarak görünür.
               Değiştirdiğinde bu varlığın tüm işlemleri de aynı birime geçer;

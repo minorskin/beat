@@ -34,7 +34,7 @@ export default function MarketPulse({ rows }: { rows: MarketRow[] }) {
   return (
     <div className="panel p-3 sm:p-4 flex flex-col">
       <div className="flex items-baseline justify-between gap-2 mb-2 min-w-0">
-        <div className="t-label truncate" style={{ color: 'var(--muted)' }}>Piyasa</div>
+        <div className="t-body truncate" style={{ color: 'var(--muted)' }}>Piyasa</div>
         <div className="t-micro shrink-0" style={{ color: 'var(--faint)' }}>bugün</div>
       </div>
 

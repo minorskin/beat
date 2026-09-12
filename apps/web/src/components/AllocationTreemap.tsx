@@ -44,11 +44,14 @@ function Dot({ color, aria }: { color: string; aria: string }) {
  * Kutucuğun iki risk noktası: kur (USD → yeşil, TL → kırmızı) ve yoğunluk.
  *
  * Geniş kutuda ADLARIYLA yazılırlar — renk tek başına anlam taşımasın diye.
- * İki satır TEK GRID: sütunlar max-content olduğu için etiket sütunu en geniş
- * ada ("Yoğunluk") göre ölçülür ve iki nokta AYNI x'te dizilir. Eskiden her
- * satır kendi flex kutusuydu, noktalar etiket uzunluğu kadar kayıyor ("Kur ●"
- * ile "Yoğunluk ●" arasında ~30px fark) ve kutucuk hatalı hizalanmış
- * görünüyordu.
+ * Her nokta KENDİ adının hemen yanında durur. Bir ara iki satır tek grid'e
+ * alınmıştı (sütunlar max-content, yani iki nokta aynı x'te); noktalar hizalı
+ * oluyordu ama "Kur"un noktası kelimesinden ~30px uzağa, "Yoğunluk"un altına
+ * düşüyor ve hangi noktanın hangi ölçüyü anlattığı okunmuyordu. Nokta ölçünün
+ * değeri: bağlı olduğu ada yapışık olması hizalı olmasından önemli.
+ *
+ * Satır aralığı verilmiyor: kutucuğun sabit satır yüksekliği (leading-[15px])
+ * bu iki satırı da pay/tutar satırlarıyla aynı ritme oturtuyor.
  *
  * Dar kutuda ad düşer: iki nokta yan yana, sayıların hemen ardında durur;
  * anlamları detay kartında ve ekran okuyucu etiketinde kalır.
@@ -77,10 +80,17 @@ function Risks({ item, share, wide, className = '' }: {
     );
   }
   return (
-    <span
-      className={`grid grid-cols-[max-content_max-content] items-center gap-x-1.5 gap-y-1 t-micro leading-tight ${className}`}>
-      {fx && (<><span className="opacity-75">Kur</span><Dot {...fx} /></>)}
-      {conc && (<><span className="opacity-75">Yoğunluk</span><Dot {...conc} /></>)}
+    <span className={`block t-micro ${className}`}>
+      {fx && (
+        <span className="flex items-center gap-1.5">
+          <span className="opacity-75">Kur</span><Dot {...fx} />
+        </span>
+      )}
+      {conc && (
+        <span className="flex items-center gap-1.5">
+          <span className="opacity-75">Yoğunluk</span><Dot {...conc} />
+        </span>
+      )}
     </span>
   );
 }
@@ -191,7 +201,7 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
           // değil — kutunun boyu bitince overflow zaten kırpıyor.
           const full = r.h > 104;
           // Risk noktalarının ADI yalnız genişlik elverdiğinde yazılır.
-          // "Yoğunluk" 12,5px'te ~58px yer ister; dar ama uzun bir kutuda
+          // "Yoğunluk" 12px'te ~56px yer ister; dar ama uzun bir kutuda
           // (USDTRY) satır kutunun kenarından taşıp yarıda kesiliyordu.
           // Orada iki nokta yan yana dizilir — anlamları detay kartında.
           const wide = r.w > 86;
@@ -215,7 +225,7 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
               // block ŞART: <button> içeriğini varsayılan olarak dikeyde
               // ORTALAR (anonim flex kutusu). Kutucuk metni ortada asılı
               // kalıyordu; blok akışında üstten başlıyor.
-              className="absolute block overflow-hidden rounded-[2px] px-1.5 py-1 leading-tight text-left cursor-pointer"
+              className="absolute block overflow-hidden rounded-[2px] px-1.5 py-1 leading-[15px] text-left cursor-pointer"
               style={{
                 left: r.x + 1, top: r.y + 1,
                 width: Math.max(0, r.w - 2), height: Math.max(0, r.h - 2),
@@ -231,17 +241,17 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
                   kendisiyle sınırlı; tamı title'da. */}
               {big && (
                 <>
-                  <span className="block t-label font-medium break-words">{r.symbol}</span>
+                  <span className="block t-body font-medium break-words">{r.symbol}</span>
                   {/* Eşikler lib/risk.ts'te — özet kartındaki "Yoğunluk Riski"
                       rozetiyle ORTAK, ikisi aynı sayıyı okuyor. */}
                   {full ? (
                     <>
                       <span className="block t-micro tnum opacity-90">%{num(share, 1)}</span>
                       <span className="block t-micro tnum break-words opacity-75">{moneyShort(r.value, cur)}</span>
-                      <Risks item={r} share={share} wide={wide} className="mt-1.5" />
+                      <Risks item={r} share={share} wide={wide} />
                     </>
                   ) : r.h > 44 && (
-                    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 t-micro leading-tight min-w-0">
+                    <span className="flex flex-wrap items-center gap-x-2 t-micro min-w-0">
                       {/* Pay da tutar da HER ZAMAN yazılır — "yüzdesi var ama
                           tutarı yok" kutucuk yarım bilgi demekti. Yan yana
                           sığmazlarsa alt alta geçerler; kaç satır olduğu
@@ -270,7 +280,7 @@ export default function AllocationTreemap({ data, cur }: { data: AllocItem[]; cu
         {groups.map((g) => (
           <div
             key={g.name}
-            className="flex items-center gap-2 t-label min-w-0"
+            className="flex items-center gap-2 t-body min-w-0"
             title={`${g.name} — ${money(g.value, cur)} · %${num((g.value / gTotal) * 100, 1)}`}
           >
             <span
@@ -317,19 +327,19 @@ function Detail({ r, total, cur, boxH, onClose }: {
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0">
-          <div className="t-label font-medium" style={{ color: 'var(--text)' }}>{r.symbol}</div>
+          <div className="t-body font-medium" style={{ color: 'var(--text)' }}>{r.symbol}</div>
           <div className="t-micro" style={{ color: 'var(--muted)' }}>{r.name}</div>
         </div>
         <button
           type="button" onClick={onClose} aria-label="Kapat"
-          className="ml-auto t-icon leading-none shrink-0 cursor-pointer"
+          className="ml-auto t-head leading-none shrink-0 cursor-pointer"
           style={{ color: 'var(--faint)' }}
         >✕</button>
       </div>
 
       <div className="flex items-baseline gap-2 mt-1.5 t-body tnum" style={{ color: 'var(--text)' }}>
         <span>{money(r.value, cur)}</span>
-        <span className="t-label" style={{ color: 'var(--muted)' }}>%{num(share, 1)}</span>
+        <span className="t-body" style={{ color: 'var(--muted)' }}>%{num(share, 1)}</span>
       </div>
 
       {/* "Diğer" birden çok varlığın toplamı — tek bir kur ya da yoğunluk

@@ -394,14 +394,14 @@ export default function PortfolioChart({
                 görünümünde etiket uzun ("20,6 Mn") ve eksen kendiliğinden
                 genişliyor. */}
             <YAxis
-              yAxisId="left" tickFormatter={fmtY} tick={{ fontSize: 12.5, fill: '#a8a8a8' }}
+              yAxisId="left" tickFormatter={fmtY} tick={{ fontSize: 12, fill: '#a8a8a8' }}
               width="auto" axisLine={false} tickLine={false} />
             {/* Sağ eksenin yazıları TOPLAM'ın renginde: hangi eksenin hangi
                 çizgiyi ölçtüğü ayrı bir açıklama gerektirmesin. */}
             {showRightAxis && (
               <YAxis
                 yAxisId="right" orientation="right" tickFormatter={fmtY}
-                tick={{ fontSize: 12.5, fill: TOTAL_COLOR }}
+                tick={{ fontSize: 12, fill: TOTAL_COLOR }}
                 width="auto" axisLine={false} tickLine={false} />
             )}
             {/* Risk serilerinin kendi ekseni: sabit 0–100, GİZLİ. Ne "% değişim"
@@ -449,7 +449,7 @@ export default function PortfolioChart({
           onClick={toggleAll}
           aria-pressed={allOn}
           title={allOn ? 'Hepsini gizle' : 'Hepsini göster'}
-          className="t-label leading-none py-0.5 cursor-pointer"
+          className="t-body leading-none py-0.5 cursor-pointer"
           style={{ color: allOn ? 'var(--text)' : 'var(--muted)' }}
         >
           {/* Kutucuk kaldırıldı: yanındaki seri çipleri renk çubuğu taşıyor,
@@ -504,9 +504,9 @@ function DateTick({ rows, x, y, payload, className }: {
   const top = String(r.t1 ?? '');
   const sub = r.t2 == null ? '' : String(r.t2);
   return (
-    <text x={x} y={y} textAnchor="middle" fill="#a8a8a8" fontSize={12.5} className={className}>
+    <text x={x} y={y} textAnchor="middle" fill="#a8a8a8" fontSize={12} className={className}>
       <tspan x={x} dy="0.75em">{top}</tspan>
-      {sub && <tspan x={x} dy="1.35em" fill="#7d7d7d" fontSize={11.5}>{sub}</tspan>}
+      {sub && <tspan x={x} dy="1.35em" fill="#7d7d7d">{sub}</tspan>}
     </text>
   );
 }
@@ -525,7 +525,7 @@ function LegendChip({ label, color, dashed, dash, on, onClick, title }: {
       onClick={onClick}
       aria-pressed={on}
       title={`${title ? `${title}\n` : ''}${on ? `${label} — gizle` : `${label} — göster`}`}
-      className="flex items-center gap-1.5 t-label leading-none py-0.5 cursor-pointer transition-opacity"
+      className="flex items-center gap-1.5 t-body leading-none py-0.5 cursor-pointer transition-opacity"
       style={{ opacity: on ? 1 : 0.35, color: on ? color : 'var(--muted)' }}
     >
       {/* CSS `border-style: dashed` tire uzunluğunu tarayıcıya bırakır; iki
@@ -570,7 +570,7 @@ function ChartTooltip({ active, payload, labelText, fmt, yearly }:
       // yoksa kutunun sınırı zeminde kayboluyor.
       backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
       border: '1px solid rgba(255,255,255,0.10)',
-      borderRadius: 5, fontSize: 12, lineHeight: 1.45, padding: '5px 7px',
+      borderRadius: 5, fontSize: 'var(--t-micro)', lineHeight: 1.45, padding: '5px 7px',
       boxShadow: '0 4px 14px rgba(0,0,0,0.4)', minWidth: 112,
     }}>
       <div style={{ color: '#a8a8a8', marginBottom: 3 }}>{labelText}</div>
@@ -668,7 +668,7 @@ function InfoTip({ children }: { children: React.ReactNode }) {
         onClick={() => setPinned((p) => !p)}
         className="flex items-center justify-center rounded-full cursor-pointer transition-colors"
         style={{
-          width: 18, height: 18, fontSize: 12, lineHeight: 1, fontStyle: 'italic',
+          width: 18, height: 18, fontSize: 'var(--t-micro)', lineHeight: 1, fontStyle: 'italic',
           fontFamily: 'Georgia, "Times New Roman", serif',
           background: open ? 'var(--panel-3)' : 'var(--panel-2)',
           color: open ? 'var(--text)' : 'var(--muted)',
@@ -688,7 +688,7 @@ function InfoTip({ children }: { children: React.ReactNode }) {
             background: 'rgba(24,24,24,0.92)',
             backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
             boxShadow: '0 6px 20px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.10)',
-            color: 'var(--muted)', fontSize: 'var(--t-label)', lineHeight: 1.45,
+            color: 'var(--muted)', fontSize: 'var(--t-body)', lineHeight: 1.45,
             // Ardışık paragraflar arası boşluk — her not ayrı bir kural.
             display: 'grid', gap: 8, whiteSpace: 'normal', textAlign: 'left',
           }}

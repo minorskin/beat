@@ -297,7 +297,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                 alt={money(altValue, altCur)}
                 badge={
                   <span
-                    className="t-label tnum leading-none"
+                    className="t-body tnum leading-none"
                     style={{ color: 'var(--faint)' }}
                     title={lastFetch
                       ? `Son güncelleme ${dateTimeStr(lastFetch.finished_at)} · ${lastFetch.status}\n`
@@ -341,7 +341,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                     o varlığın kendisi), sarı = %20–33 (izle), gri = toplam
                     varlık. Eski "Pozisyon" satırı buraya taşındı: adet zaten
                     gri rozette, bayat fiyat uyarısı da onun title'ında. */}
-                <div className="flex items-baseline justify-between gap-2 t-strong">
+                <div className="flex items-baseline justify-between gap-2 t-head">
                   <span className="shrink-0" style={{ color: 'var(--muted)' }}>Yoğunluk Riski</span>
                   <span className="flex items-center gap-1 shrink-0">
                     <Chip tone="tone-down" n={concHigh} title={`${concHigh} varlığın payı %${CONC_HIGH} üstünde — yoğunluk riski yüksek`} />
@@ -359,7 +359,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
                     yeşil = USD bazlı, gri = toplam varlık (ilk ikisinin
                     toplamı, yani satır kendi kendini denetliyor). Renge tek
                     başına güvenilmesin diye üçünün de anlamı title'da. */}
-                <div className="flex items-baseline justify-between gap-2 t-strong">
+                <div className="flex items-baseline justify-between gap-2 t-head">
                   <span className="shrink-0" style={{ color: 'var(--muted)' }}>Kur Riski</span>
                   <span className="flex items-center gap-1 shrink-0">
                     <Chip tone="tone-down" n={fxRisky} title={`${fxRisky} varlık TL bazlı — kur riski var`} />
@@ -372,7 +372,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
 
             {/* 2 — Dönemsel kâr/zarar: 3 satır × 2 eşit kutu */}
             <div className="panel p-3 sm:p-4 flex flex-col">
-              <div className="t-label mb-2 truncate" style={{ color: 'var(--muted)' }}>Kâr / Zarar — Dönemsel</div>
+              <div className="t-body mb-2 truncate" style={{ color: 'var(--muted)' }}>Kâr / Zarar — Dönemsel</div>
               <div className="grid grid-cols-2 grid-rows-3 gap-1.5 flex-1">
                 <PeriodBox label="Saatlik"   c={own ? changes.hour.own : changes.hour.total}       cur={cur} rate={rate} />
                 <PeriodBox label="Günlük"    c={own ? changes.day.own : changes.day.total}         cur={cur} rate={rate} />
@@ -465,13 +465,13 @@ function StatLine({ label, note, value, color, title }: {
   label: string; note?: string; value: string; color?: string; title?: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-2 t-strong" title={title}>
+    <div className="flex items-baseline justify-between gap-2 t-head" title={title}>
       {/* Dönem rozeti üst bardaki anahtarla AYNI kısaltmayı kullanır (S/G/H/…);
           uzun hâli title'da. Hangi sayının hangi dönemi ölçtüğü kartın kendi
           üstünde yazsın diye — bakış üst bara gitmek zorunda kalmasın. */}
       <span className="shrink-0" style={{ color: 'var(--muted)' }}>
         {label}
-        {note && <span className="t-label tnum" style={{ color: 'var(--faint)' }}> · {note}</span>}
+        {note && <span className="t-body tnum" style={{ color: 'var(--faint)' }}> · {note}</span>}
       </span>
       <span className="tnum truncate text-right font-medium" style={{ color: color ?? 'var(--text)' }}>{value}</span>
     </div>
@@ -486,7 +486,7 @@ function StatLine({ label, note, value, color, title }: {
 function Chip({ tone, n, title }: { tone: string; n: number; title: string }) {
   return (
     <span
-      className={`${tone} rounded-[var(--r-sm)] px-1.5 py-0.5 t-label tnum leading-none font-medium`}
+      className={`${tone} rounded-[var(--r-sm)] px-1.5 py-0.5 t-body tnum leading-none font-medium`}
       title={title}
     >
       {n}
@@ -505,7 +505,7 @@ function PeriodBox({ label, c, cur, rate }: { label: string; c: Change | null; c
       title={c?.since ? `${label} — ölçüm başlangıcı ${dateTimeStr(c.since)}` : label}
     >
       <div className="t-micro leading-none truncate" style={{ color: 'var(--muted)' }}>{label}</div>
-      <div className="t-strong font-semibold tnum leading-tight mt-1 truncate">
+      <div className="t-head font-semibold tnum leading-tight mt-1 truncate">
         {has ? `${good ? '+' : ''}${num(c!.pct as number, 2)}%` : '—'}
       </div>
       {has && (

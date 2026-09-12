@@ -34,47 +34,38 @@
 
 /* ── Tipografi ölçeği ───────────────────────────────────────────────────────
    Bütün punto kararları burada toplanır; bileşenlerde tek tek px yazılmaz.
-   Kademeler arası ORAN iki ekranda da aynı — mobilde bütün kademeler birlikte
-   büyür, yani hiyerarşi korunurken metin okunur hale gelir.
 
-   Dar ekranda puntoyu küçültmek yerine BÜYÜTÜYORUZ: telefonda okuma mesafesi
-   masaüstünden kısa değil, yalnız ekran küçük. Kazanılacak birkaç piksel,
-   okunmayan bir sayıdan daha değersiz. */
+   DÖRT kademe var, o kadar. Eskiden dokuz vardı (12,5 / 14 / 15 / 16 / 17 / 18
+   / 19 / 24 …) ve aralarındaki 1px'lik farklar gözle seçilmiyordu: kademe
+   olmayan bir kademe hiyerarşi kurmuyor, yalnız hangisini seçeceğini
+   belirsizleştiriyor. Yarım pikseller de gitti — tarayıcı yuvarlıyor.
+
+   Değerler 12 / 14 / 16 / 24: aynı zamanda Tailwind'in xs / sm / base / 2xl
+   kademeleri, yani iki ekranda da alışılmış boyutlar. Ekrana göre DEĞİŞMİYOR:
+   mobilde puntoyu 0,5px oynatmanın okunurluğa katkısı yok, dokunma hedefi
+   zaten dolgudan geliyor. Tek istisna aşağıdaki --t-kpi ve iOS'un girdi
+   yakınlaştırmasını kesen 16px'lik .field kuralı.
+
+   Rol dağılımı — bir sınıf seçerken sorulacak tek soru "bu metnin işi ne":
+     t-micro  ikincil alt satır, rozet, tablo başlığı, grafik ekseni
+     t-body   gövde: tablo verisi, etiket, form, buton, menü — varsayılan
+     t-head   panel başlığı ve vurgulu sayı satırı
+     t-kpi    sayfanın tek büyük sayısı */
 :root {
-  --t-micro:  12.5px;  /* kutu içi alt satır, rozet — en küçük kademe */
-  --t-label:  14px;    /* ikincil etiket, yardımcı açıklama */
-  --t-body:   15px;    /* tablo verisi, gövde metni */
-  --t-strong: 16px;    /* vurgulu sayı satırı */
-  --t-head:   17px;    /* panel başlığı */
-  --t-icon:   18px;    /* kapat (✕) gibi tek karakterlik dokunma hedefleri */
-
-  /* Ekranla birlikte kademe atlayanlar (eski text-[a] sm:text-[b] çiftleri) */
-  --t-sub:    14px;    /* başlık altı açıklama */
-  --t-h2:     19px;    /* sekme başlığı */
-  --t-kpi:    24px;    /* toplam varlık — sayfanın en büyük sayısı */
+  --t-micro: 12px;
+  --t-body:  14px;
+  --t-head:  16px;
+  --t-kpi:   24px;
 }
+/* Toplam varlık geniş ekranda büyür — tek başına duran sayı, yer var. */
 @media (min-width: 640px) {
-  :root { --t-sub: 15px; --t-h2: 21px; --t-kpi: 29px; }
-}
-@media (max-width: 639.98px) {
-  :root {
-    --t-micro:  13px;
-    --t-label:  14.5px;
-    --t-body:   15.5px;
-    --t-strong: 16.5px;
-    --t-head:   17.5px;
-  }
+  :root { --t-kpi: 29px; }
 }
 
-.t-micro  { font-size: var(--t-micro); }
-.t-label  { font-size: var(--t-label); }
-.t-body   { font-size: var(--t-body); }
-.t-strong { font-size: var(--t-strong); }
-.t-head   { font-size: var(--t-head); }
-.t-icon   { font-size: var(--t-icon); }
-.t-sub    { font-size: var(--t-sub); }
-.t-h2     { font-size: var(--t-h2); }
-.t-kpi    { font-size: var(--t-kpi); }
+.t-micro { font-size: var(--t-micro); }
+.t-body  { font-size: var(--t-body); }
+.t-head  { font-size: var(--t-head); }
+.t-kpi   { font-size: var(--t-kpi); }
 
 html, body {
   background: var(--bg);
@@ -142,7 +133,7 @@ textarea.field { font-family: inherit; line-height: 1.45; resize: vertical; }
 /* Segment / sekme */
 .seg {
   border-radius: var(--r-sm);
-  font-size: var(--t-label);
+  font-size: var(--t-body);
   padding: 0.32rem 0.62rem;
   background: transparent;
   color: var(--muted);

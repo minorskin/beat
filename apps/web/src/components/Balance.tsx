@@ -47,7 +47,7 @@ export default function Balance({ main, alt, badge }: {
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0">
         <div className="t-kpi font-semibold tnum truncate">{hidden ? mask(main) : main}</div>
-        <div className="t-label mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>
+        <div className="t-body mt-0.5 tnum truncate" style={{ color: 'var(--muted)' }}>
           {hidden ? mask(alt) : alt}
         </div>
       </div>

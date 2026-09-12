@@ -106,7 +106,7 @@ export default function SettingsMenu({
           >
             Yıl Kapanışları
             {closings.length > 0 && (
-              <span className="ml-auto tnum t-label" style={{ color: 'var(--faint)' }}>{closings.length}</span>
+              <span className="ml-auto tnum t-body" style={{ color: 'var(--faint)' }}>{closings.length}</span>
             )}
           </MenuItem>
 

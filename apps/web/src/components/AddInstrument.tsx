@@ -54,16 +54,16 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
           >
             <div className="col-span-2 flex items-center justify-between mb-1">
               <h2 className="t-head font-medium">Enstrüman Ekle</h2>
-              <button type="button" onClick={reset} className="seg t-icon leading-none" aria-label="Kapat">✕</button>
+              <button type="button" onClick={reset} className="seg t-head leading-none" aria-label="Kapat">✕</button>
             </div>
 
-            <p className="col-span-2 t-label -mt-2" style={{ color: 'var(--faint)' }}>
+            <p className="col-span-2 t-body -mt-2" style={{ color: 'var(--faint)' }}>
               {isRealty
                 ? 'Mülkü adıyla tanımla ve güncel değerini gir. Sonra “+ İşlem” ile adet 1, birim fiyat = alış bedeli olarak kaydet; kâr/zarar değerleme ile alış farkından çıkar.'
                 : 'Henüz almadığın bir varlığı ekle; izleme listesinde durur, fiyatı çekilmeye başlar. İlk alımı girdiğinde kendiliğinden pozisyona döner. Ad ve kaynak otomatik çözülür.'}
             </p>
 
-            <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 t-body" style={{ color: 'var(--muted)' }}>
               Varlık Sınıfı
               <select name="class_code" className="field mt-1" value={cls} onChange={(e) => setCls(e.target.value)}>
                 {classes.filter((c) => CLASS_DEFAULTS[c.code]).map((c) => (
@@ -74,7 +74,7 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
 
             {isRealty ? (
               <>
-                <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 t-body" style={{ color: 'var(--muted)' }}>
                   Mülkün Adı
                   <input
                     name="display_name" required className="field mt-1"
@@ -87,7 +87,7 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
                       : 'Sembol addan türetilir (Ataşehir AVM → ATASEHIR-AVM).'}
                   </span>
                 </label>
-                <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+                <label className="col-span-2 t-body" style={{ color: 'var(--muted)' }}>
                   Güncel Değer (₺)
                   <input
                     name="value" required inputMode="decimal" className="field mt-1 tnum"
@@ -100,7 +100,7 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
                 </label>
               </>
             ) : isIndex ? (
-              <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+              <label className="col-span-2 t-body" style={{ color: 'var(--muted)' }}>
                 Endeks / Çapraz Kur
                 <select name="index_code" className="field mt-1" required defaultValue="">
                   <option value="" disabled>Seç…</option>
@@ -112,7 +112,7 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
                 </span>
               </label>
             ) : isGold ? (
-              <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+              <label className="col-span-2 t-body" style={{ color: 'var(--muted)' }}>
                 Altın Türü
                 <select name="gold_code" className="field mt-1" required defaultValue="">
                   <option value="" disabled>Seç…</option>
@@ -120,7 +120,7 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
                 </select>
               </label>
             ) : (
-              <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+              <label className="col-span-2 t-body" style={{ color: 'var(--muted)' }}>
                 Sembol
                 <input
                   name="symbol" required className="field mt-1 tnum uppercase"
@@ -135,7 +135,7 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
                 sütunda kaldığında bir sonraki satıra taşarak Kâr Vergisi ile
                 Yönetim Ücreti'ni birbirinden ayırıyordu — o ikisi yan yana
                 dursun diye bu alan kendi satırını alıyor. */}
-            <label className="col-span-2 t-label" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 t-body" style={{ color: 'var(--muted)' }}>
               Kur Riski
               {/* Değer TRY/USD kalıyor (şema para birimi bekliyor); etiket
                   kullanıcının sorduğu soruyu soruyor: TL dışı bir para birimine
@@ -153,7 +153,7 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
                 kesilir, yönetim ücreti hiçbir şey kesmez — fon fiyatına zaten
                 günlük yansıdığı için künye bilgisidir. Yan yana duruyorlar,
                 farkı altlarındaki ortak açıklama söylüyor. */}
-            <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 sm:col-span-1 t-body" style={{ color: 'var(--muted)' }}>
               Kâr Vergisi (%)
               {/* type=number DEĞİL: tarayıcı yerel ayarı İngilizce olduğunda
                   "12,5" geçersiz sayılıp alan sessizce boşalıyor. Metin olarak
@@ -166,7 +166,7 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
               />
             </label>
 
-            <label className="col-span-2 sm:col-span-1 t-label" style={{ color: 'var(--muted)' }}>
+            <label className="col-span-2 sm:col-span-1 t-body" style={{ color: 'var(--muted)' }}>
               Yönetim Ücreti (%)
               <input
                 name="mgmt_fee_rate" type="text" inputMode="decimal"
@@ -176,7 +176,7 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
               />
             </label>
 
-            <p className="col-span-2 t-label -mt-1" style={{ color: 'var(--faint)' }}>
+            <p className="col-span-2 t-body -mt-1" style={{ color: 'var(--faint)' }}>
               <b style={{ color: 'var(--muted)' }}>Vergi</b> yalnız Net görünümde, kârdan kesilir.
               <b style={{ color: 'var(--muted)' }}> Yönetim ücreti</b> hiçbir yerden kesilmez: fon
               varlığından her gün kesilip fiyata yansıdığı için çekilen fiyat ondan zaten
@@ -184,7 +184,7 @@ export default function AddInstrument({ classes, calendars }: { classes: AssetCl
             </p>
 
             {eff && !isGold && (
-              <div className="col-span-2 t-label" style={{ color: 'var(--faint)' }}>
+              <div className="col-span-2 t-body" style={{ color: 'var(--faint)' }}>
                 <span className="tnum">{eff.currency}</span> · güncelleme {scheduleLabel(cals[eff.calendar])}{tzLabel(cals[eff.calendar])}
                 {eff.sources[0]?.provider === 'constant' && ' · sabit değer (kaynak yok)'}
               </div>
