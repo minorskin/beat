@@ -4,6 +4,10 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Beat · Portföy',
   description: 'Kişisel finansal portföy ve varlık takibi',
+  // Adres arama sonuçlarında görünmesin: pano kişisel, aranabilir olmasının
+  // faydası yok. robots.txt + X-Robots-Tag ile birlikte üçüncü katman (bkz.
+  // src/app/robots.ts ve next.config.ts).
+  robots: { index: false, follow: false, nocache: true },
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Beat' },
   icons: {

@@ -7,7 +7,11 @@ import { expectedToken, COOKIE } from '@/lib/auth';
 // yakalıyordu — icon.svg (sekmede kullanılan asıl dosya) ve apple-touch-icon
 // açıkta kalmıştı. Gizlenecek bir şey değiller, işaretin kendisi.
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon.svg|apple-touch-icon.png|icon-.*|login).*)'],
+  // robots.txt de korumanın DIŞINDA: şifre kapısına takılırsa /login'e yönlenir
+  // ve arama motoru "kural dosyası yok, serbestim" diye yorumlar — yani dosyayı
+  // eklemek hiçbir işe yaramazdı. İçinde gizlenecek bir şey yok, tam tersi:
+  // taranmamayı istediğimizi söyleyen dosya bu.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|icon.svg|apple-touch-icon.png|icon-.*|login).*)'],
 };
 
 export async function middleware(req: NextRequest) {
